@@ -47,6 +47,7 @@ fun SmsReaderScreen(
     val currencyUnit by viewModel.currencyUnit.collectAsState()
     val statusMessage by viewModel.statusMessage.collectAsState()
 
+    val pendingTransactions by viewModel.pendingTransactions.collectAsState()
     val bankAccounts by viewModel.bankAccounts.collectAsState()
     val bankSmsSenders by viewModel.bankSmsSenders.collectAsState()
 
@@ -138,7 +139,7 @@ fun SmsReaderScreen(
                                     color = Color(0xFFE6E1E5)
                                 )
                                 Text(
-                                    text = "پیامک‌های دریافتی از سرشماره‌های معرفیشده با BroadcastReceiver استخراج و با Gemini AI پردازش می‌شوند.",
+                                    text = "پیامک‌های دریافتی از سرشماره‌های معرفی‌شده با BroadcastReceiver استخراج و با عبارات کلیدی (آفلاین) پردازش شده و جهت تایید در اینجا نمایش داده می‌شوند.",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = Color(0xFFCAC4D0)
                                 )
@@ -185,6 +186,67 @@ fun SmsReaderScreen(
                                 Icon(Icons.Default.Sms, contentDescription = null, tint = Color(0xFF381E72))
                                 Spacer(Modifier.width(8.dp))
                                 Text("خوانش اس‌ام‌اس‌های جدید از سرشماره‌های فعال", fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 1.5 Pending Transactions Section
+            if (pendingTransactions.isNotEmpty()) {
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF3F1D38)), // A subtle alert color
+                        shape = RoundedCornerShape(24.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().padding(18.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Text(
+                                text = "تراکنش‌های نیازمند تایید (${pendingTransactions.size})",
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                color = Color(0xFFFFD8E4)
+                            )
+                            
+                            LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                items(pendingTransactions) { pending ->
+                                    val isExpense = pending.type == TransactionType.EXPENSE
+                                    Card(
+                                        modifier = Modifier.width(300.dp),
+                                        colors = CardDefaults.cardColors(containerColor = Color(0xFF4A4458)),
+                                        shape = RoundedCornerShape(16.dp)
+                                    ) {
+                                        Column(modifier = Modifier.padding(12.dp)) {
+                                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                                Text(text = if (isExpense) "برداشت" else "واریز", color = if (isExpense) Color(0xFFF2B8B5) else Color(0xFFB1E5D3), fontWeight = FontWeight.Bold)
+                                                Text(text = PersianFormatters.formatMoney(pending.amountToman, currencyUnit), color = Color.White, fontWeight = FontWeight.Bold)
+                                            }
+                                            Spacer(Modifier.height(8.dp))
+                                            Text(text = "فروشگاه: ${pending.merchantName}", color = Color(0xFFCAC4D0), fontSize = 12.sp)
+                                            Text(text = "کارت: ${pending.cardNumber ?: "نامشخص"}", color = Color(0xFFCAC4D0), fontSize = 12.sp)
+                                            
+                                            Spacer(Modifier.height(12.dp))
+                                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                Button(
+                                                    onClick = { viewModel.approvePendingTransaction(pending) },
+                                                    modifier = Modifier.weight(1f),
+                                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB1E5D3), contentColor = Color(0xFF0F5223))
+                                                ) {
+                                                    Text("تایید")
+                                                }
+                                                OutlinedButton(
+                                                    onClick = { viewModel.rejectPendingTransaction(pending) },
+                                                    modifier = Modifier.weight(1f),
+                                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFF2B8B5))
+                                                ) {
+                                                    Text("رد")
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }

@@ -33,6 +33,11 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
     }
 
     val transactions: StateFlow<List<Transaction>> = repository.allTransactions
+        .map { list -> list.filter { it.isApproved } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val pendingTransactions: StateFlow<List<Transaction>> = repository.allTransactions
+        .map { list -> list.filter { !it.isApproved } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val categories: StateFlow<List<Category>> = repository.allCategories
@@ -148,6 +153,20 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
     fun deleteTransaction(transaction: Transaction) {
         viewModelScope.launch {
             repository.deleteTransaction(transaction)
+        }
+    }
+
+    fun approvePendingTransaction(transaction: Transaction) {
+        viewModelScope.launch {
+            repository.approvePendingTransaction(transaction)
+            _statusMessage.value = "تراکنش پیامکی تایید و در موجودی کارت اعمال شد."
+        }
+    }
+
+    fun rejectPendingTransaction(transaction: Transaction) {
+        viewModelScope.launch {
+            repository.deleteTransaction(transaction)
+            _statusMessage.value = "تراکنش پیامکی رد و حذف شد."
         }
     }
 

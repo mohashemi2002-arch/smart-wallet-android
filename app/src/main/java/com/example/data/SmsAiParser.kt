@@ -26,9 +26,13 @@ You are an expert Iranian Bank SMS Parser for the Poolaki AI personal finance ap
 Your task is to analyze raw SMS messages sent by Iranian banks (e.g., Melli, Mellat, Pasargad, Saman, Blue Bank, Keshavarzi, Sepah, Parsian) and extract precise transaction details in strict JSON format.
 
 RULES:
-1. Identify if the transaction is an EXPENSE (برداشت / خرید / انتقال از / بدهکار / کسر) or INCOME (واریز / به حساب / طلبکار / افزایش).
+1. Identify if the transaction is an EXPENSE or INCOME. 
+   - EXPENSE keywords: برداشت, خرید, انتقال از, بدهکار, کسر, پرداخت, از کارت, از حساب.
+   - INCOME keywords: واریز, به حساب, طلبکار, افزایش, انتقال به, به کارت, سود, بازگشت.
+   - If a message contains BOTH "انتقال" and "به کارت/به حساب", it is INCOME.
+   - If a message contains BOTH "انتقال" and "از کارت/از حساب", it is EXPENSE.
 2. Extract the amount in TOMAN. Note: Most Iranian bank SMS report amounts in RIAL (Rials). You MUST convert RIAL to TOMAN by dividing by 10 (e.g. 1,500,000 Rials = 150,000 Toman). If the SMS explicitly states 'تومان' or 'Toman', use that value directly.
-3. Extract the merchant name, store name, or recipient if available (e.g., "Hyperstar", "Snapp", "Cafe Bazaar", "Kourosh"). If unknown, set merchantName to the bank name or "خرید عمومی".
+3. Extract the merchant name, store name, or recipient if available (e.g., "Hyperstar", "Snapp", "Cafe Bazaar", "Kourosh"). If unknown, set merchantName to the bank name or "خرید عمومی" for expense, and "واریز کننده" for income.
 4. Determine the best categoryName from this list:
    - "خوراکی و سوپرمارکت" (Food & Grocery)
    - "حمل و نقل" (Transport & Snapp)
@@ -38,6 +42,7 @@ RULES:
    - "پوشاک و خرید" (Shopping)
    - "تفریح و سرگرمی" (Entertainment & Dining)
    - "پس‌انداز و سرمایه" (Savings & Investment)
+   - "درآمد و حقوق" (Income & Salary)
    - "متفرقه" (General / Other)
 5. Extract the card number mask (e.g. "6037****1234") or bank name if present.
 6. Output MUST be ONLY a valid JSON object without markdown codeblocks or extra text.
@@ -62,25 +67,15 @@ JSON SCHEMA:
     /**
      * Parse SMS using Gemini AI with fallback to Regex.
      */
-    suspend fun parseSms(smsText: String, apiKey: String = BuildConfig.GEMINI_API_KEY): ParsedSmsResult {
+    suspend fun parseSms(smsText: String, apiKey: String = ""): ParsedSmsResult {
         return withContext(Dispatchers.IO) {
-            if (apiKey.isNotBlank() && apiKey != "MY_GEMINI_API_KEY") {
-                try {
-                    val aiResult = callGeminiApi(smsText, apiKey)
-                    if (aiResult != null) {
-                        return@withContext aiResult
-                    }
-                } catch (e: Exception) {
-                    Log.e(TAG, "Gemini parsing failed, using regex fallback: ${e.message}")
-                }
-            }
-            // Fallback to local regex parser
+            // Bypass AI entirely per user request and rely ONLY on local regex keyword-based parser
             parseSmsWithRegex(smsText)
         }
     }
 
     private fun callGeminiApi(smsText: String, apiKey: String): ParsedSmsResult? {
-        val url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=$apiKey"
+        val url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$apiKey"
 
         val jsonPayload = JSONObject().apply {
             put("systemInstruction", JSONObject().apply {
@@ -143,19 +138,31 @@ JSON SCHEMA:
      * Robust local Regex Parser for Iranian Bank SMS messages (Offline Fallback).
      */
     fun parseSmsWithRegex(smsText: String): ParsedSmsResult {
-        var isIncome = smsText.contains("واریز") || smsText.contains("افزایش") || smsText.contains("طلبکار")
-        val isExpense = smsText.contains("برداشت") || smsText.contains("خرید") || smsText.contains("کسر") || smsText.contains("بدهکار")
+        val incomeKeywords = listOf("واریز", "افزایش", "طلبکار", "به حساب", "به کارت", "انتقال به", "بازگشت", "سود")
+        val expenseKeywords = listOf("برداشت", "خرید", "کسر", "بدهکار", "از حساب", "از کارت", "انتقال از", "پرداخت")
 
-        val type = if (isIncome && !isExpense) TransactionType.INCOME else TransactionType.EXPENSE
+        val isIncome = incomeKeywords.any { smsText.contains(it) }
+        val isExpense = expenseKeywords.any { smsText.contains(it) }
 
-        // Extract amount numbers
-        val amountPattern = Pattern.compile("(?:مبلغ|مبلغ:|مبلغ :|واریز:|برداشت:)?\\s*([0-9,٫]+)\\s*(ریال|تومان)?")
+        // Extract amount numbers and potential signs (+ / -)
+        val amountPattern = Pattern.compile("(?:مبلغ|مبلغ:|مبلغ :|واریز:|برداشت:)?\\s*([+-])?\\s*([0-9,٫]+)\\s*([+-])?\\s*(ریال|تومان)?")
         val matcher = amountPattern.matcher(smsText)
 
         var amountToman = 0L
+        var explicitSignType: TransactionType? = null
+
         if (matcher.find()) {
-            val rawNum = matcher.group(1)?.replace(",", "")?.replace("٫", "") ?: "0"
-            val unit = matcher.group(2) ?: "ریال"
+            val signBefore = matcher.group(1)
+            val rawNum = matcher.group(2)?.replace(",", "")?.replace("٫", "") ?: "0"
+            val signAfter = matcher.group(3)
+            val unit = matcher.group(4) ?: "ریال"
+
+            if (signBefore == "+" || signAfter == "+") {
+                explicitSignType = TransactionType.INCOME
+            } else if (signBefore == "-" || signAfter == "-") {
+                explicitSignType = TransactionType.EXPENSE
+            }
+
             val parsedVal = rawNum.toLongOrNull() ?: 0L
 
             amountToman = if (unit.contains("تومان")) {
@@ -163,6 +170,18 @@ JSON SCHEMA:
             } else {
                 parsedVal / 10 // Convert Rial to Toman
             }
+        }
+
+        val type = explicitSignType ?: if (isIncome && !isExpense) {
+            TransactionType.INCOME
+        } else if (isExpense && !isIncome) {
+            TransactionType.EXPENSE
+        } else if (isIncome) {
+            // Prioritize income if both are present but "واریز" is explicitly mentioned
+            if (smsText.contains("واریز")) TransactionType.INCOME else TransactionType.EXPENSE
+        } else {
+            // Default to EXPENSE if neither is found
+            TransactionType.EXPENSE
         }
 
         // If no amount matched with unit, search for first large number

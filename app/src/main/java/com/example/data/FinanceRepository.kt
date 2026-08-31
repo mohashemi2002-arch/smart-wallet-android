@@ -127,40 +127,48 @@ class FinanceRepository private constructor(context: Context) {
             cardNumber = result.cardNumber,
             dateMillis = System.currentTimeMillis(),
             rawSmsText = smsText,
-            isParsedFromSms = true
+            isParsedFromSms = true,
+            isApproved = false // Set as pending for user approval
         )
         transactionDao.insert(newTransaction)
-        
-        // Match bank account by sender shortcode or card digits
-        var matchedAccount: BankAccount? = null
-        if (!senderAddress.isNull_or_blank_helper()) {
-            val cleanSender = senderAddress!!.replace("+98", "0").trim()
-            matchedAccount = bankAccountDao.findBySmsShortcode(cleanSender)
-        }
-
-        if (matchedAccount == null && result.cardNumber != null) {
-            val cleanDigits = result.cardNumber.replace("*", "").takeLast(4)
-            if (cleanDigits.length >= 4) {
-                matchedAccount = bankAccountDao.findByCardSuffix(cleanDigits)
-            }
-        }
-
-        matchedAccount?.let { acc ->
-            val newBalance = if (result.type == TransactionType.EXPENSE) {
-                (acc.balanceToman - result.amountToman).coerceAtLeast(0)
-            } else {
-                acc.balanceToman + result.amountToman
-            }
-            bankAccountDao.update(acc.copy(balanceToman = newBalance))
-        }
-
         return result
+    }
+
+    suspend fun approvePendingTransaction(transaction: Transaction) {
+        if (transaction.isApproved) return
+        
+        val updatedTransaction = transaction.copy(isApproved = true)
+        transactionDao.update(updatedTransaction)
+        
+        updateBalanceForTransaction(updatedTransaction)
     }
 
     private fun String?.isNull_or_blank_helper(): Boolean = this == null || this.trim().isEmpty()
 
     suspend fun addTransaction(transaction: Transaction) {
         transactionDao.insert(transaction)
+        if (transaction.isApproved) {
+            updateBalanceForTransaction(transaction)
+        }
+    }
+
+    private suspend fun updateBalanceForTransaction(transaction: Transaction) {
+        var matchedAccount: BankAccount? = null
+        if (transaction.cardNumber != null) {
+            val cleanDigits = transaction.cardNumber.replace("*", "").takeLast(4)
+            if (cleanDigits.length >= 4) {
+                matchedAccount = bankAccountDao.findByCardSuffix(cleanDigits)
+            }
+        }
+        
+        matchedAccount?.let { acc ->
+            val newBalance = if (transaction.type == TransactionType.EXPENSE) {
+                (acc.balanceToman - transaction.amountToman).coerceAtLeast(0)
+            } else {
+                acc.balanceToman + transaction.amountToman
+            }
+            bankAccountDao.update(acc.copy(balanceToman = newBalance))
+        }
     }
 
     suspend fun deleteTransaction(transaction: Transaction) {

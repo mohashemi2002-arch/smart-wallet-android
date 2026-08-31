@@ -24,9 +24,49 @@ class SmsReceiver : BroadcastReceiver() {
                     val repository = FinanceRepository.getInstance(context)
                     CoroutineScope(Dispatchers.IO).launch {
                         repository.processIncomingSms(body, sender)
+                        showNotification(context)
                     }
                 }
             }
+        }
+    }
+
+    private fun showNotification(context: Context) {
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+        val channelId = "bank_sms_channel"
+        
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            val channel = android.app.NotificationChannel(
+                channelId,
+                "Bank SMS Notifications",
+                android.app.NotificationManager.IMPORTANCE_DEFAULT
+            ).apply {
+                description = "Notifications for newly received bank SMS waiting for approval"
+            }
+            notificationManager.createNotificationChannel(channel)
+        }
+
+        val intent = Intent(context, com.example.MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        }
+        val pendingIntent: android.app.PendingIntent = android.app.PendingIntent.getActivity(
+            context, 0, intent, android.app.PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val builder = androidx.core.app.NotificationCompat.Builder(context, channelId)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle("تراکنش بانکی جدید")
+            .setContentText("یک تراکنش جدید دریافت شد. برای تایید کلیک کنید.")
+            .setPriority(androidx.core.app.NotificationCompat.PRIORITY_DEFAULT)
+            .setContentIntent(pendingIntent)
+            .setAutoCancel(true)
+
+        if (androidx.core.content.ContextCompat.checkSelfPermission(
+                context,
+                android.Manifest.permission.POST_NOTIFICATIONS
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            notificationManager.notify(System.currentTimeMillis().toInt(), builder.build())
         }
     }
 

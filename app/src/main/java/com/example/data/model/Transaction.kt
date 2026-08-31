@@ -20,5 +20,6 @@ data class Transaction(
     val dateMillis: Long = System.currentTimeMillis(),
     val rawSmsText: String? = null,
     val isParsedFromSms: Boolean = false,
+    val isApproved: Boolean = true,
     val notes: String? = null
 )
