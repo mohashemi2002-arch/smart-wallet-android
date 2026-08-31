@@ -1,0 +1,8 @@
+{
+  "name": "Remix Poolaki pro",
+  "description": "Iranian personal finance manager with automated bank SMS parsing via Gemini AI, non-cash asset tracking, budgeting, and loan/check management.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
