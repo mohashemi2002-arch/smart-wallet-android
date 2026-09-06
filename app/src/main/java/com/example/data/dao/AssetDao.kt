@@ -6,7 +6,7 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface AssetDao {
-    @Query("SELECT * FROM assets ORDER BY id ASC")
+    @Query("SELECT * FROM assets ORDER BY id DESC")
     fun getAllAssets(): Flow<List<Asset>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -20,4 +20,7 @@ interface AssetDao {
 
     @Delete
     suspend fun delete(asset: Asset)
+    
+    @Query("SELECT * FROM assets WHERE id = :id LIMIT 1")
+    suspend fun getAssetById(id: Long): Asset?
 }

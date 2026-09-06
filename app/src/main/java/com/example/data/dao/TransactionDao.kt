@@ -12,6 +12,12 @@ interface TransactionDao {
     @Query("SELECT * FROM transactions WHERE dateMillis >= :startTime ORDER BY dateMillis DESC")
     fun getTransactionsSince(startTime: Long): Flow<List<Transaction>>
 
+    @Query("SELECT * FROM transactions ORDER BY dateMillis DESC")
+    fun getAllTransactionsSync(): List<Transaction>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    fun insertSync(transaction: Transaction): Long
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(transaction: Transaction): Long
 

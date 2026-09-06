@@ -8,6 +8,12 @@ enum class TransactionType {
     INCOME
 }
 
+enum class TransactionStatus {
+    CONFIRMED,
+    PENDING_APPROVAL,
+    IGNORED
+}
+
 @Entity(tableName = "transactions")
 data class Transaction(
     @PrimaryKey(autoGenerate = true)
@@ -20,6 +26,6 @@ data class Transaction(
     val dateMillis: Long = System.currentTimeMillis(),
     val rawSmsText: String? = null,
     val isParsedFromSms: Boolean = false,
-    val isApproved: Boolean = true,
+    val status: TransactionStatus = TransactionStatus.CONFIRMED,
     val notes: String? = null
 )

@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -14,12 +15,17 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.Category
+import com.example.data.model.Transaction
 import com.example.data.model.TransactionType
 import com.example.ui.components.CurrencyUnit
 import com.example.ui.components.PersianFormatters
@@ -64,6 +70,10 @@ fun BudgetScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
             contentPadding = PaddingValues(bottom = 80.dp)
         ) {
+            item {
+                BudgetDonutChart(categories, transactions, currencyUnit)
+            }
+            
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -251,4 +261,149 @@ fun EditBudgetDialog(
             }
         }
     )
+}
+
+@Composable
+fun BudgetDonutChart(
+    categories: List<Category>,
+    transactions: List<Transaction>,
+    currencyUnit: CurrencyUnit
+) {
+    var totalBudget = 0L
+    var totalSpent = 0L
+
+    val categorySpends = categories.map { category ->
+        val spent = transactions
+            .filter { it.categoryName == category.name && it.type == TransactionType.EXPENSE }
+            .sumOf { it.amountToman }
+        
+        totalBudget += category.budgetLimitToman
+        totalSpent += spent
+        
+        Pair(category, spent)
+    }.filter { it.second > 0 } // Only chart categories with some spending
+
+    val remainingBudget = (totalBudget - totalSpent).coerceAtLeast(0L)
+    
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF2B2930)),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF49454F)),
+        shape = RoundedCornerShape(28.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Text(
+                text = "وضعیت کلی بودجه",
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                color = Color(0xFFE6E1E5)
+            )
+
+            if (totalBudget > 0) {
+                Box(
+                    modifier = Modifier.size(200.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        val strokeWidth = 24.dp.toPx()
+                        val size = size.width - strokeWidth
+                        
+                        var startAngle = -90f
+                        
+                        // First draw the background/remaining track
+                        drawArc(
+                            color = Color(0xFF49454F),
+                            startAngle = 0f,
+                            sweepAngle = 360f,
+                            useCenter = false,
+                            style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
+                            size = Size(size, size),
+                            topLeft = Offset(strokeWidth / 2, strokeWidth / 2)
+                        )
+
+                        // Draw each category slice
+                        val colors = listOf(
+                            Color(0xFFB1E5D3), Color(0xFFD0BCFF), Color(0xFFF2B8B5),
+                            Color(0xFF81D8D0), Color(0xFFF6D88A), Color(0xFF90C2F9)
+                        )
+                        
+                        var colorIndex = 0
+                        categorySpends.forEach { (_, spent) ->
+                            val sweepAngle = (spent.toFloat() / totalBudget.toFloat()) * 360f
+                            // Limit total drawn angles to 360 to not overlap crazily if over budget
+                            if (startAngle + sweepAngle - (-90f) <= 360f || totalSpent <= totalBudget) {
+                                drawArc(
+                                    color = colors[colorIndex % colors.size],
+                                    startAngle = startAngle,
+                                    sweepAngle = sweepAngle.coerceAtMost(360f),
+                                    useCenter = false,
+                                    style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
+                                    size = Size(size, size),
+                                    topLeft = Offset(strokeWidth / 2, strokeWidth / 2)
+                                )
+                            }
+                            startAngle += sweepAngle
+                            colorIndex++
+                        }
+                        
+                        // Draw over budget warning ring if needed
+                        if (totalSpent > totalBudget) {
+                            drawArc(
+                                color = Color(0xFFF2B8B5).copy(alpha = 0.5f),
+                                startAngle = 0f,
+                                sweepAngle = 360f,
+                                useCenter = false,
+                                style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
+                                size = Size(size, size),
+                                topLeft = Offset(strokeWidth / 2, strokeWidth / 2)
+                            )
+                        }
+                    }
+                    
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        val ratio = (totalSpent.toFloat() / totalBudget.toFloat()) * 100
+                        Text(
+                            text = "${PersianFormatters.toPersianDigits(ratio.toInt().toString())}٪",
+                            style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+                            color = if (totalSpent > totalBudget) Color(0xFFF2B8B5) else Color(0xFFB1E5D3)
+                        )
+                        Text(
+                            text = "مصرف شده",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFFCAC4D0)
+                        )
+                    }
+                }
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(horizontalAlignment = Alignment.Start) {
+                        Text("کل بودجه", style = MaterialTheme.typography.bodySmall, color = Color(0xFFCAC4D0))
+                        Text(PersianFormatters.formatMoney(totalBudget, currencyUnit), style = MaterialTheme.typography.titleMedium, color = Color(0xFFE6E1E5))
+                    }
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(if (totalSpent > totalBudget) "بیشتر از بودجه" else "باقی‌مانده", style = MaterialTheme.typography.bodySmall, color = Color(0xFFCAC4D0))
+                        val diff = if (totalSpent > totalBudget) totalSpent - totalBudget else remainingBudget
+                        Text(PersianFormatters.formatMoney(diff, currencyUnit), style = MaterialTheme.typography.titleMedium, color = if (totalSpent > totalBudget) Color(0xFFF2B8B5) else Color(0xFFB1E5D3))
+                    }
+                }
+                
+            } else {
+                Text(
+                    text = "هنوز هیچ سقف بودجه‌ای تعیین نشده است.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color(0xFFCAC4D0)
+                )
+            }
+        }
+    }
 }

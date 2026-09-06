@@ -3,6 +3,7 @@ package com.example.ui.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -46,6 +47,8 @@ fun DashboardScreen(
 ) {
     val netWorth by viewModel.totalNetWorthToman.collectAsState()
     val transactions by viewModel.transactions.collectAsState()
+    val pendingTransactions by viewModel.pendingTransactions.collectAsState()
+    var selectedPendingTx by remember { mutableStateOf<Transaction?>(null) }
     val isPremium by viewModel.isPremium.collectAsState()
     val currencyUnit by viewModel.currencyUnit.collectAsState()
     val bankAccounts by viewModel.bankAccounts.collectAsState()
@@ -54,7 +57,9 @@ fun DashboardScreen(
     var showAddDialog by remember { mutableStateOf(false) }
     var showAllTransactionsDialog by remember { mutableStateOf(false) }
     var showAddAccountDialog by remember { mutableStateOf(false) }
+    var showEditAccountDialog by remember { mutableStateOf(false) }
     var showQuickNoteDialog by remember { mutableStateOf(false) }
+    var selectedBankAccount by remember { mutableStateOf<com.example.data.model.BankAccount?>(null) }
 
     Scaffold(
         floatingActionButton = {
@@ -139,44 +144,21 @@ fun DashboardScreen(
                             horizontalArrangement = Arrangement.spacedBy(10.dp),
                             contentPadding = PaddingValues(horizontal = 4.dp)
                         ) {
-                            // Default Card 1: بانک ملی شعبه
-                            item {
-                                BankCardHeaderPill(
-                                    bankName = "بانک ملی شعبه",
-                                    balanceText = "۷۰,۰۰۰ ریال",
-                                    bgColor = Color(0xFF2C384A),
-                                    iconColor = Color(0xFFFFD54F)
-                                )
-                            }
-
-                            // Default Card 2: بانک مهر
-                            item {
-                                BankCardHeaderPill(
-                                    bankName = "بانک مهر",
-                                    balanceText = "۱۲۷,۲۱۹,۰۱۱ ریال",
-                                    bgColor = Color(0xFF2C384A),
-                                    iconColor = Color(0xFF66BB6A)
-                                )
-                            }
-
-                            // Default Card 3: نقدی
-                            item {
-                                BankCardHeaderPill(
-                                    bankName = "نقدی",
-                                    balanceText = "۰ ریال",
-                                    bgColor = Color(0xFF2C384A),
-                                    iconColor = Color(0xFF42A5F5)
-                                )
-                            }
-
                             // Dynamic User Accounts
+                            
                             items(bankAccounts) { acc ->
                                 BankCardHeaderPill(
                                     bankName = acc.bankName,
                                     balanceText = PersianFormatters.formatMoney(acc.balanceToman, currencyUnit),
                                     bgColor = Color(0xFF2C384A),
-                                    iconColor = Color(0xFF7FA2FF)
+                                    iconColor = Color(0xFF7FA2FF),
+                                    onClick = { selectedBankAccount = acc; showEditAccountDialog = true }
                                 )
+                            }
+                            if (bankAccounts.isEmpty()) {
+                                item {
+                                    Text("هنوز کارتی ثبت نشده است", color = Color.Gray, fontSize = 12.sp, modifier = Modifier.padding(16.dp))
+                                }
                             }
 
                             // Add Account Pill Button ("+ افزودن حساب/کتاب")
@@ -560,6 +542,21 @@ fun DashboardScreen(
     }
 
     // Dialog: All Transactions Full Modal
+    selectedPendingTx?.let { tx ->
+        com.example.ui.components.PendingReviewBottomSheet(
+            transaction = tx,
+            onDismiss = { selectedPendingTx = null },
+            onConfirm = { updatedTx ->
+                viewModel.approvePendingTransaction(updatedTx)
+                selectedPendingTx = null
+            },
+            onIgnore = {
+                viewModel.rejectPendingTransaction(tx)
+                selectedPendingTx = null
+            }
+        )
+    }
+
     if (showAllTransactionsDialog) {
         AllTransactionsDialog(
             transactions = transactions,
@@ -603,6 +600,24 @@ fun DashboardScreen(
     }
 
     // Dialog: Quick Note
+
+    if (showEditAccountDialog && selectedBankAccount != null) {
+        com.example.ui.components.EditAccountBottomSheet(
+            account = selectedBankAccount!!,
+            onDismiss = { showEditAccountDialog = false; selectedBankAccount = null },
+            onUpdate = { acc -> 
+                viewModel.updateBankAccount(acc)
+                showEditAccountDialog = false
+                selectedBankAccount = null
+            },
+            onDelete = { acc ->
+                viewModel.deleteBankAccount(acc)
+                showEditAccountDialog = false
+                selectedBankAccount = null
+            }
+        )
+    }
+
     if (showQuickNoteDialog) {
         QuickNoteDialog(onDismiss = { showQuickNoteDialog = false })
     }
@@ -613,9 +628,11 @@ fun BankCardHeaderPill(
     bankName: String,
     balanceText: String,
     bgColor: Color,
-    iconColor: Color
+    iconColor: Color,
+    onClick: () -> Unit = {}
 ) {
     Surface(
+        onClick = onClick,
         shape = RoundedCornerShape(20.dp),
         color = bgColor,
         modifier = Modifier.height(72.dp)
@@ -799,7 +816,7 @@ fun AddTransactionDialog(
         text = {
             Column(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth().verticalScroll(androidx.compose.foundation.rememberScrollState())
             ) {
                 Row(modifier = Modifier.fillMaxWidth()) {
                     FilterChip(

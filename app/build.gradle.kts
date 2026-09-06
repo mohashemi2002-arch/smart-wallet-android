@@ -42,7 +42,7 @@ android {
   buildTypes {
     release {
       isCrunchPngs = false
-      isMinifyEnabled = false
+      isMinifyEnabled = true
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
       signingConfig = signingConfigs.getByName("release")
     }
@@ -71,6 +71,10 @@ googleServices { missingGoogleServicesStrategy = MissingGoogleServicesStrategy.W
 // Some unused dependencies are commented out below instead of being removed.
 // This makes it easy to add them back in the future if needed.
 dependencies {
+    implementation("androidx.datastore:datastore-preferences:1.1.1")
+    implementation("androidx.work:work-runtime-ktx:2.9.0")
+    implementation("androidx.appcompat:appcompat:1.6.1")
+    implementation("androidx.biometric:biometric:1.1.0")
   implementation(platform(libs.androidx.compose.bom))
   implementation(platform(libs.firebase.bom))
   // implementation(libs.accompanist.permissions)

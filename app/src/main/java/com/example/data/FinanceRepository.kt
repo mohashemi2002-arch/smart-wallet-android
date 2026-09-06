@@ -15,14 +15,12 @@ class FinanceRepository private constructor(context: Context) {
     val transactionDao = db.transactionDao()
     val categoryDao = db.categoryDao()
     val assetDao = db.assetDao()
-    val debtLoanDao = db.debtLoanDao()
     val bankAccountDao = db.bankAccountDao()
     val bankSmsSenderDao = db.bankSmsSenderDao()
 
     val allTransactions: Flow<List<Transaction>> = transactionDao.getAllTransactions()
     val allCategories: Flow<List<Category>> = categoryDao.getAllCategories()
     val allAssets: Flow<List<Asset>> = assetDao.getAllAssets()
-    val allDebtLoans: Flow<List<DebtLoan>> = debtLoanDao.getAllDebtLoans()
     val allBankAccounts: Flow<List<BankAccount>> = bankAccountDao.getAllBankAccounts()
     val allBankSmsSenders: Flow<List<BankSmsSender>> = bankSmsSenderDao.getAllBankSmsSenders()
 
@@ -48,73 +46,6 @@ class FinanceRepository private constructor(context: Context) {
             )
             categoryDao.insertAll(defaultCategories)
         }
-
-        val transactions = transactionDao.getAllTransactions().first()
-        if (transactions.isEmpty()) {
-            val now = System.currentTimeMillis()
-            val day = 86400000L
-            val sampleTransactions = listOf(
-                Transaction(amountToman = 450000, type = TransactionType.EXPENSE, categoryName = "خوراکی و سوپرمارکت", merchantName = "هایپرمارکت کوروش", cardNumber = "6037****8910", dateMillis = now - (day * 0.2).toLong(), isParsedFromSms = true, rawSmsText = "برداشت مبلغ 4,500,000 ریال از حساب 6037****8910 - بانک ملی"),
-                Transaction(amountToman = 85000, type = TransactionType.EXPENSE, categoryName = "حمل و نقل", merchantName = "اسنپ", cardNumber = "6104****4321", dateMillis = now - (day * 0.8).toLong(), isParsedFromSms = true, rawSmsText = "خرید اسنپ مبلغ 850,000 ریال - بانک ملت"),
-                Transaction(amountToman = 12000000, type = TransactionType.INCOME, categoryName = "پس‌انداز و سرمایه", merchantName = "واریز حقوق شرکت", cardNumber = "6221****1111", dateMillis = now - (day * 2).toLong(), isParsedFromSms = true, rawSmsText = "واریز مبلغ 120,000,000 ریال به حساب - بانک پارسیان"),
-                Transaction(amountToman = 1250000, type = TransactionType.EXPENSE, categoryName = "سلامت و درمان", merchantName = "داروخانه دکتر رضایی", cardNumber = "6037****8910", dateMillis = now - (day * 3).toLong(), isParsedFromSms = true),
-                Transaction(amountToman = 3200000, type = TransactionType.EXPENSE, categoryName = "پوشاک و خرید", merchantName = "دیجی‌کالا", cardNumber = "6037****8910", dateMillis = now - (day * 5).toLong(), isParsedFromSms = true)
-            )
-            for (t in sampleTransactions) {
-                transactionDao.insert(t)
-            }
-        }
-
-        val assets = assetDao.getAllAssets().first()
-        if (assets.isEmpty()) {
-            val sampleAssets = listOf(
-                Asset(name = "طلا ۱۸ عیار", type = AssetType.GOLD, quantity = 25.5, currentPriceToman = 4650000, unit = "گرم"),
-                Asset(name = "سکه طرح جدید (امامی)", type = AssetType.GOLD_COIN, quantity = 2.0, currentPriceToman = 52000000, unit = "عدد"),
-                Asset(name = "دلار آمریکا", type = AssetType.CURRENCY, quantity = 1500.0, currentPriceToman = 68500, unit = "دلار"),
-                Asset(name = "تتر (USDT)", type = AssetType.CRYPTO, quantity = 800.0, currentPriceToman = 68700, unit = "USDT"),
-                Asset(name = "بیت‌کوین (BTC)", type = AssetType.CRYPTO, quantity = 0.045, currentPriceToman = 6450000000, unit = "BTC")
-            )
-            assetDao.insertAll(sampleAssets)
-        }
-
-        val debtLoans = debtLoanDao.getAllDebtLoans().first()
-        if (debtLoans.isEmpty()) {
-            val now = System.currentTimeMillis()
-            val day = 86400000L
-            val sampleDebts = listOf(
-                DebtLoan(title = "قسط وام مسکن - بانک مسکن", type = DebtType.LOAN_INSTALLMENT, amountToman = 4200000, dueDateMillis = now + (day * 5), isPaid = false, contactName = "شعبه مرکزی"),
-                DebtLoan(title = "چک صیادی شماره ۹۸۴۱۲ (خرید لپ‌تاپ)", type = DebtType.SAYAD_CHECK, amountToman = 18500000, dueDateMillis = now + (day * 12), isPaid = false, contactName = "فروشگاه آریا"),
-                DebtLoan(title = "طلب از آقای احمدی", type = DebtType.RECEIVABLE_DUE, amountToman = 5000000, dueDateMillis = now + (day * 20), isPaid = false, contactName = "احمدی"),
-                DebtLoan(title = "قسط وام خودرو", type = DebtType.LOAN_INSTALLMENT, amountToman = 3800000, dueDateMillis = now - (day * 2), isPaid = true, contactName = "بانک ملت")
-            )
-            for (d in sampleDebts) {
-                debtLoanDao.insert(d)
-            }
-        }
-
-        val accounts = bankAccountDao.getAllBankAccounts().first()
-        if (accounts.isEmpty()) {
-            val sampleAccounts = listOf(
-                BankAccount(bankName = "بانک ملی ایران", accountName = "حساب جاری اصلی", cardNumber = "6037-9978-1234-8910", accountNumber = "0109823412", balanceToman = 24500000, cardColorHex = "#1E88E5"),
-                BankAccount(bankName = "بانک ملت", accountName = "کارت خریدهای روزمره", cardNumber = "6104-3378-4321-4321", accountNumber = "0214872931", balanceToman = 8200000, cardColorHex = "#D32F2F"),
-                BankAccount(bankName = "بلوبانک (سامان)", accountName = "حساب پس‌انداز بلو", cardNumber = "6219-8610-5544-5544", accountNumber = "0301129841", balanceToman = 15000000, cardColorHex = "#0288D1")
-            )
-            bankAccountDao.insertAll(sampleAccounts)
-        }
-
-        val senders = bankSmsSenderDao.getAllBankSmsSenders().first()
-        if (senders.isEmpty()) {
-            val defaultSenders = listOf(
-                BankSmsSender(bankName = "بانک ملی ایران", senderNumber = "2000400", isActive = true),
-                BankSmsSender(bankName = "بانک ملت", senderNumber = "30009411", isActive = true),
-                BankSmsSender(bankName = "بانک سامان", senderNumber = "20008511", isActive = true),
-                BankSmsSender(bankName = "بلوبانک", senderNumber = "989000", isActive = true),
-                BankSmsSender(bankName = "بانک پاسارگاد", senderNumber = "200082", isActive = true),
-                BankSmsSender(bankName = "بانک سپه", senderNumber = "300025", isActive = true),
-                BankSmsSender(bankName = "بانک تجارت", senderNumber = "200070", isActive = true)
-            )
-            bankSmsSenderDao.insertAll(defaultSenders)
-        }
     }
 
     suspend fun processIncomingSms(smsText: String, senderAddress: String? = null): ParsedSmsResult {
@@ -128,16 +59,16 @@ class FinanceRepository private constructor(context: Context) {
             dateMillis = System.currentTimeMillis(),
             rawSmsText = smsText,
             isParsedFromSms = true,
-            isApproved = false // Set as pending for user approval
+            status = com.example.data.model.TransactionStatus.PENDING_APPROVAL // Set as pending for user approval
         )
         transactionDao.insert(newTransaction)
         return result
     }
 
     suspend fun approvePendingTransaction(transaction: Transaction) {
-        if (transaction.isApproved) return
+        if (transaction.status == com.example.data.model.TransactionStatus.CONFIRMED) return
         
-        val updatedTransaction = transaction.copy(isApproved = true)
+        val updatedTransaction = transaction.copy(status = com.example.data.model.TransactionStatus.CONFIRMED)
         transactionDao.update(updatedTransaction)
         
         updateBalanceForTransaction(updatedTransaction)
@@ -147,7 +78,7 @@ class FinanceRepository private constructor(context: Context) {
 
     suspend fun addTransaction(transaction: Transaction) {
         transactionDao.insert(transaction)
-        if (transaction.isApproved) {
+        if (transaction.status == com.example.data.model.TransactionStatus.CONFIRMED) {
             updateBalanceForTransaction(transaction)
         }
     }
@@ -211,17 +142,8 @@ class FinanceRepository private constructor(context: Context) {
         assetDao.delete(asset)
     }
 
-    suspend fun addDebtLoan(debtLoan: DebtLoan) {
-        debtLoanDao.insert(debtLoan)
-    }
 
-    suspend fun updateDebtLoan(debtLoan: DebtLoan) {
-        debtLoanDao.update(debtLoan)
-    }
 
-    suspend fun deleteDebtLoan(debtLoan: DebtLoan) {
-        debtLoanDao.delete(debtLoan)
-    }
 
     suspend fun updateCategoryBudget(category: Category) {
         categoryDao.update(category)

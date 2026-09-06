@@ -8,7 +8,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -19,107 +21,52 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.ui.components.CurrencyUnit
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.data.AutoLockTimeout
+import com.example.data.CurrencyMode
 import com.example.ui.components.PoolakiPlusBadge
 import com.example.ui.viewmodel.FinanceViewModel
+import com.example.ui.viewmodel.SettingsViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
-    viewModel: FinanceViewModel,
-    onBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    financeViewModel: FinanceViewModel = viewModel(),
+    settingsViewModel: SettingsViewModel = viewModel()
 ) {
-    val isPremium by viewModel.isPremium.collectAsState()
-    val currencyUnit by viewModel.currencyUnit.collectAsState()
     val context = LocalContext.current
+    val isPremium by financeViewModel.isPremium.collectAsState()
+    val preferences by settingsViewModel.userPreferences.collectAsState()
 
     var showExportDialog by remember { mutableStateOf(false) }
     var exportDataText by remember { mutableStateOf("") }
+    
+    var showWipeDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("تنظیمات و اشتراک پولکی", fontWeight = FontWeight.Bold, color = Color(0xFFE6E1E5)) },
+                title = { Text("تنظیمات سیستم", fontWeight = FontWeight.Bold, color = Color(0xFFE6E1E5)) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "بازگشت", tint = Color(0xFFE6E1E5))
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "بازگشت", tint = Color(0xFFE6E1E5))
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF1C1B1F))
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF141218))
             )
         },
-        containerColor = Color(0xFF1C1B1F)
-    ) { paddingValues ->
+        containerColor = Color(0xFF141218)
+    ) { innerPadding ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
-                .padding(16.dp),
+                .padding(innerPadding)
+                .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
-            contentPadding = PaddingValues(bottom = 80.dp)
+            contentPadding = PaddingValues(vertical = 16.dp)
         ) {
-            // 1. Subscription & Freemium Tier Bento Card
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(28.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = if (isPremium) Color(0xFF381E72) else Color(0xFF2B2930)
-                    ),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF49454F))
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFD0BCFF))
-                                Text(
-                                    text = if (isPremium) "اشتراک فعال: پولکی پلاس" else "سطح رایگان (Free Tier)",
-                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                    color = Color(0xFFE6E1E5)
-                                )
-                            }
-                            if (isPremium) PoolakiPlusBadge()
-                        }
-
-                        Text(
-                            text = if (isPremium)
-                                "امکانات پلاس شامل: خواندن هوشمند SMS با Gemini AI، مدیریت سبد طلا و ارز، خروجی اکسل و پیش‌بینی هوشمند هزینه."
-                            else
-                                "در سطح رایگان ثبت دستی تراکنش‌ها و گزارش‌های پایه فعال است. پس از انقضای اشتراک تمامی داده‌های شما کاملاً دست‌نخورده باقی می‌مانند (Graceful Downgrade).",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color(0xFFCAC4D0)
-                        )
-
-                        Button(
-                            onClick = { viewModel.togglePremium() },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("toggle_subscription_button"),
-                            shape = RoundedCornerShape(50),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFFD0BCFF),
-                                contentColor = Color(0xFF381E72)
-                            )
-                        ) {
-                            Text(if (isPremium) "تغییر به سطح رایگان (شبیه‌سازی)" else "فعال‌سازی پولکی پلاس (ارتقا)", fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
-            }
-
-            // 2. Currency Switcher Section
+            // Subscription Section
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -128,59 +75,82 @@ fun SettingsScreen(
                     border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF49454F))
                 ) {
                     Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(18.dp),
+                        modifier = Modifier.padding(18.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Text(
-                            text = "واحد پول پیش‌فرض",
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                            color = Color(0xFFE6E1E5)
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("وضعیت اشتراک", style = MaterialTheme.typography.titleMedium, color = Color(0xFFE6E1E5))
+                            if (isPremium) {
+                                Spacer(Modifier.width(8.dp))
+                                PoolakiPlusBadge()
+                            }
+                        }
+                        Button(
+                            onClick = { financeViewModel.togglePremium() },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD0BCFF))
+                        ) {
+                            Text(if (isPremium) "تغییر به سطح رایگان" else "ارتقا به پلاس", color = Color(0xFF381E72))
+                        }
+                    }
+                }
+            }
 
+            // Security & Login
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(28.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF2B2930)),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF49454F))
+                ) {
+                    Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text("امنیت و ورود", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = Color.White)
+                        
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            Text("ورود با اثر انگشت (Biometric)", color = Color.LightGray)
+                            Switch(
+                                checked = preferences.biometricEnabled,
+                                onCheckedChange = { settingsViewModel.updateBiometricEnabled(it) }
+                            )
+                        }
+                        
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            Text("مخفی کردن موجودی در شروع (Privacy)", color = Color.LightGray)
+                            Switch(
+                                checked = preferences.privacyModeEnabled,
+                                onCheckedChange = { settingsViewModel.updatePrivacyModeEnabled(it) }
+                            )
+                        }
+
+                        Text("زمان قفل خودکار", color = Color.White, modifier = Modifier.padding(top = 8.dp))
                         Row(modifier = Modifier.fillMaxWidth()) {
                             FilterChip(
-                                selected = currencyUnit == CurrencyUnit.TOMAN,
-                                onClick = { viewModel.setCurrencyUnit(CurrencyUnit.TOMAN) },
-                                label = { Text("تومان (Toman)") },
-                                modifier = Modifier.weight(1f),
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = Color(0xFF4A4458),
-                                    selectedLabelColor = Color(0xFFE8DEF8),
-                                    containerColor = Color(0xFF36343B),
-                                    labelColor = Color(0xFFCAC4D0)
-                                ),
-                                border = FilterChipDefaults.filterChipBorder(
-                                    enabled = true,
-                                    selected = currencyUnit == CurrencyUnit.TOMAN,
-                                    borderColor = Color(0xFF49454F)
-                                )
+                                selected = preferences.autoLockTimeout == AutoLockTimeout.IMMEDIATE,
+                                onClick = { settingsViewModel.updateAutoLockTimeout(AutoLockTimeout.IMMEDIATE) },
+                                label = { Text("فوری") },
+                                modifier = Modifier.weight(1f)
                             )
-                            Spacer(Modifier.width(8.dp))
+                            Spacer(Modifier.width(4.dp))
                             FilterChip(
-                                selected = currencyUnit == CurrencyUnit.RIAL,
-                                onClick = { viewModel.setCurrencyUnit(CurrencyUnit.RIAL) },
-                                label = { Text("ریال (Rial)") },
-                                modifier = Modifier.weight(1f),
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = Color(0xFF4A4458),
-                                    selectedLabelColor = Color(0xFFE8DEF8),
-                                    containerColor = Color(0xFF36343B),
-                                    labelColor = Color(0xFFCAC4D0)
-                                ),
-                                border = FilterChipDefaults.filterChipBorder(
-                                    enabled = true,
-                                    selected = currencyUnit == CurrencyUnit.RIAL,
-                                    borderColor = Color(0xFF49454F)
-                                )
+                                selected = preferences.autoLockTimeout == AutoLockTimeout.MIN_1,
+                                onClick = { settingsViewModel.updateAutoLockTimeout(AutoLockTimeout.MIN_1) },
+                                label = { Text("۱ دقیقه") },
+                                modifier = Modifier.weight(1f)
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            FilterChip(
+                                selected = preferences.autoLockTimeout == AutoLockTimeout.MIN_5,
+                                onClick = { settingsViewModel.updateAutoLockTimeout(AutoLockTimeout.MIN_5) },
+                                label = { Text("۵ دقیقه") },
+                                modifier = Modifier.weight(1f)
                             )
                         }
                     }
                 }
             }
 
-            // 3. Export Data Section
+            // Display & Currency
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -188,38 +158,70 @@ fun SettingsScreen(
                     colors = CardDefaults.cardColors(containerColor = Color(0xFF2B2930)),
                     border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF49454F))
                 ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(18.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Text(
-                            text = "خروجی گرفتن و پشتیبان‌گیری (CSV / Excel)",
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                            color = Color(0xFFE6E1E5)
-                        )
-
-                        Text(
-                            text = "دریافت خروجی استاندار اکسل از تراکنش‌ها، سبد دارایی و تعهدات.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color(0xFFCAC4D0)
-                        )
-
+                    Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text("واحد پول و نمایش", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = Color.White)
+                        Row(modifier = Modifier.fillMaxWidth()) {
+                            FilterChip(
+                                selected = preferences.currencyMode == CurrencyMode.TOMAN,
+                                onClick = { settingsViewModel.updateCurrencyMode(CurrencyMode.TOMAN) },
+                                label = { Text("تومان") },
+                                modifier = Modifier.weight(1f)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            FilterChip(
+                                selected = preferences.currencyMode == CurrencyMode.RIAL,
+                                onClick = { settingsViewModel.updateCurrencyMode(CurrencyMode.RIAL) },
+                                label = { Text("ریال") },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                }
+            }
+            
+            // Backup
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(28.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF2B2930)),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF49454F))
+                ) {
+                    Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text("پشتیبان‌گیری", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = Color.White)
                         OutlinedButton(
                             onClick = {
-                                exportDataText = viewModel.generateExport()
+                                exportDataText = financeViewModel.generateExport()
                                 showExportDialog = true
                             },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("export_data_button"),
-                            shape = RoundedCornerShape(50),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFD0BCFF))
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            Icon(Icons.Default.FileDownload, contentDescription = null, tint = Color(0xFFD0BCFF))
+                            Icon(Icons.Default.FileDownload, contentDescription = null)
                             Spacer(Modifier.width(8.dp))
-                            Text("تولید فایل CSV/Excel گزارش مالی", color = Color(0xFFD0BCFF), fontWeight = FontWeight.Bold)
+                            Text("تولید فایل CSV/Excel")
+                        }
+                    }
+                }
+            }
+
+            // About & Reset
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(28.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF2B2930)),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF49454F))
+                ) {
+                    Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text("درباره و بازنشانی", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = Color.White)
+                        Button(
+                            onClick = { showWipeDialog = true },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB3261E))
+                        ) {
+                            Icon(Icons.Default.Warning, contentDescription = null, tint = Color.White)
+                            Spacer(Modifier.width(8.dp))
+                            Text("حذف کامل داده‌ها (Wipe Data)", color = Color.White)
                         }
                     }
                 }
@@ -236,29 +238,38 @@ fun SettingsScreen(
                     value = exportDataText,
                     onValueChange = {},
                     readOnly = true,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(200.dp)
+                    modifier = Modifier.fillMaxWidth().height(200.dp)
                 )
             },
             confirmButton = {
+                Button(onClick = {
+                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    clipboard.setPrimaryClip(ClipData.newPlainText("Poolaki Export", exportDataText))
+                    Toast.makeText(context, "متن گزارش در کلیپ‌بورد کپی شد!", Toast.LENGTH_SHORT).show()
+                    showExportDialog = false
+                }) { Text("کپی در حافظه") }
+            },
+            dismissButton = { TextButton(onClick = { showExportDialog = false }) { Text("بستن") } }
+        )
+    }
+
+    if (showWipeDialog) {
+        AlertDialog(
+            onDismissRequest = { showWipeDialog = false },
+            title = { Text("هشدار بسیار مهم", color = Color.Red) },
+            text = { Text("آیا مطمئن هستید که می‌خواهید تمامی داده‌ها، تراکنش‌ها، وام‌ها، و چک‌های خود را برای همیشه حذف کنید؟ این عمل غیرقابل بازگشت است.") },
+            confirmButton = {
                 Button(
                     onClick = {
-                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        val clip = ClipData.newPlainText("Poolaki Export", exportDataText)
-                        clipboard.setPrimaryClip(clip)
-                        Toast.makeText(context, "متن گزارش در کلیپ‌بورد کپی شد!", Toast.LENGTH_SHORT).show()
-                        showExportDialog = false
-                    }
-                ) {
-                    Text("کپی در حافظه")
-                }
+                        settingsViewModel.wipeEntireDatabase {
+                            Toast.makeText(context, "داده‌ها با موفقیت حذف شدند.", Toast.LENGTH_SHORT).show()
+                            showWipeDialog = false
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+                ) { Text("بله، پاک شود", color = Color.White) }
             },
-            dismissButton = {
-                TextButton(onClick = { showExportDialog = false }) {
-                    Text("بستن")
-                }
-            }
+            dismissButton = { TextButton(onClick = { showWipeDialog = false }) { Text("انصراف") } }
         )
     }
 }

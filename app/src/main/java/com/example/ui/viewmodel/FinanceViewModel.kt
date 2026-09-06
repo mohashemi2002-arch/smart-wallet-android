@@ -33,11 +33,11 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
     }
 
     val transactions: StateFlow<List<Transaction>> = repository.allTransactions
-        .map { list -> list.filter { it.isApproved } }
+        .map { list -> list.filter { it.status == com.example.data.model.TransactionStatus.CONFIRMED } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val pendingTransactions: StateFlow<List<Transaction>> = repository.allTransactions
-        .map { list -> list.filter { !it.isApproved } }
+        .map { list -> list.filter { it.status == com.example.data.model.TransactionStatus.PENDING_APPROVAL } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val categories: StateFlow<List<Category>> = repository.allCategories
@@ -46,7 +46,6 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
     val assets: StateFlow<List<Asset>> = repository.allAssets
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val debtLoans: StateFlow<List<DebtLoan>> = repository.allDebtLoans
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val bankAccounts: StateFlow<List<BankAccount>> = repository.allBankAccounts
@@ -175,8 +174,8 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
             val asset = Asset(
                 name = name,
                 type = type,
-                quantity = quantity,
-                currentPriceToman = priceToman,
+                totalQuantity = quantity,
+                currentUnitPriceToman = priceToman,
                 unit = unit
             )
             repository.addAsset(asset)
@@ -187,33 +186,6 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
     fun deleteAsset(asset: Asset) {
         viewModelScope.launch {
             repository.deleteAsset(asset)
-        }
-    }
-
-    fun addDebtLoan(title: String, type: DebtType, amountToman: Long, dueDateMillis: Long, contactName: String?) {
-        viewModelScope.launch {
-            val debt = DebtLoan(
-                title = title,
-                type = type,
-                amountToman = amountToman,
-                dueDateMillis = dueDateMillis,
-                isPaid = false,
-                contactName = contactName
-            )
-            repository.addDebtLoan(debt)
-            _statusMessage.value = "آیتم تعهد/چک اضافه گردید."
-        }
-    }
-
-    fun toggleDebtPaid(debtLoan: DebtLoan) {
-        viewModelScope.launch {
-            repository.updateDebtLoan(debtLoan.copy(isPaid = !debtLoan.isPaid))
-        }
-    }
-
-    fun deleteDebtLoan(debtLoan: DebtLoan) {
-        viewModelScope.launch {
-            repository.deleteDebtLoan(debtLoan)
         }
     }
 
@@ -250,6 +222,13 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
             )
             repository.addBankAccount(account)
             _statusMessage.value = "کارت/حساب بانکی «$accountName» با موفقیت افزوده شد."
+        }
+    }
+
+    fun updateBankAccount(bankAccount: BankAccount) {
+        viewModelScope.launch {
+            repository.updateBankAccount(bankAccount)
+            _statusMessage.value = "اطلاعات کارت با موفقیت بروزرسانی شد."
         }
     }
 
@@ -328,8 +307,7 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
     fun generateExport(): String {
         return Exporter.generateExportCsv(
             transactions = transactions.value,
-            assets = assets.value,
-            debtLoans = debtLoans.value
+            assets = assets.value
         )
     }
 }

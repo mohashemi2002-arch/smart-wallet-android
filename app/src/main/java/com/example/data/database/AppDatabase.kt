@@ -12,18 +12,23 @@ import com.example.data.model.*
         Transaction::class,
         Category::class,
         Asset::class,
-        DebtLoan::class,
+        AssetTransactionEntity::class,
+        LoanEntity::class,
+        InstallmentEntity::class,
+        ChequeEntity::class,
         BankAccount::class,
         BankSmsSender::class
     ],
-    version = 4,
+    version = 7,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun transactionDao(): TransactionDao
     abstract fun categoryDao(): CategoryDao
     abstract fun assetDao(): AssetDao
-    abstract fun debtLoanDao(): DebtLoanDao
+    abstract fun assetTransactionDao(): AssetTransactionDao
+    abstract fun loanDao(): LoanDao
+    abstract fun chequeDao(): ChequeDao
     abstract fun bankAccountDao(): BankAccountDao
     abstract fun bankSmsSenderDao(): BankSmsSenderDao
 
@@ -38,6 +43,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "poolaki_ai_database"
                 )
+                .addMigrations(AppDatabaseMigrations.MIGRATION_1_2)
                 .fallbackToDestructiveMigration()
                 .build()
                 INSTANCE = instance

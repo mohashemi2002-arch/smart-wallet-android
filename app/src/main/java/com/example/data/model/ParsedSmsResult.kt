@@ -8,6 +8,8 @@ data class ParsedSmsResult(
     val cardNumber: String? = null,
     val bankName: String? = null,
     val rawText: String,
+    val balanceToman: Long? = null,
+    val transactionTime: String? = null,
     val confidence: Float = 0.9f,
     val parsedByAi: Boolean = true
 )

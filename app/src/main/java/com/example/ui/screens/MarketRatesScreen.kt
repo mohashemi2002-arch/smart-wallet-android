@@ -638,9 +638,9 @@ fun AddMarketAssetDialog(
                 onClick = {
                     val qty = quantityText.toDoubleOrNull() ?: 1.0
                     val assetType = when (rate.category) {
-                        MarketCategory.GOLD_COIN -> AssetType.GOLD
-                        MarketCategory.CURRENCY -> AssetType.CURRENCY
-                        MarketCategory.CRYPTO -> AssetType.CRYPTO
+                        MarketCategory.GOLD_COIN -> AssetType.GOLD_18K
+                        MarketCategory.CURRENCY -> AssetType.CURRENCY_USD
+                        MarketCategory.CRYPTO -> AssetType.CRYPTO_USDT
                     }
                     onConfirm(rate.titleFa, assetType, qty, rate.priceToman)
                 },

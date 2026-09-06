@@ -4,7 +4,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
-import androidx.activity.ComponentActivity
+import androidx.fragment.app.FragmentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
@@ -25,27 +25,40 @@ import com.example.ui.screens.*
 import com.example.ui.theme.PoolakiTheme
 import com.example.ui.viewmodel.FinanceViewModel
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { _ -> }
 
+    private lateinit var securityManager: com.example.domain.util.AppSecurityManager
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-
         checkAndRequestPermissions()
+        securityManager = com.example.domain.util.AppSecurityManager(this)
+        securityManager.applyScreenSecurity(window)
 
+        com.example.domain.worker.WorkerInitializer.enqueueFinancialReminders(this)
         setContent {
+            val isUnlocked by securityManager.isUnlocked.collectAsState()
             PoolakiTheme {
-                // Enforce Right-to-Left (RTL) Layout Direction for Persian language UI
-                CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
-                    PoolakiApp()
+                if (isUnlocked) {
+                    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                        PoolakiApp()
+                    }
+                } else {
+                    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                        com.example.ui.screens.LockScreen(
+                            onUnlockClick = { securityManager.promptBiometric(this@MainActivity) }
+                        )
+                    }
                 }
             }
         }
     }
+
 
     private fun checkAndRequestPermissions() {
         val permissionsToRequest = mutableListOf(
@@ -71,7 +84,9 @@ enum class ScreenTab(val title: String, val icon: androidx.compose.ui.graphics.v
     PORTFOLIO("دارایی", Icons.Default.AccountBalanceWallet),
     MARKET("نرخ زنده", Icons.Default.TrendingUp),
     BUDGET("بودجه", Icons.Default.Savings),
-    CALENDAR("سررسید", Icons.Default.CalendarMonth)
+    CALENDAR("سررسید", Icons.Default.CalendarMonth),
+    REPORTS("گزارش‌ها", Icons.Default.Assessment),
+    SETTINGS("تنظیمات", Icons.Default.Settings)
 }
 
 @Composable
@@ -131,8 +146,13 @@ fun PoolakiApp(financeViewModel: FinanceViewModel = viewModel()) {
                     onBack = { selectedTab = ScreenTab.DASHBOARD }
                 )
                 ScreenTab.CALENDAR -> DebtsChecksScreen(
-                    viewModel = financeViewModel,
                     onBack = { selectedTab = ScreenTab.DASHBOARD }
+                )
+                ScreenTab.REPORTS -> ReportsScreen(
+                    onNavigateBack = { selectedTab = ScreenTab.DASHBOARD }
+                )
+                ScreenTab.SETTINGS -> SettingsScreen(
+                    onNavigateBack = { selectedTab = ScreenTab.DASHBOARD }
                 )
             }
         }
