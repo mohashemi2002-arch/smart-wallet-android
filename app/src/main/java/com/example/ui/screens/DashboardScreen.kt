@@ -15,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -60,6 +61,19 @@ fun DashboardScreen(
     var showEditAccountDialog by remember { mutableStateOf(false) }
     var showQuickNoteDialog by remember { mutableStateOf(false) }
     var selectedBankAccount by remember { mutableStateOf<com.example.data.model.BankAccount?>(null) }
+    
+    var showDatePickerDialog by remember { mutableStateOf(false) }
+    val selectedDateFilter by viewModel.selectedDateFilter.collectAsState()
+    
+    if (showDatePickerDialog) {
+        com.example.ui.components.JalaliDatePickerDialog(
+            initialMillis = selectedDateFilter?.startMillis,
+            onDateSelected = { start, end, title ->
+                viewModel.updateDateFilter(start, end, title)
+            },
+            onDismiss = { showDatePickerDialog = false }
+        )
+    }
 
     Scaffold(
         floatingActionButton = {
@@ -233,14 +247,18 @@ fun DashboardScreen(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    Column(horizontalAlignment = Alignment.End) {
+                                    Column(horizontalAlignment = Alignment.End, modifier = Modifier.clickable { showDatePickerDialog = true }) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(
+                                                text = selectedDateFilter?.displayTitle ?: "کل تراکنش‌ها",
+                                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                                color = Color.White
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Icon(Icons.Default.DateRange, contentDescription = "تقویم", tint = Color(0xFF7FA2FF), modifier = Modifier.size(20.dp))
+                                        }
                                         Text(
-                                            text = "امروز",
-                                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                            color = Color.White
-                                        )
-                                        Text(
-                                            text = "یک‌شنبه، ۱۱ مرداد",
+                                            text = if (selectedDateFilter == null) "نمایش همه" else "تغییر تاریخ",
                                             style = MaterialTheme.typography.bodySmall,
                                             color = Color(0xFFB0BEC5)
                                         )

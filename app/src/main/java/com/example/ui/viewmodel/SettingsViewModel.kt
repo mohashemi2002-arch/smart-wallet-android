@@ -49,6 +49,29 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    fun importPoolakiExcel(uri: android.net.Uri, context: android.content.Context, onResult: (String) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val rows = withContext(Dispatchers.IO) {
+                    com.example.data.PoolakiExcelImporter.parse(context, uri)
+                }
+                
+                if (rows.isEmpty()) {
+                    onResult("فایلی انتخاب نشد یا فرمت پشتیبانی نمی‌شود.")
+                    return@launch
+                }
+                
+                val (txCount, accCount) = withContext(Dispatchers.IO) {
+                    com.example.data.FinanceRepository.getInstance(context).importPoolakiExcel(rows)
+                }
+                onResult("$txCount تراکنش و $accCount حساب بانکی با موفقیت وارد شدند.")
+            } catch (e: Exception) {
+                e.printStackTrace()
+                onResult("خطا در پردازش فایل: ${e.localizedMessage}")
+            }
+        }
+    }
+
     fun wipeEntireDatabase(onComplete: () -> Unit) {
         viewModelScope.launch {
             withContext(Dispatchers.IO) {

@@ -18,6 +18,9 @@ interface CategoryDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(category: Category): Long
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    fun insertSync(category: Category): Long
+
     @Update
     suspend fun update(category: Category)
 

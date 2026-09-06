@@ -9,6 +9,9 @@ interface BankAccountDao {
     @Query("SELECT * FROM bank_accounts ORDER BY id DESC")
     fun getAllBankAccounts(): Flow<List<BankAccount>>
 
+    @Query("SELECT * FROM bank_accounts ORDER BY id DESC")
+    fun getAllBankAccountsSync(): List<BankAccount>
+
     @Query("SELECT * FROM bank_accounts WHERE cardNumber LIKE '%' || :cardSuffix || '%' LIMIT 1")
     suspend fun findByCardSuffix(cardSuffix: String): BankAccount?
 
@@ -27,6 +30,9 @@ interface BankAccountDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(account: BankAccount): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    fun insertSync(account: BankAccount): Long
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(accounts: List<BankAccount>)

@@ -9,6 +9,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import com.example.util.JalaliCalendarHelper
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -50,8 +51,8 @@ object PersianFormatters {
     }
 
     fun formatDate(millis: Long): String {
-        val sdf = SimpleDateFormat("yyyy/MM/dd", Locale.US)
-        return toPersianDigits(sdf.format(Date(millis)))
+        val d = JalaliCalendarHelper.getJalaliDateFromMillis(millis)
+        return toPersianDigits("${d.dayOfWeekName}، ${d.day} ${d.monthName} ${d.year}")
     }
 
     fun formatDateTime(millis: Long): String {

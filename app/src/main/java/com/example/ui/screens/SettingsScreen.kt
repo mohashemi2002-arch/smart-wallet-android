@@ -11,10 +11,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -223,6 +226,30 @@ fun SettingsScreen(
                             Icon(Icons.Default.FileDownload, contentDescription = null)
                             Spacer(Modifier.width(8.dp))
                             Text("تولید فایل CSV/Excel")
+                        }
+                        
+                        val excelPickerLauncher = rememberLauncherForActivityResult(
+                            contract = ActivityResultContracts.GetContent()
+                        ) { uri ->
+                            uri?.let {
+                                Toast.makeText(context, "در حال پردازش و ورود اطلاعات اکسل...", Toast.LENGTH_LONG).show()
+                                settingsViewModel.importPoolakiExcel(it, context) { resultMsg ->
+                                    Toast.makeText(context, resultMsg, Toast.LENGTH_LONG).show()
+                                }
+                            }
+                        }
+
+                        OutlinedButton(
+                            onClick = { excelPickerLauncher.launch("*/*") },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF7FA2FF))
+                        ) {
+                            Icon(Icons.Default.Upload, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Column {
+                                Text("ورود اطلاعات از اکسل پولکی (Import)", fontWeight = FontWeight.Bold)
+                                Text("خواندن فایل‌های پشتیبان اکسل با پسوند xlsx", fontSize = 10.sp, color = Color.Gray)
+                            }
                         }
                     }
                 }
