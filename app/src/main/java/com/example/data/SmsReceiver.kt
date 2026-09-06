@@ -1,5 +1,4 @@
 package com.example.data
-
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -10,19 +9,22 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 class SmsReceiver : BroadcastReceiver() {
-
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == Telephony.Sms.Intents.SMS_RECEIVED_ACTION) {
             val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent)
-            for (sms in messages) {
-                val body = sms.messageBody ?: continue
-                val sender = sms.originatingAddress ?: ""
-
-                // Check if message looks like an Iranian bank SMS
-                if (isBankSms(body, sender)) {
-                    Log.d("SmsReceiver", "Bank SMS detected from $sender: $body")
-                    val repository = FinanceRepository.getInstance(context)
-                    CoroutineScope(Dispatchers.IO).launch {
+            val repository = FinanceRepository.getInstance(context)
+            
+            CoroutineScope(Dispatchers.IO).launch {
+                val activeSenders = repository.bankSmsSenderDao.getActiveSenders()
+                
+                for (sms in messages) {
+                    val body = sms.messageBody ?: continue
+                    val sender = sms.originatingAddress ?: ""
+                    
+                    val isMappedSender = activeSenders.any { sender.contains(it.senderNumber) || it.senderNumber.contains(sender) }
+                    
+                    if (isMappedSender || (activeSenders.isEmpty() && isBankSmsFallback(body, sender))) {
+                        Log.d("SmsReceiver", "Bank SMS detected from $sender: $body")
                         repository.processIncomingSms(body, sender)
                         showNotification(context)
                     }
@@ -46,11 +48,11 @@ class SmsReceiver : BroadcastReceiver() {
             notificationManager.createNotificationChannel(channel)
         }
 
-        val intent = Intent(context, com.example.MainActivity::class.java).apply {
+        val launchIntent = Intent(context, com.example.MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         }
-        val pendingIntent: android.app.PendingIntent = android.app.PendingIntent.getActivity(
-            context, 0, intent, android.app.PendingIntent.FLAG_IMMUTABLE
+        val pendingIntent = android.app.PendingIntent.getActivity(
+            context, 0, launchIntent, android.app.PendingIntent.FLAG_IMMUTABLE
         )
 
         val builder = androidx.core.app.NotificationCompat.Builder(context, channelId)
@@ -70,7 +72,7 @@ class SmsReceiver : BroadcastReceiver() {
         }
     }
 
-    private fun isBankSms(body: String, sender: String): Boolean {
+    private fun isBankSmsFallback(body: String, sender: String): Boolean {
         val knownSenderNumbers = listOf(
             "2000400", "30009411", "20008511", "989000", "200082", "300025", "200070"
         )
@@ -78,7 +80,6 @@ class SmsReceiver : BroadcastReceiver() {
         if (knownSenderNumbers.any { cleanSender.contains(it) || sender.contains(it) }) {
             return true
         }
-
         val bankKeywords = listOf(
             "برداشت", "واریز", "موجودیت", "کارت", "حساب", "بانک",
             "Melli", "Mellat", "Saman", "Pasargad", "Blue", "Sepah"

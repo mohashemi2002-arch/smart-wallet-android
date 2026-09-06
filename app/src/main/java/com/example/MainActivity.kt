@@ -94,8 +94,11 @@ fun PoolakiApp(financeViewModel: FinanceViewModel = viewModel()) {
     var selectedTab by remember { mutableStateOf(ScreenTab.DASHBOARD) }
 
     var showPendingSmsInbox by remember { mutableStateOf(false) }
+    var showSmsSenderSettings by remember { mutableStateOf(false) }
 
-    if (showPendingSmsInbox) {
+    if (showSmsSenderSettings) {
+        com.example.ui.screens.SmsSenderSettingsScreen(onNavigateBack = { showSmsSenderSettings = false })
+    } else if (showPendingSmsInbox) {
         val pendingViewModel: com.example.ui.viewmodel.PendingSmsViewModel = viewModel()
         com.example.ui.screens.PendingSmsInboxScreen(
             viewModel = pendingViewModel,
@@ -161,7 +164,8 @@ fun PoolakiApp(financeViewModel: FinanceViewModel = viewModel()) {
                     onNavigateBack = { selectedTab = ScreenTab.DASHBOARD }
                 )
                 ScreenTab.SETTINGS -> SettingsScreen(
-                    onNavigateBack = { selectedTab = ScreenTab.DASHBOARD }
+                    onNavigateBack = { selectedTab = ScreenTab.DASHBOARD },
+                    onNavigateToSmsSenders = { showSmsSenderSettings = true }
                 )
             }
         }

@@ -5,12 +5,14 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.widget.Toast
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.FileDownload
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -32,6 +34,7 @@ import com.example.ui.viewmodel.SettingsViewModel
 @Composable
 fun SettingsScreen(
     onNavigateBack: () -> Unit,
+    onNavigateToSmsSenders: () -> Unit = {},
     financeViewModel: FinanceViewModel = viewModel(),
     settingsViewModel: SettingsViewModel = viewModel()
 ) {
@@ -96,6 +99,27 @@ fun SettingsScreen(
                 }
             }
 
+
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth().clickable { onNavigateToSmsSenders() },
+                    shape = RoundedCornerShape(28.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF2B2930)),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF49454F))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(18.dp).fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column {
+                            Text("سرشماره‌های پیامک بانکی", style = MaterialTheme.typography.titleMedium, color = Color(0xFFE6E1E5))
+                            Text("مدیریت سرشماره‌های بانکی و خواندن از پیامک‌ها", style = MaterialTheme.typography.bodySmall, color = Color(0xFFCAC4D0))
+                        }
+                        Icon(Icons.Filled.Settings, contentDescription = "تنظیمات سرشماره‌ها", tint = Color(0xFFCAC4D0))
+                    }
+                }
+            }
             // Security & Login
             item {
                 Card(

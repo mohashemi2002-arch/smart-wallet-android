@@ -60,7 +60,7 @@ fun PendingSmsInboxScreen(
                 },
                 actions = {
                     if (pendingTransactions.isNotEmpty()) {
-                        TextButton(onClick = { viewModel.approveAll(pendingTransactions) }) {
+                        TextButton(onClick = { viewModel.approveAllPending(onComplete = {}, onError = {}) }) {
                             Text("تایید همه", color = Color(0xFF5C82E6), fontWeight = FontWeight.Bold)
                         }
                     }

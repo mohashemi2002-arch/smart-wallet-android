@@ -15,7 +15,7 @@ class AppSecurityManager(private val context: Context) {
     private val prefs: SharedPreferences = context.getSharedPreferences("security_prefs", Context.MODE_PRIVATE)
 
     var isBiometricEnabled: Boolean
-        get() = prefs.getBoolean("biometric_enabled", false)
+        get() = prefs.getBoolean("biometric_enabled", true)
         set(value) {
             prefs.edit().putBoolean("biometric_enabled", value).apply()
         }

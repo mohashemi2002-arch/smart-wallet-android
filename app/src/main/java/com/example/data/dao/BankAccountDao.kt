@@ -15,6 +15,16 @@ interface BankAccountDao {
     @Query("SELECT * FROM bank_accounts WHERE smsShortcode = :shortcode OR :shortcode LIKE '%' || smsShortcode || '%' LIMIT 1")
     suspend fun findBySmsShortcode(shortcode: String): BankAccount?
 
+    @Query("UPDATE bank_accounts SET balanceToman = balanceToman - :amount WHERE id = :accountId")
+    suspend fun deductBalance(accountId: Long, amount: Long)
+
+    @Query("UPDATE bank_accounts SET balanceToman = balanceToman + :amount WHERE id = :accountId")
+    suspend fun addBalance(accountId: Long, amount: Long)
+
+    @Query("UPDATE bank_accounts SET balanceToman = :newBalance WHERE id = :accountId")
+    suspend fun setDirectBalance(accountId: Long, newBalance: Long)
+
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(account: BankAccount): Long
 

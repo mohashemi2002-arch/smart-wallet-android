@@ -499,7 +499,8 @@ fun DashboardScreen(
                                         dateText = PersianFormatters.formatDate(tx.dateMillis),
                                         isIncome = isInc,
                                         iconBgColor = iconInfo.first,
-                                        iconVector = iconInfo.second
+                                        iconVector = iconInfo.second,
+                                        onDelete = { viewModel.deleteTransaction(tx) }
                                     )
                                     
                                     if (index < transactions.take(3).size - 1) {
@@ -518,7 +519,8 @@ fun DashboardScreen(
         AllTransactionsDialog(
             transactions = transactions,
             currencyUnit = currencyUnit,
-            onDismiss = { showAllTransactionsDialog = false }
+            onDismiss = { showAllTransactionsDialog = false },
+            onDeleteTransaction = { tx -> viewModel.deleteTransaction(tx) }
         )
     }
 
@@ -659,6 +661,7 @@ fun QuickActionPill(
     }
 }
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun RecentTransactionRow(
     title: String,
@@ -666,48 +669,99 @@ fun RecentTransactionRow(
     dateText: String,
     isIncome: Boolean,
     iconBgColor: Color,
-    iconVector: androidx.compose.ui.graphics.vector.ImageVector
+    iconVector: androidx.compose.ui.graphics.vector.ImageVector,
+    onDelete: (() -> Unit)? = null
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column {
-            Text(
-                text = amountText,
-                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                color = if (isIncome) Color(0xFF81C784) else Color(0xFFE57373)
-            )
-            Text(
-                text = dateText,
-                fontSize = 10.sp,
-                color = Color(0xFFB0BEC5)
-            )
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+    var hasVibrated by remember { mutableStateOf(false) }
+
+    val dismissState = androidx.compose.material3.rememberSwipeToDismissBoxState(
+        confirmValueChange = { value ->
+            if (value == androidx.compose.material3.SwipeToDismissBoxValue.EndToStart) {
+                onDelete?.invoke()
+                true
+            } else {
+                false
+            }
         }
+    )
 
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                color = Color.White
-            )
+    LaunchedEffect(dismissState.targetValue) {
+        if (dismissState.targetValue == androidx.compose.material3.SwipeToDismissBoxValue.EndToStart && !hasVibrated) {
+            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+            hasVibrated = true
+        } else if (dismissState.targetValue == androidx.compose.material3.SwipeToDismissBoxValue.Settled) {
+            hasVibrated = false
+        }
+    }
 
-            Surface(
-                shape = RoundedCornerShape(10.dp),
-                color = iconBgColor,
-                modifier = Modifier.size(36.dp)
+    androidx.compose.material3.SwipeToDismissBox(
+        state = dismissState,
+        enableDismissFromStartToEnd = false,
+        enableDismissFromEndToStart = onDelete != null,
+        backgroundContent = {
+            val color = if (dismissState.dismissDirection == androidx.compose.material3.SwipeToDismissBoxValue.EndToStart) {
+                Color(0xFFE53935)
+            } else {
+                Color.Transparent
+            }
+            
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(color, RoundedCornerShape(12.dp))
+                    .padding(end = 16.dp),
+                contentAlignment = Alignment.CenterEnd
             ) {
-                Box(contentAlignment = Alignment.Center) {
+                if (dismissState.dismissDirection == androidx.compose.material3.SwipeToDismissBoxValue.EndToStart) {
                     Icon(
-                        imageVector = iconVector,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(20.dp)
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = "حذف",
+                        tint = Color.White
                     )
+                }
+            }
+        }
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().background(Color(0xFF252E3E)),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    text = amountText,
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                    color = if (isIncome) Color(0xFF81C784) else Color(0xFFE57373)
+                )
+                Text(
+                    text = dateText,
+                    fontSize = 10.sp,
+                    color = Color(0xFFB0BEC5)
+                )
+            }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                    color = Color.White
+                )
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = iconBgColor,
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = iconVector,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
             }
         }

@@ -1,9 +1,10 @@
 package com.example.ui.components
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -15,6 +16,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.example.util.BankBinHelper
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -22,6 +24,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 
 @Composable
 fun AddBankAccountDialog(
@@ -51,8 +56,9 @@ fun AddBankAccountDialog(
     var showSmsPickerModal by remember { mutableStateOf(false) }
 
     // Auto Bank Name & Color Detection based on Iranian Bank Card 6-digit prefix
-    val detectedBank = remember(cardNumber) {
-        detectIranianBank(cardNumber)
+    val detectedBank: Pair<String, String> = remember(cardNumber) {
+        val info = BankBinHelper.getBankInfoFromCardNumber(cardNumber)
+        if (info != null) Pair(info.name, info.colorHex) else Pair("", "#1E88E5")
     }
 
     val bankName = detectedBank.first
@@ -62,121 +68,260 @@ fun AddBankAccountDialog(
         selectedColorHex = detectedColor
     }
 
-    Dialog(onDismissRequest = onDismiss) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
         Surface(
             modifier = Modifier
-                .fillMaxWidth()
+                .fillMaxWidth(0.92f)
                 .wrapContentHeight()
-                .padding(vertical = 16.dp),
+                .navigationBarsPadding()
+                .imePadding(),
             shape = RoundedCornerShape(24.dp),
             color = Color(0xFF222834),
             tonalElevation = 8.dp
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                // Header Title and Close Icon
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+            Column(modifier = Modifier.fillMaxWidth()) {
+                val scrollState = rememberScrollState()
+                
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f, fill = false)
+                        .verticalScroll(scrollState)
+                        .padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    Text(
-                        text = "افزودن حساب‌کتاب",
-                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                        color = Color.White
-                    )
-                    IconButton(onClick = onDismiss) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "بستن",
-                            tint = Color.White
-                        )
-                    }
-                }
-
-                // Account Type Segment Switch
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        text = "نوع حساب‌کتاب",
-                        fontSize = 12.sp,
-                        color = Color(0xFFB0BEC5)
-                    )
+                    // Header Title and Close Icon
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(Color(0xFF181D26), RoundedCornerShape(12.dp))
-                            .padding(4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Option 1: Bank Card
-                        Surface(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clickable { accountType = "BANK_CARD" },
-                            shape = RoundedCornerShape(10.dp),
-                            color = if (accountType == "BANK_CARD") Color(0xFF3B6FE8) else Color.Transparent
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 10.dp),
-                                horizontalArrangement = Arrangement.Center,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    Icons.Default.CreditCard,
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(Modifier.width(6.dp))
-                                Text("کارت بانکی", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                            }
-                        }
-
-                        // Option 2: Other Source
-                        Surface(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clickable { accountType = "OTHER_SOURCE" },
-                            shape = RoundedCornerShape(10.dp),
-                            color = if (accountType == "OTHER_SOURCE") Color(0xFF3B6FE8) else Color.Transparent
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 10.dp),
-                                horizontalArrangement = Arrangement.Center,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    Icons.Default.AccountBalanceWallet,
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(Modifier.width(6.dp))
-                                Text("منبع دیگر", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                            }
+                        Text(
+                            text = "افزودن حساب‌کتاب",
+                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                            color = Color.White
+                        )
+                        IconButton(onClick = onDismiss) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "بستن",
+                                tint = Color.White
+                            )
                         }
                     }
-                }
 
-                if (accountType == "BANK_CARD") {
-                    // Card Number Field
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(text = "شماره کارت ۱۶ رقمی", fontSize = 12.sp, color = Color(0xFFB0BEC5))
-                        OutlinedTextField(
-                            value = cardNumber,
-                            onValueChange = { cardNumber = it.take(19) },
-                            placeholder = { Text("۶۰۳۷ ۹۹۷۲ ۰۵۶۵ ۲۵۳۸", color = Color.Gray) },
+                    // Account Type Segment Switch
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = "نوع حساب‌کتاب",
+                            fontSize = 12.sp,
+                            color = Color(0xFFB0BEC5)
+                        )
+
+                        Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .testTag("card_number_input"),
+                                .background(Color(0xFF181D26), RoundedCornerShape(12.dp))
+                                .padding(4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            // Option 1: Bank Card
+                            Surface(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable { accountType = "BANK_CARD" },
+                                shape = RoundedCornerShape(10.dp),
+                                color = if (accountType == "BANK_CARD") Color(0xFF3B6FE8) else Color.Transparent
+                            ) {
+                                Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(vertical = 10.dp)) {
+                                    Text(
+                                        "کارت بانکی",
+                                        color = if (accountType == "BANK_CARD") Color.White else Color(0xFF8A9AAD),
+                                        fontWeight = if (accountType == "BANK_CARD") FontWeight.Bold else FontWeight.Normal
+                                    )
+                                }
+                            }
+
+                            // Option 2: Cash / Wallet
+                            Surface(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable { accountType = "OTHER_SOURCE" },
+                                shape = RoundedCornerShape(10.dp),
+                                color = if (accountType == "OTHER_SOURCE") Color(0xFF3B6FE8) else Color.Transparent
+                            ) {
+                                Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(vertical = 10.dp)) {
+                                    Text(
+                                        "کیف پول / نقد",
+                                        color = if (accountType == "OTHER_SOURCE") Color.White else Color(0xFF8A9AAD),
+                                        fontWeight = if (accountType == "OTHER_SOURCE") FontWeight.Bold else FontWeight.Normal
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Card Number Field
+                    if (accountType == "BANK_CARD") {
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            OutlinedTextField(
+                                value = cardNumber,
+                                onValueChange = { cardNumber = it.filter { c -> c.isDigit() }.take(16) },
+                                label = { Text("شماره کارت (۱۶ رقم)") },
+                                placeholder = { Text("مثال: 60379988...") },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("card_number_input"),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                shape = RoundedCornerShape(12.dp),
+                                singleLine = true,
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedContainerColor = Color(0xFF1A212D),
+                                    unfocusedContainerColor = Color(0xFF1A212D),
+                                    focusedTextColor = Color.White,
+                                    unfocusedTextColor = Color.White,
+                                    focusedBorderColor = Color(0xFF3B6FE8),
+                                    unfocusedBorderColor = Color(0xFF2E3848)
+                                )
+                            )
+
+                            // Detected Bank Name Badge (Matching Screenshot 8)
+                            if (bankName.isNotEmpty() && bankName != "بانک ناشناخته") {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    modifier = Modifier.padding(top = 2.dp)
+                                ) {
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = Color(android.graphics.Color.parseColor(selectedColorHex)).copy(alpha = 0.3f),
+                                        modifier = Modifier.size(20.dp)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Text("🏦", fontSize = 10.sp)
+                                        }
+                                    }
+                                    Text(
+                                        text = bankName,
+                                        color = Color(0xFF90CAF9),
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Card Name Field
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(text = "نام کارت (اختیاری)", fontSize = 12.sp, color = Color(0xFFB0BEC5))
+                        OutlinedTextField(
+                            value = accountName,
+                            onValueChange = { accountName = it },
+                            placeholder = { Text("کارت حقوق، حساب پس‌انداز و...", color = Color.Gray) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("account_name_input"),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedContainerColor = Color(0xFF1A212D),
+                                unfocusedContainerColor = Color(0xFF1A212D),
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White,
+                                focusedBorderColor = Color(0xFF3B6FE8),
+                                unfocusedBorderColor = Color(0xFF2E3848)
+                            )
+                        )
+                        Text(
+                            text = "اگر برای کارتت اسم بذاری، این نام رو به جای شماره کارت نمایش می‌دیم",
+                            fontSize = 11.sp,
+                            color = Color(0xFF8A9AAD)
+                        )
+                    }
+
+                    HorizontalDivider(color = Color(0xFF2E3848))
+
+                    // Toggle 1: Read Bank SMS
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("خواندن پیامک‌های بانک", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 14.sp)
+                            Text("دخل و خرج مستقیم از پیامک خوانده میشه", fontSize = 11.sp, color = Color(0xFF8A9AAD))
+                        }
+                        Switch(
+                            checked = readSmsEnabled,
+                            onCheckedChange = { readSmsEnabled = it },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = Color(0xFF3B6FE8)
+                            )
+                        )
+                    }
+
+                    if (readSmsEnabled) {
+                        // SMS Shortcode Binding
+                        OutlinedTextField(
+                            value = smsShortcode,
+                            onValueChange = { smsShortcode = it },
+                            label = { Text("سرشماره پیامک این بانک") },
+                            placeholder = { Text("مثال: 9830009417") },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedContainerColor = Color(0xFF1A212D),
+                                unfocusedContainerColor = Color(0xFF1A212D),
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White,
+                                focusedBorderColor = Color(0xFF3B6FE8),
+                                unfocusedBorderColor = Color(0xFF2E3848)
+                            )
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Button(
+                            onClick = { showSmsPickerModal = true },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+                        ) {
+                            Icon(Icons.Default.Email, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("📩 انتخاب سرشماره از بین پیامک‌های گوشی")
+                        }
+                    }
+
+                    HorizontalDivider(color = Color(0xFF2E3848))
+
+                    // Toggle 2: Initial Balance
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("موجودی اولیه کارت", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 14.sp)
+                        Switch(
+                            checked = initialBalanceEnabled,
+                            onCheckedChange = { initialBalanceEnabled = it },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = Color(0xFF3B6FE8)
+                            )
+                        )
+                    }
+
+                    if (initialBalanceEnabled) {
+                        OutlinedTextField(
+                            value = balanceTextRial,
+                            onValueChange = { balanceTextRial = it.filter { c -> c.isDigit() } },
+                            trailingIcon = { Text("ریال", color = Color(0xFF8A9AAD), modifier = Modifier.padding(end = 12.dp)) },
+                            modifier = Modifier.fillMaxWidth(),
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             shape = RoundedCornerShape(12.dp),
                             colors = OutlinedTextFieldDefaults.colors(
@@ -188,296 +333,76 @@ fun AddBankAccountDialog(
                                 unfocusedBorderColor = Color(0xFF2E3848)
                             )
                         )
-
-                        // Detected Bank Name Badge (Matching Screenshot 8)
-                        if (bankName.isNotEmpty() && bankName != "بانک ناشناخته") {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                modifier = Modifier.padding(top = 2.dp)
-                            ) {
-                                Surface(
-                                    shape = CircleShape,
-                                    color = Color(android.graphics.Color.parseColor(selectedColorHex)).copy(alpha = 0.3f),
-                                    modifier = Modifier.size(20.dp)
-                                ) {
-                                    Box(contentAlignment = Alignment.Center) {
-                                        Text("🏦", fontSize = 10.sp)
-                                    }
-                                }
-                                Text(
-                                    text = bankName,
-                                    color = Color(0xFF90CAF9),
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
                     }
-                }
+                } // End of Scrollable Column
 
-                // Card Name Field
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(text = "نام کارت (اختیاری)", fontSize = 12.sp, color = Color(0xFFB0BEC5))
-                    OutlinedTextField(
-                        value = accountName,
-                        onValueChange = { accountName = it },
-                        placeholder = { Text("کارت حقوق، حساب پس‌انداز و...", color = Color.Gray) },
+                // Fixed Action Footer
+                Surface(
+                    tonalElevation = 3.dp,
+                    color = Color(0xFF181D26),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .testTag("account_name_input"),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = Color(0xFF1A212D),
-                            unfocusedContainerColor = Color(0xFF1A212D),
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White,
-                            focusedBorderColor = Color(0xFF3B6FE8),
-                            unfocusedBorderColor = Color(0xFF2E3848)
-                        )
-                    )
-                    Text(
-                        text = "اگر برای کارتت اسم بذاری، این نام رو به جای شماره کارت نمایش می‌دیم",
-                        fontSize = 11.sp,
-                        color = Color(0xFF8A9AAD)
-                    )
-                }
-
-                HorizontalDivider(color = Color(0xFF2E3848))
-
-                // Toggle 1: Read Bank SMS
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("خواندن پیامک‌های بانک", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 14.sp)
-                        Text("دخل و خرج مستقیم از پیامک خوانده میشه", fontSize = 11.sp, color = Color(0xFF8A9AAD))
-                    }
-                    Switch(
-                        checked = readSmsEnabled,
-                        onCheckedChange = { readSmsEnabled = it },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = Color.White,
-                            checkedTrackColor = Color(0xFF3B6FE8)
-                        )
-                    )
-                }
-
-                if (readSmsEnabled) {
-                    // SMS Shortcode Binding
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        OutlinedTextField(
-                            value = smsShortcode,
-                            onValueChange = { smsShortcode = it },
-                            label = { Text("سرشماره پیامکی (مثلاً B.QMEHRIRAN)") },
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedContainerColor = Color(0xFF1A212D),
-                                unfocusedContainerColor = Color(0xFF1A212D),
-                                focusedTextColor = Color.White,
-                                unfocusedTextColor = Color.White,
-                                focusedBorderColor = Color(0xFF3B6FE8),
-                                unfocusedBorderColor = Color(0xFF2E3848)
-                            )
-                        )
-
-                        IconButton(
-                            onClick = { showSmsPickerModal = true },
-                            modifier = Modifier.background(Color(0xFF1A212D), RoundedCornerShape(12.dp))
+                        OutlinedButton(
+                            onClick = onDismiss,
+                            modifier = Modifier.weight(1f).height(50.dp),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF2E3848))
                         ) {
-                            Icon(Icons.Default.Sms, contentDescription = "انتخاب سرشماره", tint = Color(0xFF90CAF9))
+                            Text("انصراف")
+                        }
+                        Button(
+                            onClick = {
+                                val finalBankName = if (bankName.isNotBlank() && bankName != "بانک ناشناخته") bankName else "بانک تخصصی"
+                                val finalAccName = accountName.ifBlank { if (cardNumber.length >= 4) "کارت ${cardNumber.takeLast(4)}" else "حساب اصلی" }
+                                val rialAmount = balanceTextRial.toLongOrNull() ?: 0L
+                                val tomanAmount = if (initialBalanceEnabled) rialAmount / 10L else 0L
+
+                                onConfirm(
+                                    finalBankName,
+                                    finalAccName,
+                                    cardNumber.ifBlank { "6037-XXXX-XXXX-1111" },
+                                    null,
+                                    tomanAmount,
+                                    selectedColorHex,
+                                    smsShortcode.ifBlank { null },
+                                    accountType,
+                                    readSmsEnabled,
+                                    initialBalanceEnabled
+                                )
+                            },
+                            modifier = Modifier
+                                .weight(1.5f)
+                                .height(50.dp)
+                                .testTag("submit_bank_account_button"),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF5C82E6),
+                                contentColor = Color.White
+                            )
+                        ) {
+                            Text("ثبت و ذخیره کارت", fontWeight = FontWeight.Bold, fontSize = 16.sp)
                         }
                     }
                 }
-
-                HorizontalDivider(color = Color(0xFF2E3848))
-
-                // Toggle 2: Initial Balance
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("موجودی اولیه کارت", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 14.sp)
-                    Switch(
-                        checked = initialBalanceEnabled,
-                        onCheckedChange = { initialBalanceEnabled = it },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = Color.White,
-                            checkedTrackColor = Color(0xFF3B6FE8)
-                        )
-                    )
-                }
-
-                if (initialBalanceEnabled) {
-                    OutlinedTextField(
-                        value = balanceTextRial,
-                        onValueChange = { balanceTextRial = it.filter { c -> c.isDigit() } },
-                        trailingIcon = { Text("ریال", color = Color(0xFF8A9AAD), modifier = Modifier.padding(end = 12.dp)) },
-                        modifier = Modifier.fillMaxWidth(),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = Color(0xFF1A212D),
-                            unfocusedContainerColor = Color(0xFF1A212D),
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White,
-                            focusedBorderColor = Color(0xFF3B6FE8),
-                            unfocusedBorderColor = Color(0xFF2E3848)
-                        )
-                    )
-                }
-
-                // Confirm / Submit Button
-                Button(
-                    onClick = {
-                        val finalBankName = if (bankName.isNotBlank() && bankName != "بانک ناشناخته") bankName else "بانک تخصصی"
-                        val finalAccName = accountName.ifBlank { if (cardNumber.length >= 4) "کارت ${cardNumber.takeLast(4)}" else "حساب اصلی" }
-                        val rialAmount = balanceTextRial.toLongOrNull() ?: 0L
-                        val tomanAmount = if (initialBalanceEnabled) rialAmount / 10L else 0L
-
-                        onConfirm(
-                            finalBankName,
-                            finalAccName,
-                            cardNumber.ifBlank { "6037-XXXX-XXXX-1111" },
-                            null,
-                            tomanAmount,
-                            selectedColorHex,
-                            smsShortcode.ifBlank { null },
-                            accountType,
-                            readSmsEnabled,
-                            initialBalanceEnabled
-                        )
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(50.dp)
-                        .testTag("submit_bank_account_button"),
-                    shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF5C82E6),
-                        contentColor = Color.White
-                    )
-                ) {
-                    Text("ثبت  >", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                }
-            }
-        }
-    }
+            } // End of outer Column
+        } // End of Surface
+    } // End of Dialog
 
     // Modal: Select Bank Sender from Device SMS (Screenshot 7)
     if (showSmsPickerModal) {
-        Dialog(onDismissRequest = { showSmsPickerModal = false }) {
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .fillMaxHeight(0.8f),
-                shape = RoundedCornerShape(20.dp),
-                color = Color(0xFF222834)
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "انتخاب سرشماره پیامکی",
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                            color = Color.White
-                        )
-                        IconButton(onClick = { showSmsPickerModal = false }) {
-                            Icon(Icons.Default.Close, contentDescription = "بستن", tint = Color.White)
-                        }
-                    }
-
-                    Text(
-                        text = "شماره‌ای رو انتخاب کن که ازش پیامک «واریز» و «برداشت» دریافت می‌کنی",
-                        fontSize = 12.sp,
-                        color = Color(0xFF8A9AAD)
-                    )
-
-                    val sampleSenders = listOf(
-                        Pair("B.QMEHRIRAN", "بانک قرض‌الحسنه مهر ایران - واریز/برداشت"),
-                        Pair("9830009417", "بانک ملی ایران - سامانه پیامکی ورود و تراکنش"),
-                        Pair("Bank Melli", "بانک ملی ایران - بام"),
-                        Pair("20008511", "بانک سامان / بلوبانک"),
-                        Pair("30009411", "بانک ملت - تراکنش‌ها"),
-                        Pair("200082", "بانک پاسارگاد")
-                    )
-
-                    LazyColumn(
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        items(sampleSenders) { (code, name) ->
-                            Card(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        smsShortcode = code
-                                        showSmsPickerModal = false
-                                    },
-                                colors = CardDefaults.cardColors(containerColor = Color(0xFF1A212D)),
-                                shape = RoundedCornerShape(12.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(14.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                ) {
-                                    Surface(
-                                        shape = CircleShape,
-                                        color = Color(0xFF3B6FE8).copy(alpha = 0.2f),
-                                        modifier = Modifier.size(36.dp)
-                                    ) {
-                                        Box(contentAlignment = Alignment.Center) {
-                                            Icon(Icons.Default.Sms, contentDescription = null, tint = Color(0xFF90CAF9))
-                                        }
-                                    }
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(code, fontWeight = FontWeight.Bold, color = Color.White)
-                                        Text(name, fontSize = 11.sp, color = Color(0xFF8A9AAD))
-                                    }
-                                    Icon(Icons.Default.ArrowForwardIos, contentDescription = null, tint = Color(0xFF8A9AAD), modifier = Modifier.size(14.dp))
-                                }
-                            }
-                        }
-                    }
-                }
+        SmsSenderPickerSheet(
+            onDismiss = { showSmsPickerModal = false },
+            onSenderSelected = { selectedAddress ->
+                smsShortcode = selectedAddress
+                showSmsPickerModal = false
             }
-        }
-    }
-}
-
-private fun detectIranianBank(cardNumber: String): Pair<String, String> {
-    val clean = cardNumber.replace("-", "").replace(" ", "")
-    if (clean.length < 4) return Pair("", "#1E88E5")
-
-    val prefix = clean.take(4)
-    return when (prefix) {
-        "6037" -> Pair("بانک ملی ایران", "#1E88E5")
-        "6104" -> Pair("بانک ملت", "#D32F2F")
-        "6221" -> Pair("بانک پارسیان", "#7B1FA2")
-        "6219" -> Pair("بلوبانک (سامان)", "#0288D1")
-        "5022" -> Pair("بانک پاسارگاد", "#F57C00")
-        "6274" -> Pair("بانک کشاورزی", "#388E3C")
-        "5892" -> Pair("بانک سپه", "#3F51B5")
-        "6039" -> Pair("بانک رفاه کارگران", "#00897B")
-        "6273" -> Pair("بانک تجارت", "#1565C0")
-        "6393" -> Pair("بانک سینا", "#E65100")
-        "6362" -> Pair("بانک آینده", "#8D6E63")
-        "5041" -> Pair("بانک رسالت", "#00ACC1")
-        else -> Pair("بانک متصل", "#1E88E5")
+        )
     }
 }
