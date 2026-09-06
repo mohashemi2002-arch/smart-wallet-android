@@ -19,7 +19,7 @@ interface TransactionDao {
     fun getTransactionsSince(startTime: Long): Flow<List<Transaction>>
 
     @Query("SELECT * FROM transactions WHERE status = 'CONFIRMED' AND dateMillis BETWEEN :startMillis AND :endMillis ORDER BY dateMillis DESC")
-    fun getConfirmedTransactionsBetween(startMillis: Long, endMillis: Long): Flow<List<Transaction>>
+    fun getConfirmedTransactionsInRange(startMillis: Long, endMillis: Long): Flow<List<Transaction>>
 
     @Query("SELECT * FROM transactions ORDER BY dateMillis DESC")
     fun getAllTransactionsSync(): List<Transaction>

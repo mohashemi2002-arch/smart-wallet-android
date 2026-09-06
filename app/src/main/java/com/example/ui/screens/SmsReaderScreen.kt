@@ -31,7 +31,7 @@ import com.example.ui.components.AddBankAccountDialog
 import com.example.ui.components.BankCardItem
 import com.example.ui.components.CurrencyUnit
 import com.example.ui.components.PersianFormatters
-import com.example.ui.components.PoolakiPlusBadge
+import com.example.ui.components.SmartWalletPlusBadge
 import com.example.ui.viewmodel.FinanceViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -93,7 +93,7 @@ fun SmsReaderScreen(
                     }
                 },
                 actions = {
-                    if (isPremium) PoolakiPlusBadge(Modifier.padding(end = 8.dp))
+                    if (isPremium) SmartWalletPlusBadge(Modifier.padding(end = 8.dp))
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF1C1B1F))
             )

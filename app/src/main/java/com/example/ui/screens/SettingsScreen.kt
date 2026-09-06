@@ -29,7 +29,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.data.AutoLockTimeout
 import com.example.data.CurrencyMode
-import com.example.ui.components.PoolakiPlusBadge
+import com.example.ui.components.SmartWalletPlusBadge
 import com.example.ui.viewmodel.FinanceViewModel
 import com.example.ui.viewmodel.SettingsViewModel
 
@@ -88,7 +88,7 @@ fun SettingsScreen(
                             Text("وضعیت اشتراک", style = MaterialTheme.typography.titleMedium, color = Color(0xFFE6E1E5))
                             if (isPremium) {
                                 Spacer(Modifier.width(8.dp))
-                                PoolakiPlusBadge()
+                                SmartWalletPlusBadge()
                             }
                         }
                         Button(
@@ -233,7 +233,7 @@ fun SettingsScreen(
                         ) { uri ->
                             uri?.let {
                                 Toast.makeText(context, "در حال پردازش و ورود اطلاعات اکسل...", Toast.LENGTH_LONG).show()
-                                settingsViewModel.importPoolakiExcel(it, context) { resultMsg ->
+                                settingsViewModel.importSmartWalletExcel(it, context) { resultMsg ->
                                     Toast.makeText(context, resultMsg, Toast.LENGTH_LONG).show()
                                 }
                             }
@@ -247,7 +247,7 @@ fun SettingsScreen(
                             Icon(Icons.Default.Upload, contentDescription = null)
                             Spacer(Modifier.width(8.dp))
                             Column {
-                                Text("ورود اطلاعات از اکسل پولکی (Import)", fontWeight = FontWeight.Bold)
+                                Text("ورود اطلاعات از اکسل اسمارت ولت (Import)", fontWeight = FontWeight.Bold)
                                 Text("خواندن فایل‌های پشتیبان اکسل با پسوند xlsx", fontSize = 10.sp, color = Color.Gray)
                             }
                         }
@@ -295,7 +295,7 @@ fun SettingsScreen(
             confirmButton = {
                 Button(onClick = {
                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                    clipboard.setPrimaryClip(ClipData.newPlainText("Poolaki Export", exportDataText))
+                    clipboard.setPrimaryClip(ClipData.newPlainText("Smart Wallet Export", exportDataText))
                     Toast.makeText(context, "متن گزارش در کلیپ‌بورد کپی شد!", Toast.LENGTH_SHORT).show()
                     showExportDialog = false
                 }) { Text("کپی در حافظه") }

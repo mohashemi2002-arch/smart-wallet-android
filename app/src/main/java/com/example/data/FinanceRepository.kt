@@ -22,8 +22,8 @@ class FinanceRepository private constructor(context: Context) {
     val allTransactions: Flow<List<Transaction>> = transactionDao.getAllTransactions()
     val confirmedTransactions: Flow<List<Transaction>> = transactionDao.getConfirmedTransactionsFlow()
 
-    fun getConfirmedTransactionsBetween(startMillis: Long, endMillis: Long): Flow<List<Transaction>> {
-        return transactionDao.getConfirmedTransactionsBetween(startMillis, endMillis)
+    fun getConfirmedTransactionsInRange(startMillis: Long, endMillis: Long): Flow<List<Transaction>> {
+        return transactionDao.getConfirmedTransactionsInRange(startMillis, endMillis)
     }
     val pendingTransactions: Flow<List<Transaction>> = transactionDao.getPendingTransactionsFlow()
     val allCategories: Flow<List<Category>> = categoryDao.getAllCategories()
@@ -55,7 +55,7 @@ class FinanceRepository private constructor(context: Context) {
         }
     }
 
-    suspend fun importPoolakiExcel(rows: List<com.example.data.PoolakiExcelRow>): Pair<Int, Int> {
+    suspend fun importSmartWalletExcel(rows: List<com.example.data.SmartWalletExcelRow>): Pair<Int, Int> {
         var txCount = 0
         var accCount = 0
         

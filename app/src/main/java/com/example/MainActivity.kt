@@ -22,7 +22,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.ui.screens.*
-import com.example.ui.theme.PoolakiTheme
+import com.example.ui.theme.SmartWalletTheme
 import com.example.ui.viewmodel.FinanceViewModel
 
 class MainActivity : FragmentActivity() {
@@ -43,10 +43,10 @@ class MainActivity : FragmentActivity() {
         com.example.domain.worker.WorkerInitializer.enqueueFinancialReminders(this)
         setContent {
             val isUnlocked by securityManager.isUnlocked.collectAsState()
-            PoolakiTheme {
+            SmartWalletTheme {
                 if (isUnlocked) {
                     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
-                        PoolakiApp()
+                        SmartWalletApp()
                     }
                 } else {
                     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
@@ -90,7 +90,7 @@ enum class ScreenTab(val title: String, val icon: androidx.compose.ui.graphics.v
 }
 
 @Composable
-fun PoolakiApp(financeViewModel: FinanceViewModel = viewModel()) {
+fun SmartWalletApp(financeViewModel: FinanceViewModel = viewModel()) {
     var selectedTab by remember { mutableStateOf(ScreenTab.DASHBOARD) }
 
     var showPendingSmsInbox by remember { mutableStateOf(false) }

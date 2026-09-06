@@ -33,7 +33,7 @@ import com.example.ui.components.AddBankAccountDialog
 import com.example.ui.components.AllTransactionsDialog
 import com.example.ui.components.CurrencyUnit
 import com.example.ui.components.PersianFormatters
-import com.example.ui.components.PoolakiPlusBadge
+import com.example.ui.components.SmartWalletPlusBadge
 import com.example.ui.viewmodel.FinanceViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -48,6 +48,7 @@ fun DashboardScreen(
 ) {
     val netWorth by viewModel.totalNetWorthToman.collectAsState()
     val transactions by viewModel.transactions.collectAsState()
+    val allTransactions by viewModel.allTransactions.collectAsState()
     val pendingTransactions by viewModel.pendingTransactions.collectAsState()
     var selectedPendingTx by remember { mutableStateOf<Transaction?>(null) }
     val isPremium by viewModel.isPremium.collectAsState()
@@ -66,11 +67,10 @@ fun DashboardScreen(
     val selectedDateFilter by viewModel.selectedDateFilter.collectAsState()
     
     if (showDatePickerDialog) {
-        com.example.ui.components.JalaliDatePickerDialog(
-            initialMillis = selectedDateFilter?.startMillis,
-            onDateSelected = { start, end, title ->
-                viewModel.updateDateFilter(start, end, title)
-            },
+        com.example.ui.components.JalaliCalendarDialog(
+            initialFilter = selectedDateFilter,
+            transactions = allTransactions,
+            onFilterSelected = { filter -> viewModel.setDateFilter(filter) },
             onDismiss = { showDatePickerDialog = false }
         )
     }
@@ -250,7 +250,11 @@ fun DashboardScreen(
                                     Column(horizontalAlignment = Alignment.End, modifier = Modifier.clickable { showDatePickerDialog = true }) {
                                         Row(verticalAlignment = Alignment.CenterVertically) {
                                             Text(
-                                                text = selectedDateFilter?.displayTitle ?: "کل تراکنش‌ها",
+                                                text = when (val filter = selectedDateFilter) {
+                                                    is FinanceViewModel.DateFilter.SpecificDay -> "${filter.jDay} ${com.example.util.JalaliCalendarHelper.monthNames[filter.jMonth - 1]}"
+                                                    is FinanceViewModel.DateFilter.FullMonth -> "${com.example.util.JalaliCalendarHelper.monthNames[filter.jMonth - 1]} ${filter.jYear}"
+                                                    null -> "کل تراکنش‌ها"
+                                                },
                                                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                                                 color = Color.White
                                             )
@@ -536,7 +540,10 @@ fun DashboardScreen(
     if (showAllTransactionsDialog) {
         AllTransactionsDialog(
             transactions = transactions,
+            allTransactions = allTransactions,
             currencyUnit = currencyUnit,
+            selectedFilter = selectedDateFilter,
+            onFilterSelected = { filter -> viewModel.setDateFilter(filter) },
             onDismiss = { showAllTransactionsDialog = false },
             onDeleteTransaction = { tx -> viewModel.deleteTransaction(tx) }
         )

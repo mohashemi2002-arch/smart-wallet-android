@@ -49,11 +49,11 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun importPoolakiExcel(uri: android.net.Uri, context: android.content.Context, onResult: (String) -> Unit) {
+    fun importSmartWalletExcel(uri: android.net.Uri, context: android.content.Context, onResult: (String) -> Unit) {
         viewModelScope.launch {
             try {
                 val rows = withContext(Dispatchers.IO) {
-                    com.example.data.PoolakiExcelImporter.parse(context, uri)
+                    com.example.data.SmartWalletExcelImporter.parse(context, uri)
                 }
                 
                 if (rows.isEmpty()) {
@@ -62,7 +62,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 }
                 
                 val (txCount, accCount) = withContext(Dispatchers.IO) {
-                    com.example.data.FinanceRepository.getInstance(context).importPoolakiExcel(rows)
+                    com.example.data.FinanceRepository.getInstance(context).importSmartWalletExcel(rows)
                 }
                 onResult("$txCount تراکنش و $accCount حساب بانکی با موفقیت وارد شدند.")
             } catch (e: Exception) {

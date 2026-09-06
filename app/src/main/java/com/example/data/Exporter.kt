@@ -14,7 +14,7 @@ object Exporter {
     ): String {
         val sb = StringBuilder()
         val dateFormat = SimpleDateFormat("yyyy/MM/dd HH:mm", Locale.US)
-        sb.append("=== گزارش مالی پولکی AI (Poolaki AI Financial Export) ===\n")
+        sb.append("=== گزارش مالی اسمارت ولت AI (Smart Wallet Financial Export) ===\n")
         sb.append("تاریخ خروجی: ").append(dateFormat.format(Date())).append("\n\n")
 
         sb.append("--- تراکنش‌ها (Transactions) ---\n")

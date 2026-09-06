@@ -42,7 +42,7 @@ object PdfReportGenerator {
         var yPos = 50f
         
         // Title
-        canvas.drawText("گزارش مالی پولکی", pageInfo.pageWidth / 2f, yPos, titlePaint)
+        canvas.drawText("گزارش مالی اسمارت ولت", pageInfo.pageWidth / 2f, yPos, titlePaint)
         yPos += 40f
 
         // Summary
@@ -94,7 +94,7 @@ object PdfReportGenerator {
         try {
             val cacheDir = File(context.cacheDir, "reports")
             cacheDir.mkdirs()
-            val file = File(cacheDir, "poolaki_report.pdf")
+            val file = File(cacheDir, "smart wallet_report.pdf")
             val outputStream = FileOutputStream(file)
             document.writeTo(outputStream)
             document.close()

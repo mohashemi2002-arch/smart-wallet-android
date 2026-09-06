@@ -32,26 +32,36 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    data class DateFilter(val startMillis: Long, val endMillis: Long, val displayTitle: String)
+    sealed class DateFilter {
+        data class SpecificDay(val jYear: Int, val jMonth: Int, val jDay: Int, val startMillis: Long, val endMillis: Long) : DateFilter()
+        data class FullMonth(val jYear: Int, val jMonth: Int, val startMillis: Long, val endMillis: Long) : DateFilter()
+    }
 
     private val _selectedDateFilter = MutableStateFlow<DateFilter?>(null)
     val selectedDateFilter: StateFlow<DateFilter?> = _selectedDateFilter.asStateFlow()
+
+    val allTransactions: StateFlow<List<Transaction>> = repository.confirmedTransactions
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     val transactions: StateFlow<List<Transaction>> = _selectedDateFilter.flatMapLatest { filter ->
         if (filter == null) {
             repository.confirmedTransactions
         } else {
-            repository.getConfirmedTransactionsBetween(filter.startMillis, filter.endMillis)
+            val startMillis = when (filter) {
+                is DateFilter.SpecificDay -> filter.startMillis
+                is DateFilter.FullMonth -> filter.startMillis
+            }
+            val endMillis = when (filter) {
+                is DateFilter.SpecificDay -> filter.endMillis
+                is DateFilter.FullMonth -> filter.endMillis
+            }
+            repository.getConfirmedTransactionsInRange(startMillis, endMillis)
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    fun updateDateFilter(startMillis: Long, endMillis: Long, displayTitle: String) {
-        _selectedDateFilter.value = DateFilter(startMillis, endMillis, displayTitle)
-    }
-
-    fun clearDateFilter() {
-        _selectedDateFilter.value = null
+    fun setDateFilter(filter: DateFilter?) {
+        _selectedDateFilter.value = filter
     }
 
     val pendingTransactions: StateFlow<List<Transaction>> = repository.pendingTransactions
@@ -72,7 +82,7 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // App Preferences / Settings State
-    private val _isPremium = MutableStateFlow(true) // Poolaki Plus Tier
+    private val _isPremium = MutableStateFlow(true) // Smart Wallet Plus Tier
     val isPremium: StateFlow<Boolean> = _isPremium.asStateFlow()
 
     private val _currencyUnit = MutableStateFlow(CurrencyUnit.TOMAN)

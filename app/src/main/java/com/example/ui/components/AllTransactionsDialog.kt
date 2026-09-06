@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import com.example.util.JalaliCalendarHelper
+import com.example.ui.viewmodel.FinanceViewModel.DateFilter
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -33,10 +34,23 @@ import com.example.ui.components.CategoryIconMap
 @Composable
 fun AllTransactionsDialog(
     transactions: List<Transaction>,
+    allTransactions: List<Transaction>,
     currencyUnit: CurrencyUnit,
+    selectedFilter: DateFilter?,
+    onFilterSelected: (DateFilter?) -> Unit,
     onDismiss: () -> Unit,
     onDeleteTransaction: ((Transaction) -> Unit)? = null
 ) {
+    var showCalendarDialog by remember { mutableStateOf(false) }
+
+    if (showCalendarDialog) {
+        JalaliCalendarDialog(
+            initialFilter = selectedFilter,
+            transactions = allTransactions,
+            onFilterSelected = { filter -> onFilterSelected(filter) },
+            onDismiss = { showCalendarDialog = false }
+        )
+    }
     var searchQuery by remember { mutableStateOf("") }
     
     // Group transactions by Date string (e.g., "جمعه ، ۹ مرداد ۱۴۰۵")

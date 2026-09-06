@@ -22,6 +22,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "Poolaki AI"
+rootProject.name = "Smart Wallet"
 
 include(":app")

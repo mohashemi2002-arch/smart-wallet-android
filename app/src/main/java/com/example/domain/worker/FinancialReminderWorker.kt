@@ -43,7 +43,7 @@ class FinancialReminderWorker(
     }
 
     private fun sendNotification(title: String, message: String) {
-        val channelId = "poolaki_reminders"
+        val channelId = "smart wallet_reminders"
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {

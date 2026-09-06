@@ -1,5 +1,5 @@
 {
-  "name": "Remix Poolaki pro",
+  "name": "Smart Wallet",
   "description": "Iranian personal finance manager with automated bank SMS parsing via Gemini AI, non-cash asset tracking, budgeting, and loan/check management.",
   "requestFramePermissions": [],
   "majorCapabilities": [

@@ -26,7 +26,7 @@ private val BentoColorScheme = darkColorScheme(
 )
 
 @Composable
-fun PoolakiTheme(
+fun SmartWalletTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit,

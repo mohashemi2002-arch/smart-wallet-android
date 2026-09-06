@@ -1,46 +1,61 @@
-with open('app/src/main/java/com/example/ui/viewmodel/PendingSmsViewModel.kt', 'r') as f:
+import re
+
+with open('app/src/main/java/com/example/ui/viewmodel/FinanceViewModel.kt', 'r') as f:
     content = f.read()
 
-old_approve = """    fun approveTransaction(transaction: Transaction, newCardNumber: String?, newCategory: String) {
-        viewModelScope.launch {
-            val updated = transaction.copy(
-                cardNumber = newCardNumber ?: transaction.cardNumber,
-                categoryName = newCategory,
-                status = com.example.data.model.TransactionStatus.CONFIRMED
-            )
-            repository.approvePendingTransaction(updated)
-        }
-    }"""
+target = '''    data class DateFilter(val startMillis: Long, val endMillis: Long, val displayTitle: String)
 
-new_approve = """    fun approveTransaction(transaction: Transaction, newCardNumber: String?, newCategory: String) {
-        viewModelScope.launch {
-            val updated = transaction.copy(
-                cardNumber = newCardNumber ?: transaction.cardNumber,
-                categoryName = newCategory
-                // Do NOT set status here, let repository handle it to prevent double confirmation issues if we add a check
-            )
-            repository.approvePendingTransaction(updated)
-        }
-    }"""
+    private val _selectedDateFilter = MutableStateFlow<DateFilter?>(null)
+    val selectedDateFilter: StateFlow<DateFilter?> = _selectedDateFilter.asStateFlow()
 
-old_approve_all = """    fun approveAll(pendingList: List<Transaction>) {
-        viewModelScope.launch {
-            pendingList.forEach { tx ->
-                repository.approvePendingTransaction(tx.copy(status = com.example.data.model.TransactionStatus.CONFIRMED))
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    val transactions: StateFlow<List<Transaction>> = _selectedDateFilter.flatMapLatest { filter ->
+        if (filter == null) {
+            repository.confirmedTransactions
+        } else {
+            repository.getConfirmedTransactionsBetween(filter.startMillis, filter.endMillis)
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun updateDateFilter(startMillis: Long, endMillis: Long, displayTitle: String) {
+        _selectedDateFilter.value = DateFilter(startMillis, endMillis, displayTitle)
+    }
+
+    fun clearDateFilter() {
+        _selectedDateFilter.value = null
+    }'''
+
+replacement = '''    sealed class DateFilter {
+        data class SpecificDay(val jYear: Int, val jMonth: Int, val jDay: Int, val startMillis: Long, val endMillis: Long) : DateFilter()
+        data class FullMonth(val jYear: Int, val jMonth: Int, val startMillis: Long, val endMillis: Long) : DateFilter()
+    }
+
+    private val _selectedDateFilter = MutableStateFlow<DateFilter?>(null)
+    val selectedDateFilter: StateFlow<DateFilter?> = _selectedDateFilter.asStateFlow()
+
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    val transactions: StateFlow<List<Transaction>> = _selectedDateFilter.flatMapLatest { filter ->
+        if (filter == null) {
+            repository.confirmedTransactions
+        } else {
+            val startMillis = when (filter) {
+                is DateFilter.SpecificDay -> filter.startMillis
+                is DateFilter.FullMonth -> filter.startMillis
             }
-        }
-    }"""
-
-new_approve_all = """    fun approveAll(pendingList: List<Transaction>) {
-        viewModelScope.launch {
-            pendingList.forEach { tx ->
-                repository.approvePendingTransaction(tx)
+            val endMillis = when (filter) {
+                is DateFilter.SpecificDay -> filter.endMillis
+                is DateFilter.FullMonth -> filter.endMillis
             }
+            repository.getConfirmedTransactionsInRange(startMillis, endMillis)
         }
-    }"""
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-content = content.replace(old_approve, new_approve)
-content = content.replace(old_approve_all, new_approve_all)
+    fun setDateFilter(filter: DateFilter?) {
+        _selectedDateFilter.value = filter
+    }'''
 
-with open('app/src/main/java/com/example/ui/viewmodel/PendingSmsViewModel.kt', 'w') as f:
+content = content.replace(target, replacement)
+
+with open('app/src/main/java/com/example/ui/viewmodel/FinanceViewModel.kt', 'w') as f:
     f.write(content)
+

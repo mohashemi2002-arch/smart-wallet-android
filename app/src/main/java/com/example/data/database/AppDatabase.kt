@@ -41,7 +41,7 @@ abstract class AppDatabase : RoomDatabase() {
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     AppDatabase::class.java,
-                    "poolaki_ai_database"
+                    "smart wallet_ai_database"
                 )
                 .addMigrations(AppDatabaseMigrations.MIGRATION_1_2)
                 .fallbackToDestructiveMigration()

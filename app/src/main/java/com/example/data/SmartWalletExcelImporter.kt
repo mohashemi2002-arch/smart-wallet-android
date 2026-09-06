@@ -9,7 +9,7 @@ import java.io.InputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 
-data class PoolakiExcelRow(
+data class SmartWalletExcelRow(
     val dateJalali: String,
     val type: String,
     val amountRial: String,
@@ -18,10 +18,10 @@ data class PoolakiExcelRow(
     val description: String
 )
 
-object PoolakiExcelImporter {
-    fun parse(context: Context, uri: Uri): List<PoolakiExcelRow> {
+object SmartWalletExcelImporter {
+    fun parse(context: Context, uri: Uri): List<SmartWalletExcelRow> {
         val sharedStrings = mutableListOf<String>()
-        val rows = mutableListOf<PoolakiExcelRow>()
+        val rows = mutableListOf<SmartWalletExcelRow>()
 
         // 1. Read shared strings
         context.contentResolver.openInputStream(uri)?.use { inputStream ->
@@ -85,7 +85,7 @@ object PoolakiExcelImporter {
         }
     }
 
-    private fun parseSheet(inputStream: InputStream, sharedStrings: List<String>, rows: MutableList<PoolakiExcelRow>) {
+    private fun parseSheet(inputStream: InputStream, sharedStrings: List<String>, rows: MutableList<SmartWalletExcelRow>) {
         val parser = Xml.newPullParser()
         parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, false)
         parser.setInput(inputStream, null)
@@ -162,7 +162,7 @@ object PoolakiExcelImporter {
                             isHeaderRow = false
                         } else {
                             if (dateJalali.isNotBlank() || amountRial.isNotBlank()) {
-                                rows.add(PoolakiExcelRow(dateJalali, type, amountRial, source, category, description))
+                                rows.add(SmartWalletExcelRow(dateJalali, type, amountRial, source, category, description))
                             }
                         }
                     }

@@ -62,7 +62,7 @@ object PersianFormatters {
 }
 
 @Composable
-fun PoolakiPlusBadge(modifier: Modifier = Modifier) {
+fun SmartWalletPlusBadge(modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
             .background(
