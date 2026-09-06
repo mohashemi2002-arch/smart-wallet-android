@@ -121,7 +121,7 @@ fun DashboardScreen(
                             ) {
                                 Text(
                                     text = PersianFormatters.formatMoney(
-                                        if (netWorth == 0L) 127289011L else netWorth,
+                                        netWorth,
                                         currencyUnit
                                     ),
                                     style = MaterialTheme.typography.titleLarge.copy(
@@ -368,75 +368,43 @@ fun DashboardScreen(
                 }
             }
 
-            // 3. New SMS Notification Card ("۱ پیامک جدید!")
-            item {
-                PaddingBox {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFF252E3E)),
-                        shape = RoundedCornerShape(24.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF333E52))
-                    ) {
-                        Column(
+            // 3. Reactive Pending SMS Banner
+            if (pendingTransactions.isNotEmpty()) {
+                item {
+                    PaddingBox {
+                        Card(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                                .clickable { onNavigateToSms() },
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF5C82E6)),
+                            shape = RoundedCornerShape(24.dp)
                         ) {
                             Row(
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Surface(
-                                    shape = CircleShape,
-                                    color = Color(0xFF333E52),
-                                    modifier = Modifier.size(32.dp)
-                                ) {
-                                    Box(contentAlignment = Alignment.Center) {
-                                        Icon(Icons.Default.Refresh, contentDescription = "بروزرسانی", tint = Color.White, modifier = Modifier.size(18.dp))
-                                    }
-                                }
-
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                                 ) {
-                                    Text(
-                                        text = "۱ پیامک جدید!",
-                                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                        color = Color.White
-                                    )
-                                    Icon(Icons.Default.MoreHoriz, contentDescription = null, tint = Color.White)
-                                }
-                            }
-
-                            HorizontalDivider(color = Color(0xFF333E52))
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                IconButton(onClick = { /* Delete SMS preview */ }) {
-                                    Icon(Icons.Default.DeleteOutline, contentDescription = "حذف", tint = Color(0xFFB0BEC5))
-                                }
-
-                                Column(horizontalAlignment = Alignment.End) {
-                                    Text(
-                                        text = "- ۲,۱۰۹,۰۰۰ ریال",
-                                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                                        color = Color.White
-                                    )
-                                    Spacer(Modifier.height(2.dp))
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                    ) {
-                                        Text("یک‌شنبه ۱۱ مرداد ۱۰:۵۱", fontSize = 11.sp, color = Color(0xFFB0BEC5))
-                                        Text("• بانک مهر", fontSize = 11.sp, color = Color(0xFF66BB6A), fontWeight = FontWeight.Bold)
+                                    Icon(androidx.compose.material.icons.Icons.Default.Inbox, contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
+                                    Column {
+                                        Text(
+                                            text = "شما ${PersianFormatters.toPersianDigits(pendingTransactions.size.toString())} پیامک بررسی‌نشده دارید",
+                                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                            color = Color.White
+                                        )
+                                        Text(
+                                            text = "(برای بررسی و ثبت لمس کنید)",
+                                            fontSize = 11.sp,
+                                            color = Color.White.copy(alpha = 0.8f)
+                                        )
                                     }
                                 }
+                                Icon(androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = Color.White)
                             }
                         }
                     }
@@ -503,58 +471,47 @@ fun DashboardScreen(
 
                             HorizontalDivider(color = Color(0xFF333E52))
 
-                            // Recent Items matching Screenshot 1 & 4
-                            RecentTransactionRow(
-                                title = "نقدی",
-                                amountText = "+ ۱۰,۱۶۰,۰۰۰ ریال",
-                                dateText = "۱۰ مرداد ۱۴۰۵",
-                                isIncome = true,
-                                iconBgColor = Color(0xFFFBC02D),
-                                iconVector = Icons.Default.Payments
-                            )
-
-                            HorizontalDivider(color = Color(0xFF333E52).copy(alpha = 0.5f))
-
-                            RecentTransactionRow(
-                                title = "خوردنی",
-                                amountText = "- ۳,۲۸۹,۰۰۰ ریال",
-                                dateText = "۱۰ مرداد ۱۴۰۵",
-                                isIncome = false,
-                                iconBgColor = Color(0xFFFF7043),
-                                iconVector = Icons.Default.Fastfood
-                            )
-
-                            HorizontalDivider(color = Color(0xFF333E52).copy(alpha = 0.5f))
-
-                            RecentTransactionRow(
-                                title = "عوارض آزادراهی",
-                                amountText = "- ۲,۴۸۳,۵۳۹ ریال",
-                                dateText = "۱۰ مرداد ۱۴۰۵",
-                                isIncome = false,
-                                iconBgColor = Color(0xFFE53935),
-                                iconVector = Icons.Default.DirectionsCar
-                            )
+                            // Dynamic Recent Transactions
+                            if (transactions.isEmpty()) {
+                                Text(
+                                    text = "هنوز تراکنشی ثبت نشده است.",
+                                    color = Color.Gray,
+                                    fontSize = 12.sp,
+                                    modifier = Modifier.padding(top = 16.dp, bottom = 16.dp).align(Alignment.CenterHorizontally)
+                                )
+                            } else {
+                                transactions.take(3).forEachIndexed { index, tx ->
+                                    val isInc = tx.type == com.example.data.model.TransactionType.INCOME
+                                    val sign = if (isInc) "+" else "-"
+                                    
+                                    val iconInfo = when (tx.categoryName) {
+                                        "خوراکی و سوپرمارکت" -> Color(0xFFFF7043) to Icons.Default.Fastfood
+                                        "حمل و نقل" -> Color(0xFFE53935) to Icons.Default.DirectionsCar
+                                        "سلامت و درمان" -> Color(0xFFE91E63) to Icons.Default.LocalHospital
+                                        "پوشاک و خرید" -> Color(0xFFF57C00) to Icons.Default.ShoppingBag
+                                        "درآمد و حقوق" -> Color(0xFF81C784) to Icons.Default.Payments
+                                        else -> Color(0xFF607D8B) to Icons.Default.Category
+                                    }
+                                    
+                                    RecentTransactionRow(
+                                        title = tx.categoryName.ifBlank { "نامشخص" },
+                                        amountText = "$sign ${PersianFormatters.formatMoney(tx.amountToman, currencyUnit)}",
+                                        dateText = PersianFormatters.formatDate(tx.dateMillis),
+                                        isIncome = isInc,
+                                        iconBgColor = iconInfo.first,
+                                        iconVector = iconInfo.second
+                                    )
+                                    
+                                    if (index < transactions.take(3).size - 1) {
+                                        HorizontalDivider(color = Color(0xFF333E52).copy(alpha = 0.5f), modifier = Modifier.padding(vertical = 8.dp))
+                                    }
+                                }
+                            }
                         }
                     }
                 }
             }
         }
-    }
-
-    // Dialog: All Transactions Full Modal
-    selectedPendingTx?.let { tx ->
-        com.example.ui.components.PendingReviewBottomSheet(
-            transaction = tx,
-            onDismiss = { selectedPendingTx = null },
-            onConfirm = { updatedTx ->
-                viewModel.approvePendingTransaction(updatedTx)
-                selectedPendingTx = null
-            },
-            onIgnore = {
-                viewModel.rejectPendingTransaction(tx)
-                selectedPendingTx = null
-            }
-        )
     }
 
     if (showAllTransactionsDialog) {

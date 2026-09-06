@@ -31,7 +31,7 @@ class ReportsViewModel(application: Application) : AndroidViewModel(application)
     private val _filterState = MutableStateFlow(ReportFilterState())
     val filterState: StateFlow<ReportFilterState> = _filterState
 
-    private val allTransactions = transactionDao.getAllTransactions()
+    private val allTransactions = transactionDao.getConfirmedTransactionsFlow()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val filteredTransactions: StateFlow<List<Transaction>> = combine(allTransactions, _filterState) { transactions, filters ->

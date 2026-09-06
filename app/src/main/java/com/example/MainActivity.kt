@@ -93,6 +93,15 @@ enum class ScreenTab(val title: String, val icon: androidx.compose.ui.graphics.v
 fun PoolakiApp(financeViewModel: FinanceViewModel = viewModel()) {
     var selectedTab by remember { mutableStateOf(ScreenTab.DASHBOARD) }
 
+    var showPendingSmsInbox by remember { mutableStateOf(false) }
+
+    if (showPendingSmsInbox) {
+        val pendingViewModel: com.example.ui.viewmodel.PendingSmsViewModel = viewModel()
+        com.example.ui.screens.PendingSmsInboxScreen(
+            viewModel = pendingViewModel,
+            onNavigateBack = { showPendingSmsInbox = false }
+        )
+    } else {
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         bottomBar = {
@@ -126,7 +135,7 @@ fun PoolakiApp(financeViewModel: FinanceViewModel = viewModel()) {
             when (selectedTab) {
                 ScreenTab.DASHBOARD -> DashboardScreen(
                     viewModel = financeViewModel,
-                    onNavigateToSms = { selectedTab = ScreenTab.CALENDAR },
+                    onNavigateToSms = { showPendingSmsInbox = true },
                     onNavigateToBudget = { selectedTab = ScreenTab.BUDGET },
                     onNavigateToPortfolio = { selectedTab = ScreenTab.PORTFOLIO },
                     onNavigateToDebts = { selectedTab = ScreenTab.CALENDAR },
@@ -157,4 +166,5 @@ fun PoolakiApp(financeViewModel: FinanceViewModel = viewModel()) {
             }
         }
     }
+}
 }

@@ -1,19 +1,16 @@
-import re
-
 with open('app/src/main/java/com/example/ui/viewmodel/FinanceViewModel.kt', 'r') as f:
     content = f.read()
 
-# Add updateBankAccount
-new_method = """    fun updateBankAccount(bankAccount: BankAccount) {
-        viewModelScope.launch {
-            repository.updateBankAccount(bankAccount)
-            _statusMessage.value = "اطلاعات کارت با موفقیت بروزرسانی شد."
-        }
-    }
+replacement = """    val transactions: StateFlow<List<Transaction>> = repository.confirmedTransactions
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    fun deleteBankAccount(bankAccount: BankAccount)"""
+    val pendingTransactions: StateFlow<List<Transaction>> = repository.pendingTransactions
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())"""
 
-content = content.replace("    fun deleteBankAccount(bankAccount: BankAccount)", new_method)
+start_idx = content.find("    val transactions: StateFlow<List<Transaction>> = repository.allTransactions")
+end_idx = content.find("    val categories: StateFlow<List<Category>>", start_idx)
 
-with open('app/src/main/java/com/example/ui/viewmodel/FinanceViewModel.kt', 'w') as f:
-    f.write(content)
+if start_idx != -1 and end_idx != -1:
+    content = content[:start_idx] + replacement + "\n\n" + content[end_idx:]
+    with open('app/src/main/java/com/example/ui/viewmodel/FinanceViewModel.kt', 'w') as f:
+        f.write(content)

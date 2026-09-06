@@ -8,6 +8,12 @@ import kotlinx.coroutines.flow.Flow
 interface TransactionDao {
     @Query("SELECT * FROM transactions ORDER BY dateMillis DESC")
     fun getAllTransactions(): Flow<List<Transaction>>
+    
+    @Query("SELECT * FROM transactions WHERE status = 'PENDING_APPROVAL' ORDER BY dateMillis DESC")
+    fun getPendingTransactionsFlow(): Flow<List<Transaction>>
+
+    @Query("SELECT * FROM transactions WHERE status = 'CONFIRMED' ORDER BY dateMillis DESC")
+    fun getConfirmedTransactionsFlow(): Flow<List<Transaction>>
 
     @Query("SELECT * FROM transactions WHERE dateMillis >= :startTime ORDER BY dateMillis DESC")
     fun getTransactionsSince(startTime: Long): Flow<List<Transaction>>

@@ -32,12 +32,10 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    val transactions: StateFlow<List<Transaction>> = repository.allTransactions
-        .map { list -> list.filter { it.status == com.example.data.model.TransactionStatus.CONFIRMED } }
+    val transactions: StateFlow<List<Transaction>> = repository.confirmedTransactions
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val pendingTransactions: StateFlow<List<Transaction>> = repository.allTransactions
-        .map { list -> list.filter { it.status == com.example.data.model.TransactionStatus.PENDING_APPROVAL } }
+    val pendingTransactions: StateFlow<List<Transaction>> = repository.pendingTransactions
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val categories: StateFlow<List<Category>> = repository.allCategories
@@ -87,8 +85,12 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         list.filter { it.type == TransactionType.EXPENSE }.sumOf { it.amountToman }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
 
-    val totalNetWorthToman: StateFlow<Long> = combine(totalAssetsValueToman, totalIncomeToman, totalExpenseToman) { assetsVal, income, expense ->
-        assetsVal + income - expense
+    val totalBankBalances: StateFlow<Long> = bankAccounts.map { list ->
+        list.sumOf { it.balanceToman }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
+
+    val totalNetWorthToman: StateFlow<Long> = combine(totalAssetsValueToman, totalBankBalances) { assetsVal, bankBal ->
+        assetsVal + bankBal
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
 
     fun setSmsInputText(text: String) {
