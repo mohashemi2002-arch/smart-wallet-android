@@ -64,13 +64,13 @@ fun DashboardScreen(
     var selectedBankAccount by remember { mutableStateOf<com.example.data.model.BankAccount?>(null) }
     
     var showDatePickerDialog by remember { mutableStateOf(false) }
-    val selectedDateFilter by viewModel.selectedDateFilter.collectAsState()
+    val activeDateFilter by viewModel.activeDateFilter.collectAsState()
     
     if (showDatePickerDialog) {
         com.example.ui.components.JalaliCalendarDialog(
-            initialFilter = selectedDateFilter,
+            initialFilter = activeDateFilter,
             transactions = allTransactions,
-            onFilterSelected = { filter -> viewModel.setDateFilter(filter) },
+            onFilterSelected = { filter -> viewModel.setFilter(filter) },
             onDismiss = { showDatePickerDialog = false }
         )
     }
@@ -250,10 +250,10 @@ fun DashboardScreen(
                                     Column(horizontalAlignment = Alignment.End, modifier = Modifier.clickable { showDatePickerDialog = true }) {
                                         Row(verticalAlignment = Alignment.CenterVertically) {
                                             Text(
-                                                text = when (val filter = selectedDateFilter) {
-                                                    is FinanceViewModel.DateFilter.SpecificDay -> "${filter.jDay} ${com.example.util.JalaliCalendarHelper.monthNames[filter.jMonth - 1]}"
-                                                    is FinanceViewModel.DateFilter.FullMonth -> "${com.example.util.JalaliCalendarHelper.monthNames[filter.jMonth - 1]} ${filter.jYear}"
-                                                    null -> "کل تراکنش‌ها"
+                                                text = when (val filter = activeDateFilter) {
+                                                    is FinanceViewModel.TransactionDateFilter.DayFilter -> "${filter.jDay} ${com.example.util.JalaliCalendarHelper.monthNames[filter.jMonth - 1]}"
+                                                    is FinanceViewModel.TransactionDateFilter.MonthFilter -> "${com.example.util.JalaliCalendarHelper.monthNames[filter.jMonth - 1]} ${filter.jYear}"
+                                                    is FinanceViewModel.TransactionDateFilter.AllTime -> "کل تراکنش‌ها"
                                                 },
                                                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                                                 color = Color.White
@@ -262,7 +262,7 @@ fun DashboardScreen(
                                             Icon(Icons.Default.DateRange, contentDescription = "تقویم", tint = Color(0xFF7FA2FF), modifier = Modifier.size(20.dp))
                                         }
                                         Text(
-                                            text = if (selectedDateFilter == null) "نمایش همه" else "تغییر تاریخ",
+                                            text = if (activeDateFilter == null) "نمایش همه" else "تغییر تاریخ",
                                             style = MaterialTheme.typography.bodySmall,
                                             color = Color(0xFFB0BEC5)
                                         )
@@ -542,8 +542,7 @@ fun DashboardScreen(
             transactions = transactions,
             allTransactions = allTransactions,
             currencyUnit = currencyUnit,
-            selectedFilter = selectedDateFilter,
-            onFilterSelected = { filter -> viewModel.setDateFilter(filter) },
+            viewModel = viewModel,
             onDismiss = { showAllTransactionsDialog = false },
             onDeleteTransaction = { tx -> viewModel.deleteTransaction(tx) }
         )

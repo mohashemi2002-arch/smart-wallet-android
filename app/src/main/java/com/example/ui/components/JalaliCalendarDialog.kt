@@ -30,16 +30,16 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.util.JalaliCalendarHelper
-import com.example.ui.viewmodel.FinanceViewModel.DateFilter
+import com.example.ui.viewmodel.FinanceViewModel.TransactionDateFilter
 import com.example.data.model.Transaction
 import com.example.data.model.TransactionType
 
 @OptIn(ExperimentalAnimationApi::class)
 @Composable
 fun JalaliCalendarDialog(
-    initialFilter: DateFilter?,
+    initialFilter: TransactionDateFilter?,
     transactions: List<Transaction>, // For dot indicators
-    onFilterSelected: (DateFilter) -> Unit,
+    onFilterSelected: (TransactionDateFilter) -> Unit,
     onDismiss: () -> Unit
 ) {
     val currentJalali = JalaliCalendarHelper.getJalaliDateFromMillis(System.currentTimeMillis())
@@ -47,20 +47,21 @@ fun JalaliCalendarDialog(
     var viewedYear by remember { mutableStateOf(currentJalali.year) }
     var viewedMonth by remember { mutableStateOf(currentJalali.month) }
 
-    var selectedFilter by remember { mutableStateOf<DateFilter?>(initialFilter) }
+    var selectedFilter by remember { mutableStateOf<TransactionDateFilter?>(initialFilter) }
 
     // Init viewed month to the selected filter if exists
     LaunchedEffect(initialFilter) {
         if (initialFilter != null) {
             when (initialFilter) {
-                is DateFilter.SpecificDay -> {
+                is TransactionDateFilter.DayFilter -> {
                     viewedYear = initialFilter.jYear
                     viewedMonth = initialFilter.jMonth
                 }
-                is DateFilter.FullMonth -> {
+                is TransactionDateFilter.MonthFilter -> {
                     viewedYear = initialFilter.jYear
                     viewedMonth = initialFilter.jMonth
                 }
+                is TransactionDateFilter.AllTime -> {}
             }
         }
     }
@@ -91,7 +92,7 @@ fun JalaliCalendarDialog(
             ) {
                 // Header Display
                 val displayTitle = when (val filter = selectedFilter) {
-                    is DateFilter.SpecificDay -> {
+                    is TransactionDateFilter.DayFilter -> {
                         if (filter.jYear == currentJalali.year && filter.jMonth == currentJalali.month && filter.jDay == currentJalali.day) {
                             "امروز - ${filter.jDay} ${JalaliCalendarHelper.monthNames[filter.jMonth - 1]}"
                         } else {
@@ -100,7 +101,8 @@ fun JalaliCalendarDialog(
                             "${d.dayOfWeekName} ${d.day} ${d.monthName} ${d.year}"
                         }
                     }
-                    is DateFilter.FullMonth -> "${JalaliCalendarHelper.monthNames[filter.jMonth - 1]} ${filter.jYear}"
+                    is TransactionDateFilter.MonthFilter -> "${JalaliCalendarHelper.monthNames[filter.jMonth - 1]} ${filter.jYear}"
+                    is TransactionDateFilter.AllTime -> "کل تراکنش‌ها"
                     null -> "انتخاب تاریخ تراکنش‌ها"
                 }
 
@@ -198,8 +200,9 @@ fun JalaliCalendarDialog(
                         val isToday = currentJalali.year == viewedYear && currentJalali.month == viewedMonth && currentJalali.day == day
                         
                         val isSelected = when (val filter = selectedFilter) {
-                            is DateFilter.SpecificDay -> filter.jYear == viewedYear && filter.jMonth == viewedMonth && filter.jDay == day
-                            is DateFilter.FullMonth -> false
+                            is TransactionDateFilter.DayFilter -> filter.jYear == viewedYear && filter.jMonth == viewedMonth && filter.jDay == day
+                            is TransactionDateFilter.MonthFilter -> false
+                            is TransactionDateFilter.AllTime -> false
                             null -> false
                         }
 
@@ -223,7 +226,7 @@ fun JalaliCalendarDialog(
                                 .background(bgColor)
                                 .clickable {
                                     val (start, end) = JalaliCalendarHelper.getStartAndEndOfJalaliDay(viewedYear, viewedMonth, day)
-                                    selectedFilter = DateFilter.SpecificDay(viewedYear, viewedMonth, day, start, end)
+                                    selectedFilter = TransactionDateFilter.DayFilter(viewedYear,  viewedMonth,  day)
                                 },
                             contentAlignment = Alignment.Center
                         ) {
@@ -260,7 +263,7 @@ fun JalaliCalendarDialog(
                     AssistChip(
                         onClick = {
                             val (start, end) = JalaliCalendarHelper.getStartAndEndOfJalaliDay(currentJalali.year, currentJalali.month, currentJalali.day)
-                            selectedFilter = DateFilter.SpecificDay(currentJalali.year, currentJalali.month, currentJalali.day, start, end)
+                            selectedFilter = TransactionDateFilter.DayFilter(currentJalali.year,  currentJalali.month,  currentJalali.day)
                             viewedYear = currentJalali.year
                             viewedMonth = currentJalali.month
                         },
@@ -273,7 +276,7 @@ fun JalaliCalendarDialog(
                             val yesterdayMillis = System.currentTimeMillis() - 86400000L
                             val yJalali = JalaliCalendarHelper.getJalaliDateFromMillis(yesterdayMillis)
                             val (start, end) = JalaliCalendarHelper.getStartAndEndOfJalaliDay(yJalali.year, yJalali.month, yJalali.day)
-                            selectedFilter = DateFilter.SpecificDay(yJalali.year, yJalali.month, yJalali.day, start, end)
+                            selectedFilter = TransactionDateFilter.DayFilter(yJalali.year,  yJalali.month,  yJalali.day)
                             viewedYear = yJalali.year
                             viewedMonth = yJalali.month
                         },
@@ -284,11 +287,11 @@ fun JalaliCalendarDialog(
                     AssistChip(
                         onClick = {
                             val (start, end) = JalaliCalendarHelper.getStartAndEndOfJalaliMonth(viewedYear, viewedMonth)
-                            selectedFilter = DateFilter.FullMonth(viewedYear, viewedMonth, start, end)
+                            selectedFilter = TransactionDateFilter.MonthFilter(viewedYear,  viewedMonth)
                         },
                         label = { Text("کل این ماه", fontSize = 12.sp) },
                         colors = AssistChipDefaults.assistChipColors(
-                            containerColor = if (selectedFilter is DateFilter.FullMonth) MaterialTheme.colorScheme.primary else Color(0xFF1E293B),
+                            containerColor = if (selectedFilter is TransactionDateFilter.MonthFilter) MaterialTheme.colorScheme.primary else Color(0xFF1E293B),
                             labelColor = Color.White
                         ),
                         border = AssistChipDefaults.assistChipBorder(enabled = true, borderColor = Color.Transparent)

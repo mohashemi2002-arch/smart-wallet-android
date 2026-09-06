@@ -14,7 +14,6 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import com.example.util.JalaliCalendarHelper
-import com.example.ui.viewmodel.FinanceViewModel.DateFilter
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -29,6 +28,8 @@ import com.example.data.model.Transaction
 import com.example.data.model.TransactionType
 import com.example.ui.components.PersianFormatters
 import com.example.ui.components.CategoryIconMap
+import com.example.ui.viewmodel.FinanceViewModel
+import com.example.ui.viewmodel.FinanceViewModel.TransactionDateFilter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -36,29 +37,20 @@ fun AllTransactionsDialog(
     transactions: List<Transaction>,
     allTransactions: List<Transaction>,
     currencyUnit: CurrencyUnit,
-    selectedFilter: DateFilter?,
-    onFilterSelected: (DateFilter?) -> Unit,
+    viewModel: FinanceViewModel,
     onDismiss: () -> Unit,
     onDeleteTransaction: ((Transaction) -> Unit)? = null
 ) {
     var showCalendarDialog by remember { mutableStateOf(false) }
+    val activeDateFilter by viewModel.activeDateFilter.collectAsState()
 
     if (showCalendarDialog) {
         JalaliCalendarDialog(
-            initialFilter = selectedFilter,
+            initialFilter = activeDateFilter,
             transactions = allTransactions,
-            onFilterSelected = { filter -> onFilterSelected(filter) },
+            onFilterSelected = { filter -> viewModel.setFilter(filter) },
             onDismiss = { showCalendarDialog = false }
         )
-    }
-    var searchQuery by remember { mutableStateOf("") }
-    
-    // Group transactions by Date string (e.g., "جمعه ، ۹ مرداد ۱۴۰۵")
-    // For simplicity, we just format the date.
-    val grouped = remember(transactions) {
-        transactions.groupBy { tx ->
-            PersianFormatters.formatDate(tx.dateMillis)
-        }
     }
 
     Dialog(
@@ -66,103 +58,148 @@ fun AllTransactionsDialog(
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
         Surface(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color(0xFF1E2638)),
-            color = Color(0xFF1E2638)
+            modifier = Modifier.fillMaxSize(),
+            color = Color(0xFF0B1120)
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp)
-            ) {
-                // Top Header Bar
+            Column(modifier = Modifier.fillMaxSize()) {
+                // Header
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 16.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 20.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconButton(onClick = { /* Toggle search */ }) {
-                        Icon(
-                            imageVector = Icons.Default.Search,
-                            contentDescription = "جستجو",
-                            tint = Color(0xFFE6E1E5)
-                        )
-                    }
                     Text(
-                        text = "همه‌ی تراکنش‌ها",
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                        color = Color(0xFFE6E1E5)
+                        text = "تراکنش‌ها",
+                        color = Color.White,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold
                     )
-                    IconButton(onClick = onDismiss) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "بستن",
-                            tint = Color(0xFFE6E1E5)
-                        )
+                    
+                    val displayTitle = when (val filter = activeDateFilter) {
+                        is TransactionDateFilter.DayFilter -> {
+                            "${filter.jDay} ${JalaliCalendarHelper.monthNames[filter.jMonth - 1]} ${filter.jYear}"
+                        }
+                        is TransactionDateFilter.MonthFilter -> {
+                            "${JalaliCalendarHelper.monthNames[filter.jMonth - 1]} ${filter.jYear}"
+                        }
+                        is TransactionDateFilter.AllTime -> "کل تراکنش‌ها"
                     }
-                }
 
-                // Month Selector Pill Bar
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 16.dp),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
                     Surface(
-                        shape = RoundedCornerShape(50),
-                        color = Color(0xFF2C374D),
-                        modifier = Modifier.clip(RoundedCornerShape(50))
+                        shape = RoundedCornerShape(20.dp),
+                        color = Color(0xFF333E52)
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "قبلی",
-                                tint = Color(0xFFCAC4D0),
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = "مرداد ۱۴۰۵", // Mock for now
-                                    color = Color.White,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 15.sp
-                                )
-                                Spacer(Modifier.width(4.dp))
+                            IconButton(
+                                onClick = { viewModel.previousPeriod() },
+                                modifier = Modifier.size(24.dp)
+                            ) {
                                 Icon(
-                                    imageVector = Icons.Default.ArrowDropDown,
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(18.dp)
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "قبلی",
+                                    tint = Color(0xFFCAC4D0),
+                                    modifier = Modifier.size(16.dp)
                                 )
                             }
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                                contentDescription = "بعدی",
-                                tint = Color(0xFFCAC4D0),
-                                modifier = Modifier.size(16.dp)
-                            )
+                            
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically, 
+                                modifier = Modifier.clickable { showCalendarDialog = true }.padding(horizontal = 4.dp)
+                            ) {
+                                Text(
+                                    text = displayTitle,
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp
+                                )
+                                Spacer(Modifier.width(4.dp))
+                                Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                            }
+                            
+                            IconButton(
+                                onClick = { viewModel.nextPeriod() },
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                    contentDescription = "بعدی",
+                                    tint = Color(0xFFCAC4D0),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
                         }
                     }
                 }
 
+                // Total Sum Display
+                val totalIncome = transactions.filter { it.type == TransactionType.INCOME }.sumOf { it.amountToman }
+                val totalExpense = transactions.filter { it.type == TransactionType.EXPENSE }.sumOf { it.amountToman }
+                val netTotal = totalIncome - totalExpense
+                val isPositiveNet = netTotal >= 0
+                val signStr = if (isPositiveNet) "+" else "-"
+
+                Surface(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color(0xFF1E293B)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "مجموع:",
+                            color = Color(0xFF94A3B8),
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = "$signStr ${PersianFormatters.formatMoney(Math.abs(netTotal), currencyUnit)}",
+                            color = if (isPositiveNet) Color(0xFF4ADE80) else Color(0xFFF87171),
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
                 // List of Days
+                val grouped = remember(transactions) {
+                    transactions.groupBy { tx ->
+                        PersianFormatters.formatDate(tx.dateMillis)
+                    }
+                }
+
                 LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                     contentPadding = PaddingValues(bottom = 32.dp)
                 ) {
                     if (grouped.isEmpty()) {
                         item {
-                            Text("تراکنشی یافت نشد.", color = Color.Gray, modifier = Modifier.padding(16.dp))
+                            Column(
+                                modifier = Modifier.fillMaxWidth().padding(top = 40.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Info,
+                                    contentDescription = null,
+                                    tint = Color(0xFF475569),
+                                    modifier = Modifier.size(64.dp).padding(bottom = 16.dp)
+                                )
+                                Text(
+                                    text = "هیچ تراکنشی برای این تاریخ ثبت نشده است",
+                                    color = Color(0xFF94A3B8),
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
                         }
                     }
 
@@ -221,7 +258,7 @@ fun DayTransactionGroup(
                 text = totalSumText,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
-                color = if (isPositive) Color(0xFF81C784) else Color(0xFFE57373)
+                color = if (isPositive) Color(0xFF4ADE80) else Color(0xFFF87171)
             )
         }
 
@@ -234,7 +271,7 @@ fun DayTransactionGroup(
 
             val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
             var hasVibrated by remember { mutableStateOf(false) }
-        
+            
             val dismissState = androidx.compose.material3.rememberSwipeToDismissBoxState(
                 confirmValueChange = { value ->
                     if (value == androidx.compose.material3.SwipeToDismissBoxValue.EndToStart) {
@@ -245,7 +282,7 @@ fun DayTransactionGroup(
                     }
                 }
             )
-        
+            
             LaunchedEffect(dismissState.targetValue) {
                 if (dismissState.targetValue == androidx.compose.material3.SwipeToDismissBoxValue.EndToStart && !hasVibrated) {
                     haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
@@ -286,8 +323,8 @@ fun DayTransactionGroup(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color(0xFF1E2638))
-                        .padding(vertical = 6.dp, horizontal = 4.dp),
+                        .background(Color(0xFF1E2638), RoundedCornerShape(12.dp))
+                        .padding(vertical = 12.dp, horizontal = 12.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -296,10 +333,10 @@ fun DayTransactionGroup(
                         Text(
                             text = amountText,
                             style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                            color = if (isInc) Color(0xFF81C784) else Color(0xFFE57373)
+                            color = if (isInc) Color(0xFF4ADE80) else Color(0xFFF87171)
                         )
                     }
-    
+                    
                     // Right: Icon & Title
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -327,7 +364,6 @@ fun DayTransactionGroup(
                     }
                 }
             }
-            HorizontalDivider(color = Color(0xFF38496B).copy(alpha = 0.5f), thickness = 0.8.dp)
         }
     }
 }
