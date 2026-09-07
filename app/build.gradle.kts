@@ -22,9 +22,12 @@ android {
     minSdk = 24
     targetSdk = 36
     versionCode = 1
-    versionName = "1.0"
+    versionName = "1.0.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    buildConfigField("String", "GITHUB_OWNER", "\"${System.getenv("GITHUB_OWNER") ?: ""}\"")
+    buildConfigField("String", "GITHUB_REPO", "\"${System.getenv("GITHUB_REPO") ?: ""}\"")
+    buildConfigField("String", "GITHUB_TOKEN", "\"${System.getenv("GITHUB_TOKEN") ?: ""}\"")
   }
 
   signingConfigs {

@@ -24,6 +24,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.ui.screens.*
 import com.example.ui.theme.SmartWalletTheme
 import com.example.ui.viewmodel.FinanceViewModel
+import com.example.updater.*
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.launch
 
 class MainActivity : FragmentActivity() {
 
@@ -91,18 +94,43 @@ enum class ScreenTab(val title: String, val icon: androidx.compose.ui.graphics.v
 
 @Composable
 fun SmartWalletApp(financeViewModel: FinanceViewModel = viewModel()) {
+    val context = LocalContext.current
+    val updateManager = remember { AppUpdateManager(context) }
+    var updateRelease by remember { mutableStateOf<GitHubRelease?>(null) }
+
+    LaunchedEffect(Unit) {
+        updateRelease = updateManager.checkForUpdates(isManualCheck = false)
+    }
+
+    updateRelease?.let { release ->
+        UpdatePromptDialog(
+            release = release,
+            updateManager = updateManager,
+            onDismiss = { updateRelease = null }
+        )
+    }
+
     var selectedTab by remember { mutableStateOf(ScreenTab.DASHBOARD) }
 
     var showPendingSmsInbox by remember { mutableStateOf(false) }
     var showSmsSenderSettings by remember { mutableStateOf(false) }
+    var showBankSmsHistory by remember { mutableStateOf(false) }
 
     if (showSmsSenderSettings) {
         com.example.ui.screens.SmsSenderSettingsScreen(onNavigateBack = { showSmsSenderSettings = false })
+    } else if (showBankSmsHistory) {
+        val historyViewModel: com.example.ui.viewmodel.BankSmsHistoryViewModel = viewModel()
+        com.example.ui.screens.BankSmsHistoryScreen(
+            viewModel = historyViewModel,
+            onNavigateBack = { showBankSmsHistory = false },
+            onManualIngest = {} // handled internally by the screen now
+        )
     } else if (showPendingSmsInbox) {
         val pendingViewModel: com.example.ui.viewmodel.PendingSmsViewModel = viewModel()
         com.example.ui.screens.PendingSmsInboxScreen(
             viewModel = pendingViewModel,
-            onNavigateBack = { showPendingSmsInbox = false }
+            onNavigateBack = { showPendingSmsInbox = false },
+            onNavigateToHistory = { showBankSmsHistory = true }
         )
     } else {
     Scaffold(

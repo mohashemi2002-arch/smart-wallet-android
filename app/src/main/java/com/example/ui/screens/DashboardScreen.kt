@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import androidx.compose.material.icons.filled.History
 import com.example.ui.components.formatAsToman
 
 import androidx.compose.foundation.background
@@ -390,44 +391,52 @@ fun DashboardScreen(
                 }
             }
 
-            // 3. Reactive Pending SMS Banner
-            if (pendingTransactions.isNotEmpty()) {
-                item {
-                    PaddingBox {
-                        Card(
+            // 3. Permanent SMS Management Banner
+            item {
+                PaddingBox {
+                    val hasPending = pendingTransactions.isNotEmpty()
+                    val containerColor = if (hasPending) Color(0xFF5C82E6) else Color(0xFF252E3E)
+                    val contentColor = if (hasPending) Color.White else Color.LightGray
+                    
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onNavigateToSms() },
+                        colors = CardDefaults.cardColors(containerColor = containerColor),
+                        shape = RoundedCornerShape(24.dp),
+                        border = if (!hasPending) androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF333E52)) else null
+                    ) {
+                        Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { onNavigateToSms() },
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFF5C82E6)),
-                            shape = RoundedCornerShape(24.dp)
+                                .padding(16.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                ) {
-                                    Icon(androidx.compose.material.icons.Icons.Default.Inbox, contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
-                                    Column {
-                                        Text(
-                                            text = "شما ${PersianFormatters.toPersianDigits(pendingTransactions.size.toString())} پیامک بررسی‌نشده دارید",
-                                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                            color = Color.White
-                                        )
-                                        Text(
-                                            text = "(برای بررسی و ثبت لمس کنید)",
-                                            fontSize = 11.sp,
-                                            color = Color.White.copy(alpha = 0.8f)
-                                        )
-                                    }
+                                Icon(
+                                    if (hasPending) androidx.compose.material.icons.Icons.Default.Inbox else Icons.Default.History, 
+                                    contentDescription = null, 
+                                    tint = contentColor, 
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Column {
+                                    Text(
+                                        text = if (hasPending) "شما ${PersianFormatters.toPersianDigits(pendingTransactions.size.toString())} پیامک بررسی‌نشده دارید" else "تاریخچه و صندوق پیامک‌های بانکی",
+                                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                        color = contentColor
+                                    )
+                                    Text(
+                                        text = if (hasPending) "(برای بررسی و ثبت لمس کنید)" else "(مدیریت و افزودن دستی پیامک‌ها)",
+                                        fontSize = 11.sp,
+                                        color = if (hasPending) Color.White.copy(alpha = 0.8f) else Color.Gray
+                                    )
                                 }
-                                Icon(androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = Color.White)
                             }
+                            Icon(androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = contentColor)
                         }
                     }
                 }
@@ -645,7 +654,8 @@ fun BankCardHeaderPill(
             com.example.ui.components.BankLogoImage(
                 bankName = bankName,
                 cardNumber = cardNumber,
-                size = 36.dp,
+                containerSize = 44.dp,
+                logoSize = 36.dp,
                 containerColor = Color.White.copy(alpha = 0.2f)
             )
         }

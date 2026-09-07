@@ -25,17 +25,18 @@ import com.example.util.BankLogoHelper
 fun BankLogoImage(
     bankName: String?,
     cardNumber: String? = null,
-    size: Dp = 40.dp,
-    containerColor: Color = Color.White,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    containerSize: Dp = 56.dp,
+    logoSize: Dp = 46.dp,
+    containerColor: Color = Color.White
 ) {
     val context = LocalContext.current
     val resourceId = BankLogoHelper.getLogoResourceId(context, bankName, cardNumber)
     
     Box(
         modifier = modifier
-            .size(size)
-            .clip(RoundedCornerShape(12.dp))
+            .size(containerSize)
+            .clip(RoundedCornerShape(16.dp))
             .background(containerColor),
         contentAlignment = Alignment.Center
     ) {
@@ -44,8 +45,9 @@ fun BankLogoImage(
                 painter = painterResource(id = resourceId),
                 contentDescription = bankName ?: "لوگوی بانک",
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(4.dp)
+                    .size(logoSize)
+                    .padding(4.dp),
+                contentScale = androidx.compose.ui.layout.ContentScale.Fit
             )
         } else {
             // Monogram fallback
@@ -60,8 +62,10 @@ fun BankLogoImage(
                 Text(
                     text = initial,
                     color = Color.White,
-                    fontSize = (size.value * 0.35f).sp,
-                    fontWeight = FontWeight.Bold
+                    style = androidx.compose.material3.MaterialTheme.typography.titleLarge.copy(
+                        fontSize = (containerSize.value * 0.35f).sp,
+                        fontWeight = FontWeight.Bold
+                    )
                 )
             }
         }

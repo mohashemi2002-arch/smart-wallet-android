@@ -198,7 +198,9 @@ fun AddBankAccountDialog(
                                     com.example.ui.components.BankLogoImage(
                                         bankName = bankName,
                                         cardNumber = cardNumber,
-                                        size = 20.dp
+                                        containerSize = 56.dp,
+                                        logoSize = 48.dp,
+                                        containerColor = Color.White.copy(alpha = 0.2f)
                                     )
                                     Text(
                                         text = bankName,

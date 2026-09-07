@@ -31,7 +31,7 @@ fun BankCardItem(
     Card(
         modifier = Modifier
             .width(220.dp)
-            .height(130.dp),
+            .height(145.dp),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = parseColor)
     ) {
@@ -53,7 +53,6 @@ fun BankCardItem(
                         com.example.ui.components.BankLogoImage(
                             bankName = account.bankName,
                             cardNumber = account.cardNumber,
-                            size = 42.dp,
                             containerColor = Color.White.copy(alpha = 0.2f)
                         )
                         Column {

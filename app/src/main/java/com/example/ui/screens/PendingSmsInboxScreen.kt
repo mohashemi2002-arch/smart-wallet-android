@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import androidx.compose.material.icons.filled.History
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -32,7 +33,8 @@ import com.example.ui.viewmodel.PendingSmsViewModel
 @Composable
 fun PendingSmsInboxScreen(
     viewModel: PendingSmsViewModel,
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    onNavigateToHistory: () -> Unit = {}
 ) {
     val pendingTransactions by viewModel.pendingTransactions.collectAsState()
     val bankAccounts by viewModel.bankAccounts.collectAsState()
@@ -59,6 +61,9 @@ fun PendingSmsInboxScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = onNavigateToHistory) {
+                        Icon(Icons.Default.History, contentDescription = "تاریخچه پیامک‌های بانکی")
+                    }
                     if (pendingTransactions.isNotEmpty()) {
                         TextButton(onClick = { viewModel.approveAllPending(onComplete = {}, onError = {}) }) {
                             Text("تایید همه", color = Color(0xFF5C82E6), fontWeight = FontWeight.Bold)
@@ -78,6 +83,17 @@ fun PendingSmsInboxScreen(
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     Icon(Icons.Default.Inbox, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(64.dp))
                     Text("همه پیامک‌ها بررسی شدند.\nصندوق خالی است.", textAlign = TextAlign.Center, color = Color.LightGray)
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    OutlinedButton(
+                        onClick = onNavigateToHistory,
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF5C82E6))
+                    ) {
+                        Icon(Icons.Default.History, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("مشاهده کل پیامک‌های بانکی")
+                    }
                 }
             }
         } else {
@@ -139,7 +155,8 @@ fun PendingSmsCard(
                     com.example.ui.components.BankLogoImage(
                         bankName = transaction.merchantName,
                         cardNumber = transaction.cardNumber,
-                        size = 32.dp,
+                        containerSize = 44.dp,
+                        logoSize = 38.dp,
                         containerColor = Color.Transparent
                     )
                     Surface(
