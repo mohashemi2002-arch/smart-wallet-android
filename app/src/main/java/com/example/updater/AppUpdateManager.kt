@@ -46,16 +46,18 @@ class AppUpdateManager(private val context: Context) {
     }
 
 
+
+
     suspend fun checkForUpdates(isManualCheck: Boolean = false): GitHubRelease? = withContext(Dispatchers.IO) {
         if (!isNetworkAvailable()) return@withContext null
         
-        // --- Mock Update System for Testing ---
-        val currentVersion = BuildConfig.VERSION_NAME
-        val mockTag = "9.9.9"
+        val latestRelease = updateService.getLatestRelease() ?: return@withContext null
         
-        if (currentVersion != mockTag) {
-            val asset = GitHubAsset(id = 101, name = "update_test.apk", size = 10485760L, url = "https://proof.ovh.net/files/10Mb.dat")
-            return@withContext GitHubRelease(tag_name = "v9.9.9", name = "آپدیت تستی (نسخه نمایشی)", body = "این یک پیغام تستی است.", assets = listOf(asset))
+        val currentVersion = BuildConfig.VERSION_NAME
+        val latestTag = latestRelease.tag_name.removePrefix("v").removePrefix("V")
+        
+        if (latestTag != currentVersion && latestTag.isNotEmpty()) {
+            return@withContext latestRelease
         }
         return@withContext null
     }
@@ -71,6 +73,8 @@ class AppUpdateManager(private val context: Context) {
             val request = builder.build()
 
             client.newCall(request).execute().use { response ->
+
+
 
                 if (!response.isSuccessful) {
                     _downloadState.value = DownloadState.Error("خطا در دانلود (${response.code})")
