@@ -1,41 +1,40 @@
 import re
 
-with open('app/src/main/java/com/example/ui/screens/DashboardScreen.kt', 'r') as f:
-    content = f.read()
+files = [
+    'app/src/main/java/com/example/ui/components/AddBankAccountDialog.kt',
+    'app/src/main/java/com/example/ui/components/EditAccountBottomSheet.kt',
+    'app/src/main/java/com/example/ui/components/AddAssetBottomSheet.kt',
+    'app/src/main/java/com/example/ui/components/AddChequeBottomSheet.kt',
+    'app/src/main/java/com/example/ui/components/AddLoanBottomSheet.kt'
+]
 
-# Fix AddTransactionDialog Column
-content = content.replace(
-"""            Column(
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {""",
-"""            Column(
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier.fillMaxWidth().verticalScroll(androidx.compose.foundation.rememberScrollState())
-            ) {"""
-)
+for file in files:
+    try:
+        with open(file, 'r') as f:
+            content = f.read()
 
-# Add EditAccountBottomSheet integration
-bottom_sheet_code = """
-    if (showEditAccountDialog && selectedBankAccount != null) {
-        com.example.ui.components.EditAccountBottomSheet(
-            account = selectedBankAccount!!,
-            onDismiss = { showEditAccountDialog = false; selectedBankAccount = null },
-            onUpdate = { acc -> 
-                viewModel.updateBankAccount(acc)
-                showEditAccountDialog = false
-                selectedBankAccount = null
-            },
-            onDelete = { acc ->
-                viewModel.deleteBankAccount(acc)
-                showEditAccountDialog = false
-                selectedBankAccount = null
-            }
+        # Update text field logic
+        content = re.sub(
+            r'onValueChange = \{ ([a-zA-Z0-9_]+) = it.filter \{ c -> c.isDigit\(\) \} \}',
+            r'''onValueChange = { input -> 
+                        if (input.all { it.isDigit() || it in '۰'..'۹' }) {
+                            \1 = input
+                        }
+                    },
+                    visualTransformation = com.example.ui.components.ThousandsSeparatorVisualTransformation()''',
+            content
         )
-    }
-"""
 
-content = content.replace("    if (showQuickNoteDialog) {", bottom_sheet_code + "\n    if (showQuickNoteDialog) {")
+        # Update extraction
+        content = re.sub(
+            r'([a-zA-Z0-9_]+)\.toLongOrNull\(\) \?: 0L',
+            r'com.example.ui.components.PersianCurrencyFormatter.extractCleanAmount(\1)',
+            content
+        )
+        
+        with open(file, 'w') as f:
+            f.write(content)
+            
+    except Exception as e:
+        print(f"Error in {file}: {e}")
 
-with open('app/src/main/java/com/example/ui/screens/DashboardScreen.kt', 'w') as f:
-    f.write(content)

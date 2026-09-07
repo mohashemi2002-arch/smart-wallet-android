@@ -57,7 +57,12 @@ fun AddChequeBottomSheet(
 
             OutlinedTextField(
                 value = sayadNumber,
-                onValueChange = { sayadNumber = it.filter { c -> c.isDigit() } },
+                onValueChange = { input -> 
+                        if (input.all { it.isDigit() || it in '۰'..'۹' }) {
+                            sayadNumber = input
+                        }
+                    },
+                    visualTransformation = com.example.ui.components.ThousandsSeparatorVisualTransformation(),
                 label = { Text("شناسه صیادی (۱۶ رقم)") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.fillMaxWidth()
@@ -65,7 +70,12 @@ fun AddChequeBottomSheet(
 
             OutlinedTextField(
                 value = amountText,
-                onValueChange = { amountText = it.filter { c -> c.isDigit() } },
+                onValueChange = { input -> 
+                        if (input.all { it.isDigit() || it in '۰'..'۹' }) {
+                            amountText = input
+                        }
+                    },
+                    visualTransformation = com.example.ui.components.ThousandsSeparatorVisualTransformation(),
                 label = { Text("مبلغ چک (تومان)") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.fillMaxWidth()
@@ -87,7 +97,7 @@ fun AddChequeBottomSheet(
 
             Button(
                 onClick = {
-                    val a = amountText.toLongOrNull() ?: 0L
+                    val a = com.example.ui.components.PersianCurrencyFormatter.extractCleanAmount(amountText)
                     onConfirm(sayadNumber.ifBlank { "0000000000000000" }, selectedType, a, bankName.ifBlank { "نامشخص" }, partyName.ifBlank { "نامشخص" })
                 },
                 modifier = Modifier.fillMaxWidth().height(50.dp),

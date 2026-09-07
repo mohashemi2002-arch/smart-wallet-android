@@ -195,15 +195,11 @@ fun AddBankAccountDialog(
                                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                                     modifier = Modifier.padding(top = 2.dp)
                                 ) {
-                                    Surface(
-                                        shape = CircleShape,
-                                        color = Color(android.graphics.Color.parseColor(selectedColorHex)).copy(alpha = 0.3f),
-                                        modifier = Modifier.size(20.dp)
-                                    ) {
-                                        Box(contentAlignment = Alignment.Center) {
-                                            Text("🏦", fontSize = 10.sp)
-                                        }
-                                    }
+                                    com.example.ui.components.BankLogoImage(
+                                        bankName = bankName,
+                                        cardNumber = cardNumber,
+                                        size = 20.dp
+                                    )
                                     Text(
                                         text = bankName,
                                         color = Color(0xFF90CAF9),
@@ -319,7 +315,12 @@ fun AddBankAccountDialog(
                     if (initialBalanceEnabled) {
                         OutlinedTextField(
                             value = balanceTextRial,
-                            onValueChange = { balanceTextRial = it.filter { c -> c.isDigit() } },
+                            onValueChange = { input -> 
+                        if (input.all { it.isDigit() || it in '۰'..'۹' }) {
+                            balanceTextRial = input
+                        }
+                    },
+                    visualTransformation = com.example.ui.components.ThousandsSeparatorVisualTransformation(),
                             trailingIcon = { Text("ریال", color = Color(0xFF8A9AAD), modifier = Modifier.padding(end = 12.dp)) },
                             modifier = Modifier.fillMaxWidth(),
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -361,7 +362,7 @@ fun AddBankAccountDialog(
                             onClick = {
                                 val finalBankName = if (bankName.isNotBlank() && bankName != "بانک ناشناخته") bankName else "بانک تخصصی"
                                 val finalAccName = accountName.ifBlank { if (cardNumber.length >= 4) "کارت ${cardNumber.takeLast(4)}" else "حساب اصلی" }
-                                val rialAmount = balanceTextRial.toLongOrNull() ?: 0L
+                                val rialAmount = com.example.ui.components.PersianCurrencyFormatter.extractCleanAmount(balanceTextRial)
                                 val tomanAmount = if (initialBalanceEnabled) rialAmount / 10L else 0L
 
                                 onConfirm(

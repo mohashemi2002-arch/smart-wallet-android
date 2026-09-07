@@ -1,5 +1,7 @@
 package com.example.ui.screens
 
+import com.example.ui.components.formatAsToman
+
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -191,14 +193,14 @@ fun CategoryBudgetCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "مصرف شده: ${PersianFormatters.formatMoney(spentToman, currencyUnit)}",
+                    text = "مصرف شده: ${spentToman.formatAsToman() + if (currencyUnit == com.example.ui.components.CurrencyUnit.RIAL) " ریال" else " تومان"}",
                     style = MaterialTheme.typography.bodySmall,
                     color = progressColor,
                     fontWeight = FontWeight.Bold
                 )
 
                 Text(
-                    text = "سقف: ${PersianFormatters.formatMoney(limitToman, currencyUnit)} (${PersianFormatters.toPersianDigits(percentInt.toString())}٪)",
+                    text = "سقف: ${limitToman.formatAsToman() + if (currencyUnit == com.example.ui.components.CurrencyUnit.RIAL) " ریال" else " تومان"} (${PersianFormatters.toPersianDigits(percentInt.toString())}٪)",
                     style = MaterialTheme.typography.bodySmall,
                     color = Color(0xFFCAC4D0)
                 )
@@ -388,12 +390,12 @@ fun BudgetDonutChart(
                 ) {
                     Column(horizontalAlignment = Alignment.Start) {
                         Text("کل بودجه", style = MaterialTheme.typography.bodySmall, color = Color(0xFFCAC4D0))
-                        Text(PersianFormatters.formatMoney(totalBudget, currencyUnit), style = MaterialTheme.typography.titleMedium, color = Color(0xFFE6E1E5))
+                        Text(totalBudget.formatAsToman() + if (currencyUnit == com.example.ui.components.CurrencyUnit.RIAL) " ریال" else " تومان", style = MaterialTheme.typography.titleMedium, color = Color(0xFFE6E1E5))
                     }
                     Column(horizontalAlignment = Alignment.End) {
                         Text(if (totalSpent > totalBudget) "بیشتر از بودجه" else "باقی‌مانده", style = MaterialTheme.typography.bodySmall, color = Color(0xFFCAC4D0))
                         val diff = if (totalSpent > totalBudget) totalSpent - totalBudget else remainingBudget
-                        Text(PersianFormatters.formatMoney(diff, currencyUnit), style = MaterialTheme.typography.titleMedium, color = if (totalSpent > totalBudget) Color(0xFFF2B8B5) else Color(0xFFB1E5D3))
+                        Text(diff.formatAsToman() + if (currencyUnit == com.example.ui.components.CurrencyUnit.RIAL) " ریال" else " تومان", style = MaterialTheme.typography.titleMedium, color = if (totalSpent > totalBudget) Color(0xFFF2B8B5) else Color(0xFFB1E5D3))
                     }
                 }
                 

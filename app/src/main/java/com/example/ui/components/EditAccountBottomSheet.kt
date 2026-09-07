@@ -89,7 +89,12 @@ fun EditAccountBottomSheet(
 
             OutlinedTextField(
                 value = balanceTextRial,
-                onValueChange = { balanceTextRial = it.filter { c -> c.isDigit() } },
+                onValueChange = { input -> 
+                        if (input.all { it.isDigit() || it in '۰'..'۹' }) {
+                            balanceTextRial = input
+                        }
+                    },
+                    visualTransformation = com.example.ui.components.ThousandsSeparatorVisualTransformation(),
                 label = { Text("موجودی (ریال)") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.fillMaxWidth()
@@ -138,7 +143,7 @@ fun EditAccountBottomSheet(
 
                     Button(
                         onClick = {
-                            val newBalance = (balanceTextRial.toLongOrNull() ?: 0L) / 10L
+                            val newBalance = (com.example.ui.components.PersianCurrencyFormatter.extractCleanAmount(balanceTextRial)) / 10L
                             onUpdate(account.copy(
                                 bankName = bankName,
                                 accountName = accountName,

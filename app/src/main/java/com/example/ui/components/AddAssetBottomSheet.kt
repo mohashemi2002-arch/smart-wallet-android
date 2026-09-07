@@ -65,7 +65,12 @@ fun AddAssetBottomSheet(
 
             OutlinedTextField(
                 value = priceRial,
-                onValueChange = { priceRial = it.filter { c -> c.isDigit() } },
+                onValueChange = { input -> 
+                        if (input.all { it.isDigit() || it in '۰'..'۹' }) {
+                            priceRial = input
+                        }
+                    },
+                    visualTransformation = com.example.ui.components.ThousandsSeparatorVisualTransformation(),
                 label = { Text("ارزش هر واحد (ریال)") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.fillMaxWidth()
@@ -74,7 +79,7 @@ fun AddAssetBottomSheet(
             Button(
                 onClick = {
                     val q = quantity.toDoubleOrNull() ?: 0.0
-                    val p = (priceRial.toLongOrNull() ?: 0L) / 10L
+                    val p = (com.example.ui.components.PersianCurrencyFormatter.extractCleanAmount(priceRial)) / 10L
                     onConfirm(name.ifBlank { "دارایی" }, selectedType, q, p, unit)
                 },
                 modifier = Modifier.fillMaxWidth().height(50.dp),

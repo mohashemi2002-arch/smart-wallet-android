@@ -93,3 +93,37 @@ fun SmartWalletPlusBadge(modifier: Modifier = Modifier) {
         }
     }
 }
+
+object PersianCurrencyFormatter {
+    fun formatToman(amount: Long, usePersianDigits: Boolean = true): String {
+        val formatter = java.text.DecimalFormat("#,###")
+        val formatted = formatter.format(amount)
+        val withPersianCommas = formatted.replace(",", "،")
+        return if (usePersianDigits) toPersianDigits(withPersianCommas) else withPersianCommas
+    }
+
+    fun toPersianDigits(input: String): String {
+        val persianDigits = arrayOf("۰", "۱", "۲", "۳", "۴", "۵", "۶", "۷", "۸", "۹")
+        var result = input
+        for (i in 0..9) {
+            result = result.replace(i.toString(), persianDigits[i])
+        }
+        return result
+    }
+
+    fun extractCleanAmount(input: String): Long {
+        val cleanAscii = input
+            .replace("۰", "0").replace("۱", "1").replace("۲", "2")
+            .replace("۳", "3").replace("۴", "4").replace("۵", "5")
+            .replace("۶", "6").replace("۷", "7").replace("۸", "8")
+            .replace("۹", "9")
+            .replace(",", "")
+            .replace("،", "")
+            .replace(" ", "")
+            .filter { it.isDigit() }
+        return cleanAscii.toLongOrNull() ?: 0L
+    }
+}
+
+fun Long.formatAsToman(usePersianDigits: Boolean = true): String =
+    PersianCurrencyFormatter.formatToman(this, usePersianDigits)

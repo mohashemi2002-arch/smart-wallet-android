@@ -1,5 +1,7 @@
 package com.example.ui.screens
 
+import com.example.ui.components.formatAsToman
+
 import android.content.Context
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -134,19 +136,19 @@ fun ReportsScreen(
                 Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text("کل درآمد:", color = Color(0xFF388E3C))
-                        Text(PersianFormatters.formatMoney(totalInflow), fontWeight = FontWeight.Bold, color = Color(0xFF388E3C))
+                        Text(totalInflow.formatAsToman() + " تومان", fontWeight = FontWeight.Bold, color = Color(0xFF388E3C))
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text("کل هزینه:", color = Color(0xFFD32F2F))
-                        Text(PersianFormatters.formatMoney(totalOutflow), fontWeight = FontWeight.Bold, color = Color(0xFFD32F2F))
+                        Text(totalOutflow.formatAsToman() + " تومان", fontWeight = FontWeight.Bold, color = Color(0xFFD32F2F))
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                     HorizontalDivider()
                     Spacer(modifier = Modifier.height(8.dp))
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text("تراز خالص:", fontWeight = FontWeight.Bold)
-                        Text(PersianFormatters.formatMoney(netBalance), fontWeight = FontWeight.Bold)
+                        Text(netBalance.formatAsToman() + " تومان", fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -175,7 +177,7 @@ fun ReportsScreen(
                                 Text(PersianFormatters.formatDate(tx.dateMillis), style = MaterialTheme.typography.bodySmall)
                             }
                             Text(
-                                text = PersianFormatters.formatMoney(tx.amountToman),
+                                text = tx.amountToman.formatAsToman() + " تومان",
                                 color = if (tx.type == TransactionType.INCOME) Color(0xFF388E3C) else Color(0xFFD32F2F),
                                 fontWeight = FontWeight.Bold
                             )

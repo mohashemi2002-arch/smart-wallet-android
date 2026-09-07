@@ -135,17 +135,25 @@ fun PendingSmsCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Surface(
-                    color = Color(0xFF333E52),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text(
-                        text = "تراکنش بانکی",
-                        color = Color.White,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    com.example.ui.components.BankLogoImage(
+                        bankName = transaction.merchantName,
+                        cardNumber = transaction.cardNumber,
+                        size = 32.dp,
+                        containerColor = Color.Transparent
                     )
+                    Surface(
+                        color = Color(0xFF333E52),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text(
+                            text = transaction.merchantName.ifBlank { "تراکنش بانکی" },
+                            color = Color.White,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
                 Text(
                     text = PersianFormatters.formatDate(transaction.dateMillis),

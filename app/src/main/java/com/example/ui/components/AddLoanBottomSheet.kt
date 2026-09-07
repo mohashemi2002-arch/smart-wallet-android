@@ -46,7 +46,12 @@ fun AddLoanBottomSheet(
 
             OutlinedTextField(
                 value = totalAmountText,
-                onValueChange = { totalAmountText = it.filter { c -> c.isDigit() } },
+                onValueChange = { input -> 
+                        if (input.all { it.isDigit() || it in '۰'..'۹' }) {
+                            totalAmountText = input
+                        }
+                    },
+                    visualTransformation = com.example.ui.components.ThousandsSeparatorVisualTransformation(),
                 label = { Text("مبلغ کل وام (تومان)") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.fillMaxWidth()
@@ -55,14 +60,24 @@ fun AddLoanBottomSheet(
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
                     value = countText,
-                    onValueChange = { countText = it.filter { c -> c.isDigit() } },
+                    onValueChange = { input -> 
+                        if (input.all { it.isDigit() || it in '۰'..'۹' }) {
+                            countText = input
+                        }
+                    },
+                    visualTransformation = com.example.ui.components.ThousandsSeparatorVisualTransformation(),
                     label = { Text("تعداد اقساط") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.weight(1f)
                 )
                 OutlinedTextField(
                     value = amountText,
-                    onValueChange = { amountText = it.filter { c -> c.isDigit() } },
+                    onValueChange = { input -> 
+                        if (input.all { it.isDigit() || it in '۰'..'۹' }) {
+                            amountText = input
+                        }
+                    },
+                    visualTransformation = com.example.ui.components.ThousandsSeparatorVisualTransformation(),
                     label = { Text("مبلغ هر قسط (تومان)") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.weight(1f)
@@ -72,9 +87,9 @@ fun AddLoanBottomSheet(
             Button(
                 onClick = {
                     val t = title.ifBlank { "وام جدید" }
-                    val tot = totalAmountText.toLongOrNull() ?: 0L
+                    val tot = com.example.ui.components.PersianCurrencyFormatter.extractCleanAmount(totalAmountText)
                     val c = countText.toIntOrNull() ?: 1
-                    val a = amountText.toLongOrNull() ?: 0L
+                    val a = com.example.ui.components.PersianCurrencyFormatter.extractCleanAmount(amountText)
                     onConfirm(t, tot, c, a)
                 },
                 modifier = Modifier.fillMaxWidth().height(50.dp),

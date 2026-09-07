@@ -1,5 +1,7 @@
 package com.example.ui.components
 
+import com.example.ui.components.formatAsToman
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -47,17 +49,25 @@ fun BankCardItem(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column {
-                        Text(
-                            text = account.bankName,
-                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                            color = Color.White
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        com.example.ui.components.BankLogoImage(
+                            bankName = account.bankName,
+                            cardNumber = account.cardNumber,
+                            size = 42.dp,
+                            containerColor = Color.White.copy(alpha = 0.2f)
                         )
-                        Text(
-                            text = account.accountName,
-                            fontSize = 10.sp,
-                            color = Color.White.copy(alpha = 0.8f)
-                        )
+                        Column {
+                            Text(
+                                text = account.bankName,
+                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                color = Color.White
+                            )
+                            Text(
+                                text = account.accountName,
+                                fontSize = 10.sp,
+                                color = Color.White.copy(alpha = 0.8f)
+                            )
+                        }
                     }
 
                     if (onDelete != null) {
@@ -85,7 +95,7 @@ fun BankCardItem(
                 Column {
                     Text(text = "موجودی فعلی:", fontSize = 9.sp, color = Color.White.copy(alpha = 0.7f))
                     Text(
-                        text = PersianFormatters.formatMoney(account.balanceToman, currencyUnit),
+                        text = account.balanceToman.formatAsToman() + if (currencyUnit == com.example.ui.components.CurrencyUnit.RIAL) " ریال" else " تومان",
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White

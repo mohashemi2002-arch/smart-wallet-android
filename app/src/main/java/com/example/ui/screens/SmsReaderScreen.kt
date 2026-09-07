@@ -1,5 +1,7 @@
 package com.example.ui.screens
 
+import com.example.ui.components.formatAsToman
+
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
@@ -221,7 +223,7 @@ fun SmsReaderScreen(
                                         Column(modifier = Modifier.padding(12.dp)) {
                                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                                 Text(text = if (isExpense) "برداشت" else "واریز", color = if (isExpense) Color(0xFFF2B8B5) else Color(0xFFB1E5D3), fontWeight = FontWeight.Bold)
-                                                Text(text = PersianFormatters.formatMoney(pending.amountToman, currencyUnit), color = Color.White, fontWeight = FontWeight.Bold)
+                                                Text(text = pending.amountToman.formatAsToman() + if (currencyUnit == com.example.ui.components.CurrencyUnit.RIAL) " ریال" else " تومان", color = Color.White, fontWeight = FontWeight.Bold)
                                             }
                                             Spacer(Modifier.height(8.dp))
                                             Text(text = "فروشگاه: ${pending.merchantName}", color = Color(0xFFCAC4D0), fontSize = 12.sp)
@@ -528,7 +530,7 @@ fun SmsReaderScreen(
                                     Column {
                                         Text("مبلغ:", style = MaterialTheme.typography.bodySmall)
                                         Text(
-                                            text = PersianFormatters.formatMoney(result.amountToman, currencyUnit),
+                                            text = result.amountToman.formatAsToman() + if (currencyUnit == com.example.ui.components.CurrencyUnit.RIAL) " ریال" else " تومان",
                                             style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                                             color = typeColor
                                         )

@@ -1,5 +1,7 @@
 package com.example.ui.screens
 
+import com.example.ui.components.formatAsToman
+
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -223,7 +225,7 @@ fun MarketRatesScreen(
 
                             Column(horizontalAlignment = Alignment.End) {
                                 Text(
-                                    text = PersianFormatters.formatMoney(rate.priceToman, currencyUnit),
+                                    text = rate.priceToman.formatAsToman() + if (currencyUnit == com.example.ui.components.CurrencyUnit.RIAL) " ریال" else " تومان",
                                     fontWeight = FontWeight.Bold,
                                     color = Color(0xFFFFD54F),
                                     fontSize = 15.sp
@@ -389,7 +391,7 @@ fun MarketHighlightCard(
             }
 
             Text(
-                text = PersianFormatters.formatMoney(priceToman, currencyUnit),
+                text = priceToman.formatAsToman() + if (currencyUnit == com.example.ui.components.CurrencyUnit.RIAL) " ریال" else " تومان",
                 fontWeight = FontWeight.Bold,
                 fontSize = 17.sp,
                 color = Color.White
@@ -399,8 +401,8 @@ fun MarketHighlightCard(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text("کف: ${PersianFormatters.formatMoney(lowToman, currencyUnit)}", fontSize = 10.sp, color = Color(0xFF8A9AAD))
-                Text("سقف: ${PersianFormatters.formatMoney(highToman, currencyUnit)}", fontSize = 10.sp, color = Color(0xFF8A9AAD))
+                Text("کف: ${lowToman.formatAsToman() + if (currencyUnit == com.example.ui.components.CurrencyUnit.RIAL) " ریال" else " تومان"}", fontSize = 10.sp, color = Color(0xFF8A9AAD))
+                Text("سقف: ${highToman.formatAsToman() + if (currencyUnit == com.example.ui.components.CurrencyUnit.RIAL) " ریال" else " تومان"}", fontSize = 10.sp, color = Color(0xFF8A9AAD))
             }
         }
     }
@@ -457,7 +459,7 @@ fun MarketRateRowItem(
             ) {
                 Column(horizontalAlignment = Alignment.End) {
                     Text(
-                        text = PersianFormatters.formatMoney(rate.priceToman, currencyUnit),
+                        text = rate.priceToman.formatAsToman() + if (currencyUnit == com.example.ui.components.CurrencyUnit.RIAL) " ریال" else " تومان",
                         fontWeight = FontWeight.Bold,
                         color = Color.White,
                         fontSize = 15.sp
@@ -539,7 +541,7 @@ fun LiveRateConverterDialog(
                 ) {
                     Text("نرخ پایه زنده:", color = Color(0xFF8A9AAD), fontSize = 12.sp)
                     Text(
-                        text = PersianFormatters.formatMoney(rate.priceToman, currencyUnit),
+                        text = rate.priceToman.formatAsToman() + if (currencyUnit == com.example.ui.components.CurrencyUnit.RIAL) " ریال" else " تومان",
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFF90CAF9)
                     )
@@ -572,7 +574,7 @@ fun LiveRateConverterDialog(
                     ) {
                         Text("مبلغ کل معادل:", fontSize = 12.sp, color = Color(0xFFB0BEC5))
                         Text(
-                            text = PersianFormatters.formatMoney(totalToman, currencyUnit),
+                            text = totalToman.formatAsToman() + if (currencyUnit == com.example.ui.components.CurrencyUnit.RIAL) " ریال" else " تومان",
                             style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                             color = Color(0xFFFFD54F)
                         )

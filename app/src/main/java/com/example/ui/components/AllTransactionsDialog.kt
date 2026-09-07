@@ -1,5 +1,7 @@
 package com.example.ui.components
 
+import com.example.ui.components.formatAsToman
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -159,7 +161,7 @@ fun AllTransactionsDialog(
                             fontWeight = FontWeight.SemiBold
                         )
                         Text(
-                            text = "$signStr ${PersianFormatters.formatMoney(Math.abs(netTotal), currencyUnit)}",
+                            text = "$signStr ${Math.abs(netTotal).formatAsToman() + if (currencyUnit == com.example.ui.components.CurrencyUnit.RIAL) " ریال" else " تومان"}",
                             color = if (isPositiveNet) Color(0xFF4ADE80) else Color(0xFFF87171),
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold
@@ -209,7 +211,7 @@ fun AllTransactionsDialog(
                         val net = incomeSum - expenseSum
                         val isPositive = net >= 0
                         
-                        val sumText = (if (isPositive) "+" else "-") + " " + PersianFormatters.formatMoney(Math.abs(net), currencyUnit)
+                        val sumText = (if (isPositive) "+" else "-") + " " + Math.abs(net).formatAsToman() + if (currencyUnit == com.example.ui.components.CurrencyUnit.RIAL) " ریال" else " تومان"
 
                         item {
                             DayTransactionGroup(
@@ -267,7 +269,7 @@ fun DayTransactionGroup(
             val sign = if (isInc) "+" else "-"
             val iconInfo = CategoryIconMap.getIconForCategory(tx.categoryName)
             val title = tx.categoryName.ifBlank { "نامشخص" }
-            val amountText = "$sign ${PersianFormatters.formatMoney(tx.amountToman, currencyUnit)}"
+            val amountText = "$sign ${tx.amountToman.formatAsToman() + if (currencyUnit == com.example.ui.components.CurrencyUnit.RIAL) " ریال" else " تومان"}"
 
             val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
             var hasVibrated by remember { mutableStateOf(false) }

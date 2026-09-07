@@ -1,5 +1,7 @@
 package com.example.ui.screens
 
+import com.example.ui.components.formatAsToman
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -138,7 +140,7 @@ fun LoansTab(viewModel: LoansViewModel) {
                     }
                     Column(horizontalAlignment = Alignment.End) {
                         Text(
-                            text = "${PersianFormatters.formatMoney(inst.amount)}",
+                            text = "${inst.amount.formatAsToman() + " تومان"}",
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.error
                         )
@@ -167,8 +169,8 @@ fun LoansTab(viewModel: LoansViewModel) {
                 Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
                     Text(loan.title, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text("کل مبلغ: ${PersianFormatters.formatMoney(loan.totalAmount)}")
-                    Text("مبلغ هر قسط: ${PersianFormatters.formatMoney(loan.installmentAmount)}")
+                    Text("کل مبلغ: ${loan.totalAmount.formatAsToman() + " تومان"}")
+                    Text("مبلغ هر قسط: ${loan.installmentAmount.formatAsToman() + " تومان"}")
                     Text("تعداد اقساط: ${PersianFormatters.toPersianDigits(loan.installmentCount.toString())}")
                 }
             }
@@ -203,7 +205,7 @@ fun ChequesTab(viewModel: ChequesViewModel) {
                     Text("شماره صیاد: ${PersianFormatters.toPersianDigits(cheque.sayadNumber)}")
                     Text("بانک: ${cheque.bankName} - در وجه: ${cheque.partyName}")
                     Text(
-                        text = "مبلغ: ${PersianFormatters.formatMoney(cheque.amount)}",
+                        text = "مبلغ: ${cheque.amount.formatAsToman() + " تومان"}",
                         fontWeight = FontWeight.Bold
                     )
                     Text("سررسید: ${PersianFormatters.formatDate(cheque.dueDateTimestamp)}")

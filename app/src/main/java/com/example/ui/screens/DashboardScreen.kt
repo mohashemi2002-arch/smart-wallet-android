@@ -1,5 +1,7 @@
 package com.example.ui.screens
 
+import com.example.ui.components.formatAsToman
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -134,10 +136,7 @@ fun DashboardScreen(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 Text(
-                                    text = PersianFormatters.formatMoney(
-                                        netWorth,
-                                        currencyUnit
-                                    ),
+                                    text = netWorth.let { com.example.ui.components.PersianCurrencyFormatter.formatToman(it, true) } + if (currencyUnit == CurrencyUnit.RIAL) " ریال" else " تومان",
                                     style = MaterialTheme.typography.titleLarge.copy(
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 22.sp
@@ -163,7 +162,8 @@ fun DashboardScreen(
                             items(bankAccounts) { acc ->
                                 BankCardHeaderPill(
                                     bankName = acc.bankName,
-                                    balanceText = PersianFormatters.formatMoney(acc.balanceToman, currencyUnit),
+                                    cardNumber = acc.cardNumber,
+                                    balanceText = acc.balanceToman.let { com.example.ui.components.PersianCurrencyFormatter.formatToman(it, true) } + if (currencyUnit == CurrencyUnit.RIAL) " ریال" else " تومان",
                                     bgColor = Color(0xFF2C384A),
                                     iconColor = Color(0xFF7FA2FF),
                                     onClick = { selectedBankAccount = acc; showEditAccountDialog = true }
@@ -366,7 +366,7 @@ fun DashboardScreen(
                                         )
                                     }
                                     Text(
-                                        text = "دلار: ${usdRate?.priceToman?.let { PersianFormatters.formatMoney(it, currencyUnit) } ?: "---"}  |  طلا: ${goldRate?.priceToman?.let { PersianFormatters.formatMoney(it, currencyUnit) } ?: "---"}",
+                                        text = "دلار: ${usdRate?.priceToman?.let { it.let { com.example.ui.components.PersianCurrencyFormatter.formatToman(it, true) } + if (currencyUnit == CurrencyUnit.RIAL) " ریال" else " تومان" } ?: "---"}  |  طلا: ${goldRate?.priceToman?.let { it.let { com.example.ui.components.PersianCurrencyFormatter.formatToman(it, true) } + if (currencyUnit == CurrencyUnit.RIAL) " ریال" else " تومان" } ?: "---"}",
                                         fontSize = 11.sp,
                                         color = Color(0xFF90CAF9)
                                     )
@@ -517,7 +517,7 @@ fun DashboardScreen(
                                     
                                     RecentTransactionRow(
                                         title = tx.categoryName.ifBlank { "نامشخص" },
-                                        amountText = "$sign ${PersianFormatters.formatMoney(tx.amountToman, currencyUnit)}",
+                                        amountText = "$sign ${tx.amountToman.let { com.example.ui.components.PersianCurrencyFormatter.formatToman(it, true) }} ${if (currencyUnit == CurrencyUnit.RIAL) "ریال" else "تومان"}",
                                         dateText = PersianFormatters.formatDate(tx.dateMillis),
                                         isIncome = isInc,
                                         iconBgColor = iconInfo.first,
@@ -609,6 +609,7 @@ fun DashboardScreen(
 @Composable
 fun BankCardHeaderPill(
     bankName: String,
+    cardNumber: String,
     balanceText: String,
     bgColor: Color,
     iconColor: Color,
@@ -641,21 +642,12 @@ fun BankCardHeaderPill(
                     fontWeight = FontWeight.SemiBold
                 )
             }
-
-            Surface(
-                shape = CircleShape,
-                color = iconColor.copy(alpha = 0.2f),
-                modifier = Modifier.size(36.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = Icons.Default.AccountBalance,
-                        contentDescription = null,
-                        tint = iconColor,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
+            com.example.ui.components.BankLogoImage(
+                bankName = bankName,
+                cardNumber = cardNumber,
+                size = 36.dp,
+                containerColor = Color.White.copy(alpha = 0.2f)
+            )
         }
     }
 }
@@ -871,9 +863,15 @@ fun AddTransactionDialog(
 
                 OutlinedTextField(
                     value = amountText,
-                    onValueChange = { amountText = it },
+                    onValueChange = { input ->
+                        if (input.all { it.isDigit() || it in '۰'..'۹' }) {
+                            amountText = input
+                        }
+                    },
                     label = { Text("مبلغ (تومان)") },
+                    visualTransformation = com.example.ui.components.ThousandsSeparatorVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    trailingIcon = { Text("تومان", style = MaterialTheme.typography.bodySmall) },
                     modifier = Modifier.fillMaxWidth()
                 )
 
@@ -888,7 +886,7 @@ fun AddTransactionDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    val amount = amountText.toLongOrNull() ?: 0L
+                    val amount = com.example.ui.components.PersianCurrencyFormatter.extractCleanAmount(amountText)
                     onConfirm(amount, selectedType, selectedCategory, merchantText.ifBlank { "تراکنش دستی" })
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF5C82E6))
