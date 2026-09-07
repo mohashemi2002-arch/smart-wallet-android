@@ -1,4 +1,6 @@
 package com.example.ui.viewmodel
+import com.example.ui.components.PersianFormatters
+import kotlinx.coroutines.flow.map
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
@@ -8,6 +10,7 @@ import com.example.data.FinanceRepository
 import com.example.data.MarketRepository
 import com.example.data.SmsAiParser
 import com.example.data.model.*
+import com.example.data.database.AppDatabase
 import com.example.ui.components.CurrencyUnit
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -15,11 +18,38 @@ import kotlinx.coroutines.launch
 class FinanceViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = FinanceRepository.getInstance(application)
-    private val marketRepository = MarketRepository.getInstance()
+    private val database = AppDatabase.getDatabase(application)
+    private val marketRepository = MarketRepository.getInstance(database.marketRateDao(), database.assetDao())
 
-    val marketRates: StateFlow<List<MarketRate>> = marketRepository.rates
-    val isRefreshingMarket: StateFlow<Boolean> = marketRepository.isRefreshing
-    val lastMarketUpdatedTime: StateFlow<String> = marketRepository.lastUpdatedTime
+    val marketRates: StateFlow<List<MarketRate>> = marketRepository.getCachedRates().map { entities ->
+        entities.map { entity ->
+            val cat = when (entity.category) {
+                "CURRENCY" -> MarketCategory.CURRENCY
+                "GOLD" -> MarketCategory.GOLD_COIN
+                "CRYPTO" -> MarketCategory.CRYPTO
+                else -> MarketCategory.CURRENCY
+            }
+            val unitStr = if (entity.category == "GOLD" && entity.symbol.contains("18K")) "تومان / گرم" else "تومان"
+            val changeD = entity.changePercent.replace(Regex("[^0-9.]"), "").toDoubleOrNull() ?: 0.0
+            val finalChange = if (entity.isPositive) changeD else -changeD
+            
+            MarketRate(
+                id = entity.symbol,
+                titleFa = entity.name,
+                symbol = entity.symbol,
+                priceToman = entity.priceToman,
+                changePercent = finalChange,
+                highToman = 0L,
+                lowToman = 0L,
+                category = cat,
+                unit = unitStr,
+                lastUpdated = PersianFormatters.formatDateTime(entity.lastUpdatedTimestamp)
+            )
+        }
+    }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+    private val _isRefreshingMarket = MutableStateFlow(false)
+    val isRefreshingMarket: StateFlow<Boolean> = _isRefreshingMarket.asStateFlow()
+    val lastMarketUpdatedTime: StateFlow<String> = marketRates.map { rates -> rates.firstOrNull()?.lastUpdated ?: "" }.stateIn(viewModelScope, SharingStarted.Lazily, "")
 
     init {
         // Initial fetch of market rates
@@ -28,7 +58,9 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
 
     fun refreshMarketRates() {
         viewModelScope.launch {
-            marketRepository.fetchLiveRates()
+            _isRefreshingMarket.value = true
+            val result = marketRepository.refreshRates()
+            _isRefreshingMarket.value = false
         }
     }
 

@@ -17,9 +17,10 @@ import com.example.data.model.*
         InstallmentEntity::class,
         ChequeEntity::class,
         BankAccount::class,
-        BankSmsSender::class
+        BankSmsSender::class,
+        MarketRateEntity::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -31,6 +32,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun chequeDao(): ChequeDao
     abstract fun bankAccountDao(): BankAccountDao
     abstract fun bankSmsSenderDao(): BankSmsSenderDao
+    abstract fun marketRateDao(): MarketRateDao
 
     companion object {
         @Volatile

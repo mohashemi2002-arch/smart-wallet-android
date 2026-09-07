@@ -8,6 +8,8 @@ import kotlinx.coroutines.flow.Flow
 interface AssetDao {
     @Query("SELECT * FROM assets ORDER BY id DESC")
     fun getAllAssets(): Flow<List<Asset>>
+    @Query("SELECT * FROM assets")
+    suspend fun getAllAssetsSync(): List<Asset>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(asset: Asset): Long
