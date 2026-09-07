@@ -19,7 +19,8 @@ data class GitHubAsset(
     val id: Long = 0,
     val name: String = "",
     val size: Long = 0,
-    val url: String = ""
+    val url: String = "",
+    val browser_download_url: String = ""
 )
 
 class GitHubUpdateService(private val owner: String, private val repo: String, private val token: String) {

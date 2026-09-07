@@ -21,13 +21,13 @@ android {
     applicationId = "com.aistudio.smartwallet.ai.qmfzzm"
     minSdk = 24
     targetSdk = 36
-    versionCode = 5
-    versionName = "1.4.0"
+    versionCode = 6
+    versionName = "1.5.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     buildConfigField("String", "GITHUB_OWNER", "\"mohashemi2002-arch\"")
     buildConfigField("String", "GITHUB_REPO", "\"smart-wallet-android\"")
-    buildConfigField("String", "GITHUB_TOKEN", "\"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\"")
+    buildConfigField("String", "GITHUB_TOKEN", "\"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\"")
   }
 
   signingConfigs {

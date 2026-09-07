@@ -62,17 +62,25 @@ class AppUpdateManager(private val context: Context) {
         return@withContext null
     }
 
+
     suspend fun downloadUpdate(asset: GitHubAsset) = withContext(Dispatchers.IO) {
         _downloadState.value = DownloadState.Downloading(0f, "0", "0")
         try {
-            val builder = Request.Builder().url(asset.url)
-            if (token.isNotBlank()) builder.header("Authorization", "Bearer $token")
-            builder.header("Accept", "application/octet-stream")
-            builder.header("X-GitHub-Api-Version", "2022-11-28")
+            // Use browser_download_url if available, fallback to api url
+            val targetUrl = if (asset.browser_download_url.isNotBlank()) asset.browser_download_url else asset.url
+            val builder = Request.Builder().url(targetUrl)
+            
+            // Only add auth headers if using the API URL, because browser_download_url (S3) will reject the token
+            if (targetUrl == asset.url) {
+                if (token.isNotBlank()) builder.header("Authorization", "Bearer $token")
+                builder.header("Accept", "application/octet-stream")
+                builder.header("X-GitHub-Api-Version", "2022-11-28")
+            }
             
             val request = builder.build()
 
             client.newCall(request).execute().use { response ->
+
 
 
 
