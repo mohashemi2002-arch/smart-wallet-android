@@ -45,15 +45,17 @@ class AppUpdateManager(private val context: Context) {
         return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
     }
 
+
     suspend fun checkForUpdates(isManualCheck: Boolean = false): GitHubRelease? = withContext(Dispatchers.IO) {
         if (!isNetworkAvailable()) return@withContext null
-        val latestRelease = updateService.getLatestRelease() ?: return@withContext null
         
+        // --- Mock Update System for Testing ---
         val currentVersion = BuildConfig.VERSION_NAME
-        val latestTag = latestRelease.tag_name.removePrefix("v").removePrefix("V")
+        val mockTag = "9.9.9"
         
-        if (latestTag != currentVersion && latestTag.isNotEmpty()) {
-            return@withContext latestRelease
+        if (currentVersion != mockTag) {
+            val asset = GitHubAsset(id = 101, name = "update_test.apk", size = 10485760L, url = "https://proof.ovh.net/files/10Mb.dat")
+            return@withContext GitHubRelease(tag_name = "v9.9.9", name = "آپدیت تستی (نسخه نمایشی)", body = "این یک پیغام تستی است.", assets = listOf(asset))
         }
         return@withContext null
     }
@@ -61,14 +63,15 @@ class AppUpdateManager(private val context: Context) {
     suspend fun downloadUpdate(asset: GitHubAsset) = withContext(Dispatchers.IO) {
         _downloadState.value = DownloadState.Downloading(0f, "0", "0")
         try {
-            val request = Request.Builder()
-                .url(asset.url)
-                .header("Authorization", "Bearer $token")
-                .header("Accept", "application/octet-stream")
-                .header("X-GitHub-Api-Version", "2022-11-28")
-                .build()
+            val builder = Request.Builder().url(asset.url)
+            if (token.isNotBlank()) builder.header("Authorization", "Bearer $token")
+            builder.header("Accept", "application/octet-stream")
+            builder.header("X-GitHub-Api-Version", "2022-11-28")
+            
+            val request = builder.build()
 
             client.newCall(request).execute().use { response ->
+
                 if (!response.isSuccessful) {
                     _downloadState.value = DownloadState.Error("خطا در دانلود (${response.code})")
                     return@use
