@@ -104,9 +104,10 @@ fun UpdatePromptDialog(
                                 }
                                 Button(
                                     onClick = {
-                                        val apkAsset = release.assets.find { it.name.endsWith(".apk") }
+                                                                                val apkAsset = release.assets.find { it.name.endsWith(".apk") }
                                         if (apkAsset != null) {
                                             scope.launch { updateManager.downloadUpdate(apkAsset) }
+                                        } else {
                                         }
                                     },
                                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF5C82E6))
@@ -165,9 +166,10 @@ fun UpdatePromptDialog(
                                 }
                                 Button(
                                     onClick = {
-                                        val apkAsset = release.assets.find { it.name.endsWith(".apk") }
+                                                                                val apkAsset = release.assets.find { it.name.endsWith(".apk") }
                                         if (apkAsset != null) {
                                             scope.launch { updateManager.downloadUpdate(apkAsset) }
+                                        } else {
                                         }
                                     },
                                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF5C82E6))

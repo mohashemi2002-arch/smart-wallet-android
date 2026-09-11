@@ -15,14 +15,14 @@ plugins {
 
 android {
   namespace = "com.example"
-  compileSdk { version = release(36) { minorApiLevel = 1 } }
+  compileSdk = 35
 
   defaultConfig {
     applicationId = "com.aistudio.smartwallet.ai.qmfzzm"
     minSdk = 24
-    targetSdk = 36
-    versionCode = 6
-    versionName = "1.5.0"
+    targetSdk = 35
+    versionCode = 8
+    versionName = "1.5.2"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     buildConfigField("String", "GITHUB_OWNER", "\"mohashemi2002-arch\"")
