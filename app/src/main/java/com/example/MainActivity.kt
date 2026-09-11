@@ -95,6 +95,30 @@ enum class ScreenTab(val title: String, val icon: androidx.compose.ui.graphics.v
 @Composable
 fun SmartWalletApp(financeViewModel: FinanceViewModel = viewModel()) {
     val context = LocalContext.current
+
+    var crashLog by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) {
+        val prefs = context.getSharedPreferences("crash_prefs", android.content.Context.MODE_PRIVATE)
+        val lastCrash = prefs.getString("last_crash", null)
+        if (lastCrash != null) {
+            crashLog = lastCrash
+            prefs.edit().remove("last_crash").apply()
+        }
+    }
+
+    if (crashLog != null) {
+        AlertDialog(
+            onDismissRequest = { crashLog = null },
+            title = { Text("App Crashed Previously") },
+            text = { Text("Crash Details:\n$crashLog") },
+            confirmButton = {
+                Button(onClick = { crashLog = null }) {
+                    Text("OK")
+                }
+            }
+        )
+    }
+
     val updateManager = remember { AppUpdateManager(context) }
     var updateRelease by remember { mutableStateOf<GitHubRelease?>(null) }
 

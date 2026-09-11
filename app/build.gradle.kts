@@ -6,6 +6,7 @@ import com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesS
 
 plugins {
   alias(libs.plugins.android.application)
+  kotlin("android")
   alias(libs.plugins.kotlin.compose)
   alias(libs.plugins.google.devtools.ksp)
   alias(libs.plugins.roborazzi)
@@ -21,8 +22,8 @@ android {
     applicationId = "com.aistudio.smartwallet.ai.qmfzzm"
     minSdk = 24
     targetSdk = 35
-    versionCode = 8
-    versionName = "1.5.2"
+    versionCode = 11
+    versionName = "1.5.5"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     buildConfigField("String", "GITHUB_OWNER", "\"mohashemi2002-arch\"")
@@ -58,6 +59,9 @@ android {
   compileOptions {
     sourceCompatibility = JavaVersion.VERSION_11
     targetCompatibility = JavaVersion.VERSION_11
+  }
+  kotlinOptions {
+    jvmTarget = "11"
   }
   buildFeatures {
     compose = true
