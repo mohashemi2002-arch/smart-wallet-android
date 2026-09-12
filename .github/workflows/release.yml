@@ -17,6 +17,7 @@ jobs:
   release:
     name: Build, Sign and Release APK
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: Checkout
@@ -33,6 +34,11 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Bootstrap Gradle wrapper
+        run: |
+          gradle wrapper --gradle-version 9.3.1 --distribution-type bin
+          chmod +x ./gradlew
+
       - name: Decode release keystore
         env:
           RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
@@ -47,7 +53,6 @@ jobs:
           SIGNING_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           SIGNING_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          chmod +x ./gradlew
           ./gradlew clean assembleRelease --no-daemon
 
       - name: Prepare release APK and metadata
@@ -61,11 +66,13 @@ jobs:
           cp "$APK_PATH" smart-wallet-release.apk
           SHA256=$(sha256sum smart-wallet-release.apk | awk '{print $1}')
           VERSION_NAME="${TAG_NAME#v}"
+          VERSION_CODE=$(sed -n 's/^[[:space:]]*versionCode[[:space:]]*=[[:space:]]*\([0-9][0-9]*\).*/\1/p' app/build.gradle.kts | head -n 1)
+          test -n "$VERSION_CODE" || { echo 'Could not determine versionCode from app/build.gradle.kts'; exit 1; }
 
           echo "apk_path=smart-wallet-release.apk" >> "$GITHUB_OUTPUT"
           echo "sha256=$SHA256" >> "$GITHUB_OUTPUT"
           echo "version_name=$VERSION_NAME" >> "$GITHUB_OUTPUT"
-          echo "version_code=$(grep -oP 'versionCode\\s*=\\s*\\K[0-9]+' app/build.gradle.kts | head -n 1)" >> "$GITHUB_OUTPUT"
+          echo "version_code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

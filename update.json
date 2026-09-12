@@ -1,11 +1,11 @@
 {
-  "versionCode": 15,
+  "versionCode": 14,
   "versionName": "1.5.6",
   "mandatory": false,
   "minSupportedVersionCode": 1,
-  "apkUrl": "https://github.com/mohashemi2002-arch/smart-wallet-android/releases/download/v1.5.5/smart-wallet-v1.5.5.apk",
-  "sha256": "",
+  "apkUrl": "https://github.com/mohashemi2002-arch/smart-wallet-android/releases/download/v1.5.6/smart-wallet-release.apk",
+  "sha256": "9982f74e6f6813bd8b122edc8898e802d6ba5cfd8bbb563563a316e29e519287",
   "releaseNotes": [
-    "به‌روزرسانی برنامه به نسخه جدید"
+    "Update to version 1.5.6"
   ]
 }
