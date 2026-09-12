@@ -1,0 +1,130 @@
+name: Build, Sign & Release OTA
+
+on:
+  push:
+    tags:
+      - 'v*' # اجرای خودکار روی تگ‌هایی مثل v1.5.8 یا v2.0.0
+
+permissions:
+  contents: write # دسترسی لازم برای آپدیت update.json و ایجاد GitHub Release
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main # برای اینکه بتوانیم مستقیماً تغییرات update.json را روی main کامیت کنیم
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Decode Keystore File
+        run: |
+          echo "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" | base64 --decode > app/smart-wallet-release.jks
+
+      - name: Build Release APK
+        env:
+          SIGNING_KEYSTORE_PATH: "smart-wallet-release.jks"
+          SIGNING_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          SIGNING_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
+
+      # پیدا کردن مسیر دقیق APK و محاسبه هش SHA-256
+      - name: Process APK & Calculate SHA-256
+        id: process_apk
+        run: |
+          # پیدا کردن فایل APK بیلد شده
+          APK_PATH=$(find app/build/outputs/apk/release -name "*.apk" | head -n 1)
+          if [ -z "$APK_PATH" ]; then
+            echo "Error: Release APK not found!"
+            exit 1
+          fi
+          
+          # تغییر نام فایل به یک نام مشخص و تمیز برای دانلود
+          FINAL_APK="smart-wallet-release.apk"
+          cp "\(APK_PATH" "\)FINAL_APK"
+          
+          # محاسبه هش SHA-256
+          SHA256_HASH=\((sha256sum "\)FINAL_APK" | awk '{print $1}')
+          
+          # استخراج تگ فعلی و شماره نسخه (مثال: v1.5.8 -> 1.5.8)
+          TAG_NAME="${{ github.ref_name }}"
+          VERSION_NAME="${TAG_NAME#v}"
+          
+          echo "apk_path=\(FINAL_APK" >>\)GITHUB_OUTPUT
+          echo "sha256=\(SHA256_HASH" >>\)GITHUB_OUTPUT
+          echo "version_name=\(VERSION_NAME" >>\)GITHUB_OUTPUT
+
+      # آپدیت فایل update.json با jq
+      - name: Update update.json
+        id: update_json
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+          VERSION_NAME: ${{ steps.process_apk.outputs.version_name }}
+          SHA256: ${{ steps.process_apk.outputs.sha256 }}
+          REPO: ${{ github.repository }}
+        run: |
+          DOWNLOAD_URL="https://github.com/\({REPO}/releases/download/\){TAG_NAME}/smart-wallet-release.apk"
+          
+          # اگر فایل وجود ندارد، یک ساختار پیش‌فرض می‌سازیم
+          if [ ! -f update.json ]; then
+            echo '{"versionCode": 0, "versionName": "0.0.0", "apkUrl": "", "sha256": "", "changelog": ""}' > update.json
+          fi
+          
+          # افزایش یا خواندن versionCode فعلی از build.gradle.kts یا دیتای موجود
+          # در اینجا versionCode با فرمت زمان بیلد یا نگاشت افزایشی درج می‌شود
+          CURRENT_VCODE=$(jq -r '.versionCode // 0' update.json)
+          NEW_VCODE=$((CURRENT_VCODE + 1))
+          
+          # به‌روزرسانی محتوای JSON
+          jq \
+            --arg vc "$NEW_VCODE" \
+            --arg vn "$VERSION_NAME" \
+            --arg url "$DOWNLOAD_URL" \
+            --arg hash "$SHA256" \
+            '.versionCode = (\(vc | tonumber) | .versionName =\)vn | .apkUrl = \(url | .sha256 =\)hash' \
+            update.json > update.json.tmp && mv update.json.tmp update.json
+          
+          echo "Updated update.json:"
+          cat update.json
+
+      # کامیت و پوش مستقیم فایل update.json روی برنچ main
+      - name: Commit & Push update.json
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          git add update.json
+          # فقط اگر فایلی تغییر کرده بود کامیت کن
+          git diff-index --quiet HEAD || git commit -m "chore(ota): bump version to ${{ steps.process_apk.outputs.version_name }} in update.json [skip ci]"
+          git push origin main
+
+      # ایجاد Release و آپلود فایل APK
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Smart Wallet ${{ steps.process_apk.outputs.version_name }}"
+          tag_name: ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          files: ${{ steps.process_apk.outputs.apk_path }}
+          body: |
+            ## تغییرات نسخه ${{ steps.process_apk.outputs.version_name }}
+            
+            - **فایل دانلود مستقیم:** [smart-wallet-release.apk](\({{ github.server_url }}/\){{ github.repository }}/releases/download/${{ github.ref_name }}/smart-wallet-release.apk)
+            - **هش SHA-256:** `${{ steps.process_apk.outputs.sha256 }}`
+            
+            > این بیلد به صورت خودکار توسط سیستم CI/CD امضا و اعتبارسنجی شده است.
