@@ -17,6 +17,7 @@ jobs:
   release:
     name: Build, Sign and Release APK
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: Checkout
@@ -33,6 +34,11 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Bootstrap Gradle wrapper
+        run: |
+          gradle wrapper --gradle-version 9.3.1 --distribution-type bin
+          chmod +x ./gradlew
+
       - name: Decode release keystore
         env:
           RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
@@ -47,7 +53,6 @@ jobs:
           SIGNING_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           SIGNING_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          chmod +x ./gradlew
           ./gradlew clean assembleRelease --no-daemon
 
       - name: Prepare release APK and metadata
