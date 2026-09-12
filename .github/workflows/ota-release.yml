@@ -1,4 +1,4 @@
-name: Build and Publish OTA Release
+name: Build and Deploy OTA Update
 
 on:
   push:
@@ -6,66 +6,65 @@ on:
       - 'v*'
 
 jobs:
-  build:
+  build-and-release:
     runs-on: ubuntu-latest
     permissions:
       contents: write
 
     steps:
-      - name: Checkout Code
+      - name: Checkout Repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Setup Java 17
+      - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
           cache: 'gradle'
 
-      - name: Make Gradlew Executable
+      - name: Grant Execute Permission to Gradlew
         run: chmod +x gradlew
 
       - name: Build APK
         run: ./gradlew assembleRelease || ./gradlew assembleDebug
 
-      - name: Prepare Artifact and Calculate Checksum
-        id: meta
+      - name: Process APK and Calculate SHA-256
+        id: prep
         run: |
-          APK_FILE=$(find app/build/outputs/apk/ -type f -name "*.apk" | head -n 1)
-          if [ -z "$APK_FILE" ]; then
-            echo "Error: No APK file generated!"
+          TAG_NAME="${GITHUB_REF#refs/tags/}"
+          VERSION_NAME="${TAG_NAME#v}"
+
+          # پیدا کردن فایل نصبی خروجی گرادل
+          APK_PATH=$(find app/build/outputs/apk/ -type f -name "*.apk" | head -n 1)
+          if [ -z "$APK_PATH" ]; then
+            echo "Error: No APK found!"
             exit 1
           fi
 
-          FINAL_NAME="app-release.apk"
-          cp "\(APK_FILE" "./\)FINAL_NAME"
+          cp "$APK_PATH" "./app-release.apk"
 
-          # محاسبه هش SHA-256
-          HASH=\((sha256sum "./\)FINAL_NAME" | cut -d ' ' -f 1)
-          
-          # استخراج مشخصات از تگ
-          TAG="${GITHUB_REF#refs/tags/}"
-          VER_NAME="${TAG#v}"
-          
-          # استخراج versionCode از گرادل یا استفاده از شماره ساخت به عنوان جایگزین
-          VER_CODE=\((grep -oP 'versionCode\s*=\s*\K[0-9]+' app/build.gradle.kts 2>/dev/null || echo "\)GITHUB_RUN_NUMBER")
+          # محاسبه هش SHA-256 برای بررسی اصالت در گوشی
+          SHA256_SUM=$(sha256sum "./app-release.apk" | awk '{print $1}')
 
-          echo "apk_path=./\(FINAL_NAME" >>\)GITHUB_OUTPUT
-          echo "sha256=\(HASH" >>\)GITHUB_OUTPUT
-          echo "ver_name=\(VER_NAME" >>\)GITHUB_OUTPUT
-          echo "ver_code=\(VER_CODE" >>\)GITHUB_OUTPUT
+          # استخراج versionCode از گرادل یا شماره ساخت
+          VERSION_CODE=\((grep -oP 'versionCode\s*=\s*\K[0-9]+' app/build.gradle.kts 2>/dev/null || echo "\)GITHUB_RUN_NUMBER")
 
-      - name: Create Release
+          echo "apk_path=./app-release.apk" >> $GITHUB_OUTPUT
+          echo "sha256=\(SHA256_SUM" >>\)GITHUB_OUTPUT
+          echo "version_name=\(VERSION_NAME" >>\)GITHUB_OUTPUT
+          echo "version_code=\(VERSION_CODE" >>\)GITHUB_OUTPUT
+
+      - name: Publish Release to GitHub
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          name: Release ${{ github.ref_name }}
-          files: ${{ steps.meta.outputs.apk_path }}
+          name: Version ${{ steps.prep.outputs.version_name }}
+          files: ${{ steps.prep.outputs.apk_path }}
           generate_release_notes: true
 
-      - name: Update update.json in Main Branch
+      - name: Update update.json in main branch
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -73,22 +72,22 @@ jobs:
           git checkout main
           git pull origin main
 
-          DL_URL="https://github.com/\({{ github.repository }}/releases/download/\){{ github.ref_name }}/app-release.apk"
+          APK_URL="https://github.com/\({{ github.repository }}/releases/download/\){{ github.ref_name }}/app-release.apk"
 
           cat < update.json
           {
-            "versionCode": ${{ steps.meta.outputs.ver_code }},
-            "versionName": "${{ steps.meta.outputs.ver_name }}",
+            "versionCode": ${{ steps.prep.outputs.version_code }},
+            "versionName": "${{ steps.prep.outputs.version_name }}",
             "mandatory": false,
             "minSupportedVersionCode": 1,
-            "apkUrl": "$DL_URL",
-            "sha256": "${{ steps.meta.outputs.sha256 }}",
+            "apkUrl": "$APK_URL",
+            "sha256": "${{ steps.prep.outputs.sha256 }}",
             "releaseNotes": [
-              "Release ${{ steps.meta.outputs.ver_name }}"
+              "نسخه جدید ${{ steps.prep.outputs.version_name }}"
             ]
           }
           EOF
 
           git add update.json
-          git commit -m "chore(ota): update to ${{ steps.meta.outputs.ver_name }} [skip ci]" || exit 0
+          git commit -m "chore(ota): bump update.json to ${{ steps.prep.outputs.version_name }} [skip ci]" || exit 0
           git push origin main
