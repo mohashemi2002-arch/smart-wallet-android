@@ -66,11 +66,13 @@ jobs:
           cp "$APK_PATH" smart-wallet-release.apk
           SHA256=$(sha256sum smart-wallet-release.apk | awk '{print $1}')
           VERSION_NAME="${TAG_NAME#v}"
+          VERSION_CODE=$(sed -n 's/^[[:space:]]*versionCode[[:space:]]*=[[:space:]]*\([0-9][0-9]*\).*/\1/p' app/build.gradle.kts | head -n 1)
+          test -n "$VERSION_CODE" || { echo 'Could not determine versionCode from app/build.gradle.kts'; exit 1; }
 
           echo "apk_path=smart-wallet-release.apk" >> "$GITHUB_OUTPUT"
           echo "sha256=$SHA256" >> "$GITHUB_OUTPUT"
           echo "version_name=$VERSION_NAME" >> "$GITHUB_OUTPUT"
-          echo "version_code=$(grep -oP 'versionCode\\s*=\\s*\\K[0-9]+' app/build.gradle.kts | head -n 1)" >> "$GITHUB_OUTPUT"
+          echo "version_code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
