@@ -1,0 +1,11 @@
+{
+  "versionCode": 13,
+  "versionName": "1.5.7",
+  "mandatory": false,
+  "minSupportedVersionCode": 1,
+  "apkUrl": "https://github.com/mohashemi2002-arch/smart-wallet-android/releases",
+  "sha256": "",
+  "releaseNotes": [
+    "Initial setup"
+  ]
+}
