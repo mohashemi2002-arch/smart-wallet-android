@@ -22,13 +22,11 @@ android {
     applicationId = "com.aistudio.smartwallet.ai.qmfzzm"
     minSdk = 24
     targetSdk = 35
-    versionCode = 11
-    versionName = "1.5.5"
+    versionCode = 12
+    versionName = "1.5.6"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-    buildConfigField("String", "GITHUB_OWNER", "\"mohashemi2002-arch\"")
-    buildConfigField("String", "GITHUB_REPO", "\"smart-wallet-android\"")
-    buildConfigField("String", "GITHUB_TOKEN", "\"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\"")
+    buildConfigField("String", "UPDATE_JSON_URL", "\"https://raw.githubusercontent.com/mohashemi2002-arch/smart-wallet-android/main/update.json\"")
   }
 
   signingConfigs {
@@ -36,7 +34,7 @@ android {
       val keystorePath = System.getenv("KEYSTORE_PATH") ?: "${rootDir}/my-upload-key.jks"
       storeFile = file(keystorePath)
       storePassword = System.getenv("STORE_PASSWORD")
-      keyAlias = "upload"
+      keyAlias = System.getenv("KEY_ALIAS") ?: "upload"
       keyPassword = System.getenv("KEY_PASSWORD")
     }
     create("debugConfig") {

@@ -47,12 +47,12 @@ fun SettingsScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val updateManager = remember { AppUpdateManager(context) }
-    var updateRelease by remember { mutableStateOf<GitHubRelease?>(null) }
+    var updateRelease by remember { mutableStateOf<UpdateMetadata?>(null) }
     var isCheckingUpdate by remember { mutableStateOf(false) }
 
     updateRelease?.let { release ->
         UpdatePromptDialog(
-            release = release,
+            metadata = release,
             updateManager = updateManager,
             onDismiss = { updateRelease = null }
         )
@@ -115,7 +115,7 @@ fun SettingsScreen(
                     ) {
                         Column {
                             Text("بررسی بروزرسانی", style = MaterialTheme.typography.titleMedium, color = Color(0xFFE6E1E5))
-                            Text(if (isCheckingUpdate) "در حال بررسی..." else "دریافت آخرین نسخه برنامه", style = MaterialTheme.typography.bodySmall, color = Color(0xFFCAC4D0))
+                            Text(if (isCheckingUpdate) "در حال بررسی..." else "نسخه فعلی: ${com.example.BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.bodySmall, color = Color(0xFFCAC4D0))
                         }
                         if (isCheckingUpdate) {
                             CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color(0xFFCAC4D0))

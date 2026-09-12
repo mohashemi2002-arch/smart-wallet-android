@@ -11,7 +11,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -25,7 +24,7 @@ import java.io.File
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun UpdatePromptDialog(
-    release: GitHubRelease,
+    metadata: UpdateMetadata,
     updateManager: AppUpdateManager,
     onDismiss: () -> Unit
 ) {
@@ -35,7 +34,11 @@ fun UpdatePromptDialog(
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
         BasicAlertDialog(
             onDismissRequest = {
-                if (downloadState !is DownloadState.Downloading) onDismiss()
+                // If it's mandatory, they shouldn't be able to dismiss it normally,
+                // but let's allow dismiss unless downloading, or maybe just block if mandatory.
+                if (downloadState !is DownloadState.Downloading && !metadata.mandatory) {
+                    onDismiss()
+                }
             },
             modifier = Modifier.fillMaxWidth(0.95f)
         ) {
@@ -59,9 +62,9 @@ fun UpdatePromptDialog(
                     )
                     
                     Text(
-                        text = "بروزرسانی جدید در دسترس است",
+                        text = if (metadata.mandatory) "بروزرسانی اجباری" else "بروزرسانی جدید در دسترس است",
                         style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                        color = Color.White
+                        color = if (metadata.mandatory) Color(0xFFFF6B6B) else Color.White
                     )
                     
                     Surface(
@@ -69,7 +72,7 @@ fun UpdatePromptDialog(
                         color = Color(0xFF5C82E6).copy(alpha = 0.2f)
                     ) {
                         Text(
-                            text = "نسخه جدید: ${PersianFormatters.toPersianDigits(release.tag_name)}",
+                            text = "نسخه جدید: ${PersianFormatters.toPersianDigits(metadata.versionName)}",
                             color = Color(0xFF7FA2FF),
                             fontSize = 12.sp,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
@@ -83,8 +86,9 @@ fun UpdatePromptDialog(
                             .heightIn(max = 150.dp)
                             .verticalScroll(rememberScrollState())
                     ) {
+                        val notesText = metadata.releaseNotes.joinToString("\n• ", prefix = "• ").ifEmpty { "بهبود عملکرد و رفع ایرادات جزئی." }
                         Text(
-                            text = release.body.ifEmpty { "بهبود عملکرد و رفع ایرادات جزئی." },
+                            text = notesText,
                             color = Color.LightGray,
                             fontSize = 14.sp,
                             textAlign = TextAlign.Right,
@@ -99,16 +103,17 @@ fun UpdatePromptDialog(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                TextButton(onClick = onDismiss) {
-                                    Text("بعداً", color = Color.Gray)
+                                if (!metadata.mandatory) {
+                                    TextButton(onClick = onDismiss) {
+                                        Text("بعداً", color = Color.Gray)
+                                    }
+                                } else {
+                                    Spacer(modifier = Modifier.width(8.dp))
                                 }
+                                
                                 Button(
                                     onClick = {
-                                                                                val apkAsset = release.assets.find { it.name.endsWith(".apk") }
-                                        if (apkAsset != null) {
-                                            scope.launch { updateManager.downloadUpdate(apkAsset) }
-                                        } else {
-                                        }
+                                        scope.launch { updateManager.downloadUpdate(metadata) }
                                     },
                                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF5C82E6))
                                 ) {
@@ -161,16 +166,17 @@ fun UpdatePromptDialog(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                TextButton(onClick = onDismiss) {
-                                    Text("بستن", color = Color.Gray)
+                                if (!metadata.mandatory) {
+                                    TextButton(onClick = onDismiss) {
+                                        Text("بستن", color = Color.Gray)
+                                    }
+                                } else {
+                                    Spacer(modifier = Modifier.width(8.dp))
                                 }
+                                
                                 Button(
                                     onClick = {
-                                                                                val apkAsset = release.assets.find { it.name.endsWith(".apk") }
-                                        if (apkAsset != null) {
-                                            scope.launch { updateManager.downloadUpdate(apkAsset) }
-                                        } else {
-                                        }
+                                        scope.launch { updateManager.downloadUpdate(metadata) }
                                     },
                                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF5C82E6))
                                 ) {

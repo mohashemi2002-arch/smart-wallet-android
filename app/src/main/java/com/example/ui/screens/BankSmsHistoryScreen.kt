@@ -40,6 +40,7 @@ fun BankSmsHistoryScreen(
 ) {
     val smsList by viewModel.smsHistoryList.collectAsState()
     val banks by viewModel.registeredBanks.collectAsState()
+    val bankAccounts by viewModel.bankAccounts.collectAsState()
     val selectedBank by viewModel.selectedBankFilter.collectAsState()
     val isScanning by viewModel.isScanning.collectAsState()
     val scope = rememberCoroutineScope()
@@ -135,6 +136,7 @@ fun BankSmsHistoryScreen(
     transactionToReview?.let { tx ->
         PendingReviewBottomSheet(
             transaction = tx,
+            banks = bankAccounts,
             onDismiss = { transactionToReview = null },
             onConfirm = { updatedTx ->
                 viewModel.insertTransaction(updatedTx)

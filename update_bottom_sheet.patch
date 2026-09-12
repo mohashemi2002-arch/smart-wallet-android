@@ -1,0 +1,71 @@
+--- app/src/main/java/com/example/ui/components/PendingReviewBottomSheet.kt
++++ app/src/main/java/com/example/ui/components/PendingReviewBottomSheet.kt
+@@ -10,6 +10,7 @@
+ import androidx.compose.ui.Modifier
+ import androidx.compose.ui.unit.dp
+ import com.example.data.model.Transaction
++import com.example.data.model.BankAccount
+ import com.example.data.model.TransactionStatus
+ import com.example.data.model.TransactionType
+ 
+@@ -17,14 +18,17 @@
+ @Composable
+ fun PendingReviewBottomSheet(
+     transaction: Transaction,
++    banks: List<BankAccount> = emptyList(),
+     onDismiss: () -> Unit,
+     onConfirm: (Transaction) -> Unit,
+     onIgnore: (Transaction) -> Unit
+ ) {
+     var amountText by remember { mutableStateOf(transaction.amountToman.toString()) }
+     var categoryText by remember { mutableStateOf(transaction.categoryName) }
+     var merchantText by remember { mutableStateOf(transaction.merchantName) }
+     var type by remember { mutableStateOf(transaction.type) }
++    var expandedAccount by remember { mutableStateOf(false) }
++    var selectedCard by remember { mutableStateOf(transaction.cardNumber ?: "") }
+ 
+     ModalBottomSheet(
+         onDismissRequest = onDismiss,
+@@ -53,6 +57,32 @@
+                 label = { Text("دسته‌بندی") },
+                 modifier = Modifier.fillMaxWidth()
+             )
++            
++            ExposedDropdownMenuBox(
++                expanded = expandedAccount,
++                onExpandedChange = { expandedAccount = it },
++                modifier = Modifier.fillMaxWidth()
++            ) {
++                val displayName = banks.find { it.cardNumber == selectedCard }?.let { "${it.bankName} - ${it.cardNumber.takeLast(4)}" } ?: "انتخاب کارت مبدا/مقصد"
++                OutlinedTextField(
++                    value = displayName,
++                    onValueChange = {},
++                    readOnly = true,
++                    label = { Text("کارت مرتبط") },
++                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedAccount) },
++                    modifier = Modifier.menuAnchor().fillMaxWidth()
++                )
++                ExposedDropdownMenu(
++                    expanded = expandedAccount,
++                    onDismissRequest = { expandedAccount = false }
++                ) {
++                    banks.forEach { acc ->
++                        DropdownMenuItem(
++                            text = { Text("${acc.bankName} - ${acc.cardNumber.takeLast(4)}") },
++                            onClick = { selectedCard = acc.cardNumber; expandedAccount = false }
++                        )
++                    }
++                }
++            }
++
+             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                 FilterChip(
+                     selected = type == TransactionType.EXPENSE,
+@@ -74,6 +104,7 @@
+                             categoryName = categoryText,
+                             merchantName = merchantText,
+                             type = type,
++                            cardNumber = selectedCard.takeIf { it.isNotBlank() },
+                             status = TransactionStatus.CONFIRMED
+                         )
+                         onConfirm(updated)

@@ -243,8 +243,14 @@ fun PendingSmsCard(
                     onExpandedChange = { expandedAccount = it },
                     modifier = Modifier.weight(1f)
                 ) {
+                    val displayCard = if (selectedCard?.startsWith("ID:") == true) {
+                        val id = selectedCard?.removePrefix("ID:")?.toLongOrNull()
+                        val acc = bankAccounts.find { it.id == id }
+                        if (acc != null) "${acc.bankName} - ${acc.cardNumber.takeLast(4)}" else selectedCard
+                    } else selectedCard
+
                     OutlinedTextField(
-                        value = selectedCard ?: "انتخاب کارت",
+                        value = displayCard ?: "انتخاب کارت",
                         onValueChange = {},
                         readOnly = true,
                         label = { Text("کارت مرتبط", fontSize = 10.sp) },
@@ -260,7 +266,7 @@ fun PendingSmsCard(
                             DropdownMenuItem(
                                 text = { Text("${acc.bankName} - ${acc.cardNumber.takeLast(4)}") },
                                 onClick = {
-                                    selectedCard = acc.cardNumber
+                                    selectedCard = "ID:${acc.id}"
                                     expandedAccount = false
                                 }
                             )

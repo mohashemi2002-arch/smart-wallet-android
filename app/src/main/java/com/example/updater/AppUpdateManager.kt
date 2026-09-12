@@ -18,6 +18,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
 import java.io.FileOutputStream
+import java.security.MessageDigest
 import java.util.Locale
 
 sealed class DownloadState {
@@ -31,11 +32,7 @@ class AppUpdateManager(private val context: Context) {
     private val _downloadState = MutableStateFlow<DownloadState>(DownloadState.Idle)
     val downloadState: StateFlow<DownloadState> = _downloadState.asStateFlow()
 
-    private val owner = BuildConfig.GITHUB_OWNER
-    private val repo = BuildConfig.GITHUB_REPO
-    private val token = BuildConfig.GITHUB_TOKEN
-
-    private val updateService = GitHubUpdateService(owner, repo, token)
+    private val updateChecker = UpdateChecker()
     private val client = OkHttpClient()
 
     private fun isNetworkAvailable(): Boolean {
@@ -45,45 +42,31 @@ class AppUpdateManager(private val context: Context) {
         return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
     }
 
-
-
-
-    suspend fun checkForUpdates(isManualCheck: Boolean = false): GitHubRelease? = withContext(Dispatchers.IO) {
-        if (!isNetworkAvailable()) return@withContext null
-        
-        val latestRelease = updateService.getLatestRelease() ?: return@withContext null
-        
-        val currentVersion = BuildConfig.VERSION_NAME
-        val latestTag = latestRelease.tag_name.removePrefix("v").removePrefix("V")
-        
-        if (latestTag != currentVersion && latestTag.isNotEmpty()) {
-            return@withContext latestRelease
+    suspend fun checkForUpdates(isManualCheck: Boolean = false): UpdateMetadata? = withContext(Dispatchers.IO) {
+        if (!isNetworkAvailable()) {
+            android.util.Log.e("OTA", "Network unavailable")
+            return@withContext null
         }
+        
+        val metadata = updateChecker.getUpdateMetadata() ?: return@withContext null
+        
+        val currentVersionCode = BuildConfig.VERSION_CODE
+        
+        // Remote versionCode > installed versionCode -> Update available
+        if (metadata.versionCode > currentVersionCode) {
+            android.util.Log.d("OTA", "OTA: update available")
+            return@withContext metadata
+        }
+        android.util.Log.d("OTA", "OTA: no update available")
         return@withContext null
     }
 
-
-    suspend fun downloadUpdate(asset: GitHubAsset) = withContext(Dispatchers.IO) {
+    suspend fun downloadUpdate(metadata: UpdateMetadata) = withContext(Dispatchers.IO) {
         _downloadState.value = DownloadState.Downloading(0f, "0", "0")
+        android.util.Log.d("OTA", "OTA: downloading APK from ${metadata.apkUrl}")
         try {
-            // Use browser_download_url if available, fallback to api url
-            val targetUrl = if (asset.browser_download_url.isNotBlank()) asset.browser_download_url else asset.url
-            val builder = Request.Builder().url(targetUrl)
-            
-            // Only add auth headers if using the API URL, because browser_download_url (S3) will reject the token
-            if (targetUrl == asset.url) {
-                if (token.isNotBlank()) builder.header("Authorization", "Bearer $token")
-                builder.header("Accept", "application/octet-stream")
-                builder.header("X-GitHub-Api-Version", "2022-11-28")
-            }
-            
-            val request = builder.build()
-
+            val request = Request.Builder().url(metadata.apkUrl).build()
             client.newCall(request).execute().use { response ->
-
-
-
-
                 if (!response.isSuccessful) {
                     _downloadState.value = DownloadState.Error("خطا در دانلود (${response.code})")
                     return@use
@@ -96,7 +79,7 @@ class AppUpdateManager(private val context: Context) {
                 val outputFile = File(updateDir, "update_release.apk")
                 if (outputFile.exists()) outputFile.delete()
                 
-                val totalBytes = body.contentLength().takeIf { it > 0 } ?: asset.size
+                val totalBytes = body.contentLength().takeIf { it > 0 } ?: 0L
                 var downloadedBytes = 0L
                 val buffer = ByteArray(8 * 1024)
                 
@@ -118,12 +101,41 @@ class AppUpdateManager(private val context: Context) {
                     }
                 }
                 
+                android.util.Log.d("OTA", "OTA: download completed")
+                
+                // SHA-256 verification
+                if (!metadata.sha256.isNullOrBlank()) {
+                    android.util.Log.d("OTA", "OTA: verifying SHA-256")
+                    val calculatedSha = calculateSHA256(outputFile)
+                    if (!calculatedSha.equals(metadata.sha256, ignoreCase = true)) {
+                        android.util.Log.e("OTA", "OTA: verification failed. Expected ${metadata.sha256}, got $calculatedSha")
+                        outputFile.delete()
+                        _downloadState.value = DownloadState.Error("خطا در تایید فایل (SHA-256 نامعتبر)")
+                        return@use
+                    }
+                    android.util.Log.d("OTA", "OTA: verification successful")
+                }
+                
                 _downloadState.value = DownloadState.ReadyToInstall(outputFile)
             }
         } catch (e: Exception) {
             e.printStackTrace()
+            android.util.Log.e("OTA", "OTA: APK download failure", e)
             _downloadState.value = DownloadState.Error("خطا در دریافت: ${e.localizedMessage}")
         }
+    }
+
+    private fun calculateSHA256(file: File): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        file.inputStream().use { input ->
+            val buffer = ByteArray(8192)
+            var read = input.read(buffer)
+            while (read > 0) {
+                digest.update(buffer, 0, read)
+                read = input.read(buffer)
+            }
+        }
+        return digest.digest().joinToString("") { "%02x".format(it) }
     }
 
     fun installUpdate(file: File) {

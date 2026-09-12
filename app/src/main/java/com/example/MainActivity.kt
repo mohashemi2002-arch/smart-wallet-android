@@ -120,7 +120,7 @@ fun SmartWalletApp(financeViewModel: FinanceViewModel = viewModel()) {
     }
 
     val updateManager = remember { AppUpdateManager(context) }
-    var updateRelease by remember { mutableStateOf<GitHubRelease?>(null) }
+    var updateRelease by remember { mutableStateOf<UpdateMetadata?>(null) }
 
     LaunchedEffect(Unit) {
         updateRelease = updateManager.checkForUpdates(isManualCheck = false)
@@ -128,7 +128,7 @@ fun SmartWalletApp(financeViewModel: FinanceViewModel = viewModel()) {
 
     updateRelease?.let { release ->
         UpdatePromptDialog(
-            release = release,
+            metadata = release,
             updateManager = updateManager,
             onDismiss = { updateRelease = null }
         )

@@ -3,6 +3,7 @@ package com.example.ui.viewmodel
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.data.FinanceRepository
 import com.example.data.database.AppDatabase
 import com.example.data.model.InstallmentEntity
 import com.example.data.model.LoanEntity
@@ -16,7 +17,7 @@ import kotlinx.coroutines.launch
 class LoansViewModel(application: Application) : AndroidViewModel(application) {
     private val db = AppDatabase.getDatabase(application)
     private val loanDao = db.loanDao()
-    private val transactionDao = db.transactionDao()
+    private val repository = FinanceRepository.getInstance(application)
 
     val loans: StateFlow<List<LoanEntity>> = loanDao.getAllLoans()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -78,7 +79,7 @@ class LoansViewModel(application: Application) : AndroidViewModel(application) {
                 )
             )
 
-            transactionDao.insert(
+            repository.addTransaction(
                 Transaction(
                     amountToman = installment.amount,
                     type = TransactionType.EXPENSE,

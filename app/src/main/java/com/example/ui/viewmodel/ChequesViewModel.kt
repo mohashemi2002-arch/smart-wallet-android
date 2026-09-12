@@ -3,6 +3,7 @@ package com.example.ui.viewmodel
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.data.FinanceRepository
 import com.example.data.database.AppDatabase
 import com.example.data.model.ChequeEntity
 import com.example.data.model.ChequeStatus
@@ -17,7 +18,7 @@ import kotlinx.coroutines.launch
 class ChequesViewModel(application: Application) : AndroidViewModel(application) {
     private val db = AppDatabase.getDatabase(application)
     private val chequeDao = db.chequeDao()
-    private val transactionDao = db.transactionDao()
+    private val repository = FinanceRepository.getInstance(application)
 
     val allCheques: StateFlow<List<ChequeEntity>> = chequeDao.getAllCheques()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -53,7 +54,7 @@ class ChequesViewModel(application: Application) : AndroidViewModel(application)
             chequeDao.updateCheque(cheque.copy(status = ChequeStatus.CLEARED))
 
             val txType = if (cheque.type == ChequeType.ISSUED) TransactionType.EXPENSE else TransactionType.INCOME
-            transactionDao.insert(
+            repository.addTransaction(
                 Transaction(
                     amountToman = cheque.amount,
                     type = txType,

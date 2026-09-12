@@ -208,10 +208,16 @@ suspend fun confirmAndSyncBalance(
         if (transaction.status != com.example.data.model.TransactionStatus.CONFIRMED) return
         
         db.withTransaction {
-            val account = if (!transaction.cardNumber.isNullOrBlank()) {
+            var account: BankAccount? = null
+            if (transaction.cardNumber?.startsWith("ID:") == true) {
+                val accId = transaction.cardNumber.removePrefix("ID:").toLongOrNull()
+                if (accId != null) {
+                    account = bankAccountDao.getAllBankAccountsSync().find { it.id == accId }
+                }
+            } else if (!transaction.cardNumber.isNullOrBlank()) {
                 val cleanDigits = transaction.cardNumber.replace("*", "").replace("-", "").takeLast(4)
-                if (cleanDigits.isNotEmpty()) bankAccountDao.findByCardSuffix(cleanDigits) else null
-            } else null
+                if (cleanDigits.isNotEmpty()) account = bankAccountDao.findByCardSuffix(cleanDigits)
+            }
 
             account?.let {
                 when (transaction.type) {
@@ -226,17 +232,22 @@ suspend fun confirmAndSyncBalance(
         }
     }
 
-    suspend fun approvePendingTransaction(transaction: Transaction) {
-        if (transaction.status == com.example.data.model.TransactionStatus.CONFIRMED) return
-        
-        // This is a single approval from UI that might not have resolved the accountId yet.
-        // But if UI passes everything via PendingSmsViewModel, we can do it directly.
-        // Wait, old UI might just call this. We will redirect it to a resolve-then-call logic.
-        
+    private suspend fun resolveAccountAndSyncBalance(transaction: Transaction) {
         var finalCardNumber = transaction.cardNumber
         var matchedAccount: BankAccount? = null
-        if (!finalCardNumber.isNullOrBlank()) {
-            val cleanDigits = finalCardNumber.replace("*", "").replace("-", "").takeLast(4)
+
+        if (finalCardNumber?.startsWith("ID:") == true) {
+            val accId = finalCardNumber.removePrefix("ID:").toLongOrNull()
+            if (accId != null) {
+                matchedAccount = bankAccountDao.getAllBankAccountsSync().find { it.id == accId }
+                if (matchedAccount != null) {
+                    finalCardNumber = matchedAccount.cardNumber
+                }
+            }
+        }
+
+        if (matchedAccount == null && !finalCardNumber.isNullOrBlank()) {
+            val cleanDigits = finalCardNumber!!.replace("*", "").replace("-", "").takeLast(4)
             if (cleanDigits.isNotEmpty()) {
                 matchedAccount = bankAccountDao.findByCardSuffix(cleanDigits)
                 if (matchedAccount == null) {
@@ -250,7 +261,6 @@ suspend fun confirmAndSyncBalance(
                         accountType = "BANK_CARD"
                     )
                     val insertedId = bankAccountDao.insert(newAccount)
-                    // We must fetch it or create dummy one with ID
                     matchedAccount = newAccount.copy(id = insertedId)
                 }
             }
@@ -273,11 +283,19 @@ suspend fun confirmAndSyncBalance(
         )
     }
 
+    suspend fun approvePendingTransaction(transaction: Transaction) {
+        // Prevent double execution if it was already confirmed in the database
+        val txInDb = transactionDao.getAllTransactionsSync().find { it.id == transaction.id }
+        if (txInDb?.status == com.example.data.model.TransactionStatus.CONFIRMED) return
+        
+        resolveAccountAndSyncBalance(transaction)
+    }
+
     suspend fun addTransaction(transaction: Transaction) {
         val newId = transactionDao.insert(transaction)
         val inserted = transaction.copy(id = newId)
         if (inserted.status == com.example.data.model.TransactionStatus.CONFIRMED) {
-            approvePendingTransaction(inserted)
+            resolveAccountAndSyncBalance(inserted)
         }
     }
 

@@ -5,10 +5,12 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.database.AppDatabase
 import com.example.data.model.BankSmsHistoryItem
+import com.example.data.model.BankAccount
 import com.example.data.model.Transaction
 import com.example.data.model.TransactionStatus
 import com.example.data.SmsAiParser
 import com.example.domain.util.BankSmsHistoryScanner
+import com.example.data.FinanceRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -20,6 +22,10 @@ class BankSmsHistoryViewModel(application: Application) : AndroidViewModel(appli
     private val database = AppDatabase.getDatabase(application)
     private val scanner = BankSmsHistoryScanner(application, database)
     private val parser = SmsAiParser
+    private val repository = FinanceRepository.getInstance(application)
+
+    val bankAccounts: StateFlow<List<BankAccount>> = repository.allBankAccounts
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val _isScanning = MutableStateFlow(false)
     val isScanning: StateFlow<Boolean> = _isScanning
@@ -86,7 +92,7 @@ class BankSmsHistoryViewModel(application: Application) : AndroidViewModel(appli
     
     fun insertTransaction(transaction: Transaction) {
         viewModelScope.launch {
-            database.transactionDao().insert(transaction)
+            repository.addTransaction(transaction)
             refreshScan() // Re-scan to update the "registered" flag
         }
     }

@@ -1,0 +1,21 @@
+--- app/src/main/java/com/example/ui/screens/PendingSmsInboxScreen.kt
++++ app/src/main/java/com/example/ui/screens/PendingSmsInboxScreen.kt
+@@ -107,13 +107,15 @@
+                         label = { Text("کارت مرتبط", fontSize = 10.sp) },
+                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedAccount) },
+                         modifier = Modifier.menuAnchor().fillMaxWidth(),
+                         textStyle = LocalTextStyle.current.copy(fontSize = 12.sp)
+                     )
+                     ExposedDropdownMenu(
+                         expanded = expandedAccount,
+                         onDismissRequest = { expandedAccount = false }
+                     ) {
+                         bankAccounts.forEach { acc ->
+                             DropdownMenuItem(
+                                 text = { Text("${acc.bankName} - ${acc.cardNumber.takeLast(4)}") },
+                                 onClick = {
+-                                    selectedCard = acc.cardNumber
++                                    selectedCard = "ID:${acc.id}"
+                                     expandedAccount = false
+                                 }
+                             )

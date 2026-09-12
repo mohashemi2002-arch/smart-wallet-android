@@ -8,6 +8,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.data.model.Transaction
+import com.example.data.model.BankAccount
 import com.example.data.model.TransactionStatus
 import com.example.data.model.TransactionType
 
@@ -15,6 +16,7 @@ import com.example.data.model.TransactionType
 @Composable
 fun PendingReviewBottomSheet(
     transaction: Transaction,
+    banks: List<BankAccount> = emptyList(),
     onDismiss: () -> Unit,
     onConfirm: (Transaction) -> Unit,
     onIgnore: (Transaction) -> Unit
@@ -23,6 +25,8 @@ fun PendingReviewBottomSheet(
     var categoryText by remember { mutableStateOf(transaction.categoryName) }
     var merchantText by remember { mutableStateOf(transaction.merchantName) }
     var type by remember { mutableStateOf(transaction.type) }
+    var expandedAccount by remember { mutableStateOf(false) }
+    var selectedCard by remember { mutableStateOf(transaction.cardNumber ?: "") }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -61,6 +65,40 @@ fun PendingReviewBottomSheet(
                 modifier = Modifier.fillMaxWidth()
             )
 
+            ExposedDropdownMenuBox(
+                expanded = expandedAccount,
+                onExpandedChange = { expandedAccount = it },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                val displayName = if (selectedCard.startsWith("ID:")) {
+                    val id = selectedCard.removePrefix("ID:").toLongOrNull()
+                    val acc = banks.find { it.id == id }
+                    if (acc != null) "${acc.bankName} - ${acc.cardNumber.takeLast(4)}" else selectedCard
+                } else {
+                    banks.find { it.cardNumber == selectedCard }?.let { "${it.bankName} - ${it.cardNumber.takeLast(4)}" } ?: "انتخاب کارت مبدا/مقصد"
+                }
+                
+                OutlinedTextField(
+                    value = displayName,
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("کارت مرتبط") },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedAccount) },
+                    modifier = Modifier.menuAnchor().fillMaxWidth()
+                )
+                ExposedDropdownMenu(
+                    expanded = expandedAccount,
+                    onDismissRequest = { expandedAccount = false }
+                ) {
+                    banks.forEach { acc ->
+                        DropdownMenuItem(
+                            text = { Text("${acc.bankName} - ${acc.cardNumber.takeLast(4)}") },
+                            onClick = { selectedCard = "ID:${acc.id}"; expandedAccount = false }
+                        )
+                    }
+                }
+            }
+
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilterChip(
                     selected = type == TransactionType.EXPENSE,
@@ -88,6 +126,7 @@ fun PendingReviewBottomSheet(
                             categoryName = categoryText,
                             merchantName = merchantText,
                             type = type,
+                            cardNumber = selectedCard.takeIf { it.isNotBlank() },
                             status = TransactionStatus.CONFIRMED
                         )
                         onConfirm(updated)
