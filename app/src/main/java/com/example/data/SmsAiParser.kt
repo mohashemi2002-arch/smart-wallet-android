@@ -20,48 +20,28 @@ object SmsAiParser {
         val isMelliText = normalizedText.contains("بانک ملی") || normalizedText.contains("Melli") || normalizedText.contains("بانک ملي")
         val isMelli = isMelliSender || isMelliText
         
-        if (isMelli) {
-            // Melli Amount pattern: انتقال:1,459,000- or +2,000,000
-            val melliAmountPattern = Pattern.compile("(?:انتقال|برداشت|واریز|خرید|مبلغ)?\\s*:?\\s*([+-])?\\s*([0-9,٫]+)\\s*([+-])?")
-            val melliAmountMatcher = melliAmountPattern.matcher(normalizedText)
-            if (melliAmountMatcher.find()) {
-                val signBefore = melliAmountMatcher.group(1)
-                val rawNum = melliAmountMatcher.group(2)?.replace(",", "")?.replace("٫", "") ?: "0"
-                val signAfter = melliAmountMatcher.group(3)
-                
-                if (signBefore == "+" || signAfter == "+") explicitSignType = TransactionType.INCOME
-                else if (signBefore == "-" || signAfter == "-") explicitSignType = TransactionType.EXPENSE
-                
-                // Melli is always in Rial, divide by 10
-                amountToman = (rawNum.toLongOrNull() ?: 0L) / 10
-            }
-            
-            // Melli Balance pattern: مانده:82,000
-            val melliBalancePattern = Pattern.compile("مانده\\s*:?\\s*([0-9,٫]+)")
-            val melliBalanceMatcher = melliBalancePattern.matcher(normalizedText)
-            if (melliBalanceMatcher.find()) {
-                val rawBal = melliBalanceMatcher.group(1)?.replace(",", "")?.replace("٫", "") ?: "0"
-                balanceToman = (rawBal.toLongOrNull() ?: 0L) / 10
-            }
-            
-            // Melli Account pattern: حساب:02003
-            val melliAccountPattern = Pattern.compile("حساب\\s*:?\\s*(\\d+)")
-            val melliAccountMatcher = melliAccountPattern.matcher(normalizedText)
-            if (melliAccountMatcher.find()) {
-                cardNumber = melliAccountMatcher.group(1)
-            }
-        }
-        
-        // General parsing if not found by Melli specifics or to augment
         if (amountToman == 0L) {
-            val amountPattern = Pattern.compile("(?:مبلغ|مبلغ:|مبلغ :|واریز:|برداشت:)?\\s*([+-])?\\s*([0-9,٫]+)\\s*([+-])?\\s*(ریال|تومان|Rial)?")
-            val amountMatcher = amountPattern.matcher(normalizedText)
-                    
-            if (amountMatcher.find()) {
-                val signBefore = amountMatcher.group(1)
-                val rawNum = amountMatcher.group(2)?.replace(",", "")?.replace("٫", "") ?: "0"
-                val signAfter = amountMatcher.group(3)
-                val unit = amountMatcher.group(4) ?: "ریال"
+            // First try finding an explicit transaction pattern with words
+            val amountPattern1 = Pattern.compile("(?:مبلغ|مبلغ:|مبلغ :|واریز|برداشت|انتقال|خرید|حواله پل|اصلاحي|اصلاحی|پايانه فروش|پایانه فروش|خريد)\\s*:?\\s*([+-])?\\s*([0-9,٫]+)\\s*([+-])?\\s*(ریال|تومان|Rial)?")
+            val amountMatcher1 = amountPattern1.matcher(normalizedText)
+            
+            // Then try matching standalone numbers that explicitly end or start with a sign e.g. 1,000,000+ or -1,360,000
+            val amountPattern2 = Pattern.compile("([+-])?\\s*([0-9]{1,3}(?:,[0-9]{3})+)\\s*([+-])\\s*(ریال|تومان|Rial)?")
+            val amountMatcher2 = amountPattern2.matcher(normalizedText)
+            
+            val amountPattern3 = Pattern.compile("([+-])\\s*([0-9]{1,3}(?:,[0-9]{3})+)\\s*([+-])?\\s*(ریال|تومان|Rial)?")
+            val amountMatcher3 = amountPattern3.matcher(normalizedText)
+
+            val matched = if (amountMatcher1.find()) amountMatcher1 
+                          else if (amountMatcher2.find()) amountMatcher2 
+                          else if (amountMatcher3.find()) amountMatcher3 
+                          else null
+
+            if (matched != null) {
+                val signBefore = matched.group(1)
+                val rawNum = matched.group(2)?.replace(",", "")?.replace("٫", "") ?: "0"
+                val signAfter = matched.group(3)
+                val unit = matched.group(4) ?: "ریال"
                 
                 if (signBefore == "+" || signAfter == "+") explicitSignType = TransactionType.INCOME
                 else if (signBefore == "-" || signAfter == "-") explicitSignType = TransactionType.EXPENSE
@@ -76,7 +56,7 @@ object SmsAiParser {
         }
         
         if (balanceToman == null) {
-            val balancePattern = Pattern.compile("موجودی(?:\\s*:|:)?\\s*([0-9,٫]+)\\s*(ریال|تومان)?")
+            val balancePattern = Pattern.compile("(?:موجودی|مانده)(?:\\s*:|:)?\\s*([0-9,٫]+)\\s*(ریال|تومان)?")
             val balanceMatcher = balancePattern.matcher(normalizedText)
             if (balanceMatcher.find()) {
                 val rawBal = balanceMatcher.group(1)?.replace(",", "")?.replace("٫", "") ?: "0"
@@ -87,9 +67,9 @@ object SmsAiParser {
         }
 
         if (cardNumber == null) {
-            val cardMatcher = Pattern.compile("(\\d{4}\\*+\\d{4}|کارت\\s*\\d{4}|\\d{4}-\\d{4}|\\*\\d{4})")
+            val cardMatcher = Pattern.compile("(\\d{4}\\*+\\d{4}|کارت\\s*\\d{4}|\\d{4}-\\d{4}|\\*\\d{4}|حساب\\s*:?\\s*\\d+|\\b\\d{14,18}\\b)")
             val cardNumberMatcher = cardMatcher.matcher(normalizedText)
-            cardNumber = if (cardNumberMatcher.find()) cardNumberMatcher.group(1)?.replace("-", "")?.replace("کارت", "")?.trim() else null
+            cardNumber = if (cardNumberMatcher.find()) cardNumberMatcher.group(1)?.replace("-", "")?.replace("کارت", "")?.replace("حساب", "")?.replace(":", "")?.trim() else null
         }
 
         val incomeKeywords = listOf("واریز", "افزایش", "طلبکار", "به حساب", "به کارت", "انتقال به", "بازگشت", "سود", "پایا به")
@@ -123,6 +103,7 @@ object SmsAiParser {
             normalizedText.contains("کشاورزی") -> "بانک کشاورزی"
             normalizedText.contains("تجارت") -> "بانک تجارت"
             normalizedText.contains("رسالت") -> "بانک رسالت"
+            normalizedText.contains("صادرات") -> "بانک صادرات"
             else -> "بانک نامشخص"
         }
 
