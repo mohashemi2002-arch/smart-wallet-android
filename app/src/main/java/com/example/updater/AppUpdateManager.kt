@@ -44,7 +44,7 @@ class AppUpdateManager(private val context: Context) {
 
     suspend fun checkForUpdates(isManualCheck: Boolean = false): UpdateMetadata? = withContext(Dispatchers.IO) {
         if (!isNetworkAvailable()) {
-            android.util.Log.e("OTA", "Network unavailable")
+            android.util.Log.d("OTA", "Network unavailable, skipping update check")
             return@withContext null
         }
         

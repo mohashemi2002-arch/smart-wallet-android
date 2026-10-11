@@ -1,6 +1,7 @@
 package com.example.data.model
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
 enum class TransactionType {
@@ -14,7 +15,15 @@ enum class TransactionStatus {
     IGNORED
 }
 
-@Entity(tableName = "transactions")
+@Entity(
+    tableName = "transactions",
+    indices = [
+        Index(value = ["dateMillis"]),
+        Index(value = ["status"]),
+        Index(value = ["categoryName"]),
+        Index(value = ["isParsedFromSms"])
+    ]
+)
 data class Transaction(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
@@ -27,5 +36,8 @@ data class Transaction(
     val rawSmsText: String? = null,
     val isParsedFromSms: Boolean = false,
     val status: TransactionStatus = TransactionStatus.CONFIRMED,
-    val notes: String? = null
+    val notes: String? = null,
+    val bankName: String? = null,
+    val balanceAfterToman: Long? = null,
+    val senderNumber: String? = null
 )

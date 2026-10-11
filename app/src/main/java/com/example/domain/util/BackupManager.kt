@@ -2,15 +2,12 @@ package com.example.domain.util
 
 import android.content.Context
 import android.net.Uri
-import android.util.Base64
 import com.example.data.database.AppDatabase
-import com.example.data.model.Transaction
+import com.example.data.model.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
-import java.io.InputStream
-import java.io.OutputStream
 import java.security.SecureRandom
 import javax.crypto.Cipher
 import javax.crypto.SecretKeyFactory
@@ -36,9 +33,12 @@ object BackupManager {
         val db = AppDatabase.getDatabase(context)
         val transactions = db.transactionDao().getAllTransactionsSync()
         val categories = db.categoryDao().getAllCategoriesSync()
-        // Here we could extract other entities similarly
+        val budgets = db.budgetDao().getAllBudgetsSync()
+        val assets = db.assetDao().getAllAssetsSync()
+        val parsedSms = db.parsedSmsDao().getAllParsedSmsSync()
         
         val json = JSONObject().apply {
+            // 1. Transactions
             val txArray = JSONArray()
             transactions.forEach { t ->
                 txArray.put(JSONObject().apply {
@@ -48,10 +48,79 @@ object BackupManager {
                     put("merchantName", t.merchantName)
                     put("dateMillis", t.dateMillis)
                     put("cardNumber", t.cardNumber ?: "")
+                    put("rawSmsText", t.rawSmsText ?: "")
+                    put("isParsedFromSms", t.isParsedFromSms)
+                    put("status", t.status.name)
+                    put("notes", t.notes ?: "")
+                    put("bankName", t.bankName ?: "")
+                    put("balanceAfterToman", t.balanceAfterToman ?: 0L)
+                    put("senderNumber", t.senderNumber ?: "")
                 })
             }
             put("transactions", txArray)
-            // Put other arrays
+
+            // 2. Categories
+            val catArray = JSONArray()
+            categories.forEach { c ->
+                catArray.put(JSONObject().apply {
+                    put("name", c.name)
+                    put("budgetLimitToman", c.budgetLimitToman)
+                    put("colorHex", c.colorHex)
+                    put("iconName", c.iconName)
+                })
+            }
+            put("categories", catArray)
+
+            // 3. Budgets
+            val budgetArray = JSONArray()
+            budgets.forEach { b ->
+                budgetArray.put(JSONObject().apply {
+                    put("categoryName", b.categoryName)
+                    put("amountLimitToman", b.amountLimitToman)
+                    put("period", b.period.name)
+                    put("jalaliYear", b.jalaliYear)
+                    put("jalaliMonth", b.jalaliMonth)
+                    put("warningThresholdPercent", b.warningThresholdPercent)
+                    put("criticalThresholdPercent", b.criticalThresholdPercent)
+                    put("isActive", b.isActive)
+                    put("notes", b.notes ?: "")
+                })
+            }
+            put("budgets", budgetArray)
+
+            // 4. Assets
+            val assetArray = JSONArray()
+            assets.forEach { a ->
+                assetArray.put(JSONObject().apply {
+                    put("type", a.type.name)
+                    put("name", a.name)
+                    put("totalQuantity", a.totalQuantity)
+                    put("currentUnitPriceToman", a.currentUnitPriceToman)
+                    put("purchaseUnitPriceToman", a.purchaseUnitPriceToman)
+                    put("unit", a.unit)
+                    put("notes", a.notes ?: "")
+                })
+            }
+            put("assets", assetArray)
+
+            // 5. Parsed SMS Records
+            val smsArray = JSONArray()
+            parsedSms.forEach { s ->
+                smsArray.put(JSONObject().apply {
+                    put("senderAddress", s.senderAddress)
+                    put("bankName", s.bankName)
+                    put("rawSmsText", s.rawSmsText)
+                    put("amountToman", s.amountToman)
+                    put("type", s.type.name)
+                    put("cardNumber", s.cardNumber ?: "")
+                    put("balanceToman", s.balanceToman ?: 0L)
+                    put("dateMillis", s.dateMillis)
+                    put("categoryName", s.categoryName)
+                    put("merchantName", s.merchantName)
+                    put("status", s.status.name)
+                })
+            }
+            put("parsedSms", smsArray)
         }
 
         val plainText = json.toString().toByteArray(Charsets.UTF_8)
@@ -91,23 +160,131 @@ object BackupManager {
             val jsonStr = String(plainText, Charsets.UTF_8)
             val jsonObj = JSONObject(jsonStr)
 
-            val txArray = jsonObj.optJSONArray("transactions")
             val db = AppDatabase.getDatabase(context)
             
             db.runInTransaction {
+                // Restore Categories
+                val catArray = jsonObj.optJSONArray("categories")
+                if (catArray != null) {
+                    val existingCats = db.categoryDao().getAllCategoriesSync().associateBy { it.name }
+                    for (i in 0 until catArray.length()) {
+                        val obj = catArray.getJSONObject(i)
+                        val name = obj.getString("name")
+                        if (!existingCats.containsKey(name)) {
+                            db.categoryDao().insertSync(
+                                Category(
+                                    name = name,
+                                    budgetLimitToman = obj.optLong("budgetLimitToman", 0L),
+                                    colorHex = obj.optString("colorHex", "#00897B"),
+                                    iconName = obj.optString("iconName", "category")
+                                )
+                            )
+                        }
+                    }
+                }
+
+                // Restore Transactions
+                val txArray = jsonObj.optJSONArray("transactions")
                 if (txArray != null) {
                     for (i in 0 until txArray.length()) {
                         val obj = txArray.getJSONObject(i)
                         db.transactionDao().insertSync(
                             Transaction(
                                 amountToman = obj.getLong("amountToman"),
-                                type = com.example.data.model.TransactionType.valueOf(obj.getString("type")),
+                                type = TransactionType.valueOf(obj.getString("type")),
                                 categoryName = obj.getString("categoryName"),
                                 merchantName = obj.getString("merchantName"),
                                 dateMillis = obj.getLong("dateMillis"),
-                                cardNumber = obj.optString("cardNumber").takeIf { it.isNotBlank() }
+                                cardNumber = obj.optString("cardNumber").takeIf { it.isNotBlank() },
+                                rawSmsText = obj.optString("rawSmsText").takeIf { it.isNotBlank() },
+                                isParsedFromSms = obj.optBoolean("isParsedFromSms", false),
+                                status = if (obj.has("status")) TransactionStatus.valueOf(obj.getString("status")) else TransactionStatus.CONFIRMED,
+                                notes = obj.optString("notes").takeIf { it.isNotBlank() },
+                                bankName = obj.optString("bankName").takeIf { it.isNotBlank() },
+                                balanceAfterToman = if (obj.has("balanceAfterToman") && obj.getLong("balanceAfterToman") != 0L) obj.getLong("balanceAfterToman") else null,
+                                senderNumber = obj.optString("senderNumber").takeIf { it.isNotBlank() }
                             )
                         )
+                    }
+                }
+
+                // Restore Budgets
+                val budgetArray = jsonObj.optJSONArray("budgets")
+                if (budgetArray != null) {
+                    for (i in 0 until budgetArray.length()) {
+                        val obj = budgetArray.getJSONObject(i)
+                        val periodStr = obj.optString("period", "MONTHLY")
+                        val period = try { BudgetPeriod.valueOf(periodStr) } catch (_: Exception) { BudgetPeriod.MONTHLY }
+                        val b = BudgetEntity(
+                            categoryName = obj.getString("categoryName"),
+                            amountLimitToman = obj.getLong("amountLimitToman"),
+                            period = period,
+                            jalaliYear = obj.optInt("jalaliYear", 1404),
+                            jalaliMonth = obj.optInt("jalaliMonth", 0),
+                            warningThresholdPercent = obj.optInt("warningThresholdPercent", 80),
+                            criticalThresholdPercent = obj.optInt("criticalThresholdPercent", 100),
+                            isActive = obj.optBoolean("isActive", true),
+                            notes = obj.optString("notes").takeIf { it.isNotBlank() }
+                        )
+                        // Run blocking or insert
+                        runCatching {
+                            kotlinx.coroutines.runBlocking { db.budgetDao().insert(b) }
+                        }
+                    }
+                }
+
+                // Restore Assets
+                val assetArray = jsonObj.optJSONArray("assets")
+                if (assetArray != null) {
+                    val existingAssets = runCatching {
+                        kotlinx.coroutines.runBlocking { db.assetDao().getAllAssetsSync() }
+                    }.getOrDefault(emptyList()).associateBy { it.name }
+
+                    for (i in 0 until assetArray.length()) {
+                        val obj = assetArray.getJSONObject(i)
+                        val name = obj.getString("name")
+                        if (!existingAssets.containsKey(name)) {
+                            val typeStr = obj.optString("type", "CUSTOM")
+                            val type = try { AssetType.valueOf(typeStr) } catch (_: Exception) { AssetType.CUSTOM }
+                            val a = Asset(
+                                type = type,
+                                name = name,
+                                totalQuantity = obj.optDouble("totalQuantity", 0.0),
+                                currentUnitPriceToman = obj.optLong("currentUnitPriceToman", 0L),
+                                purchaseUnitPriceToman = obj.optLong("purchaseUnitPriceToman", 0L),
+                                unit = obj.optString("unit", ""),
+                                notes = obj.optString("notes").takeIf { it.isNotBlank() }
+                            )
+                            runCatching {
+                                kotlinx.coroutines.runBlocking { db.assetDao().insert(a) }
+                            }
+                        }
+                    }
+                }
+
+                // Restore Parsed SMS Records
+                val smsArray = jsonObj.optJSONArray("parsedSms")
+                if (smsArray != null) {
+                    for (i in 0 until smsArray.length()) {
+                        val obj = smsArray.getJSONObject(i)
+                        val statusStr = obj.optString("status", "PENDING")
+                        val status = try { SmsProcessingStatus.valueOf(statusStr) } catch (_: Exception) { SmsProcessingStatus.PENDING }
+                        val s = ParsedSmsEntity(
+                            senderAddress = obj.getString("senderAddress"),
+                            bankName = obj.getString("bankName"),
+                            rawSmsText = obj.getString("rawSmsText"),
+                            amountToman = obj.getLong("amountToman"),
+                            type = TransactionType.valueOf(obj.getString("type")),
+                            cardNumber = obj.optString("cardNumber").takeIf { it.isNotBlank() },
+                            balanceToman = if (obj.has("balanceToman") && obj.getLong("balanceToman") != 0L) obj.getLong("balanceToman") else null,
+                            dateMillis = obj.optLong("dateMillis", System.currentTimeMillis()),
+                            categoryName = obj.optString("categoryName", "متفرقه"),
+                            merchantName = obj.optString("merchantName", ""),
+                            status = status
+                        )
+                        runCatching {
+                            kotlinx.coroutines.runBlocking { db.parsedSmsDao().insert(s) }
+                        }
                     }
                 }
             }
@@ -127,17 +304,18 @@ object BackupManager {
             out.write(byteArrayOf(0xEF.toByte(), 0xBB.toByte(), 0xBF.toByte()))
             
             val writer = out.writer(Charsets.UTF_8)
-            writer.write("تاریخ,نوع,دسته‌بندی,فروشگاه/توضیحات,مبلغ (تومان),شماره کارت\n")
+            writer.write("تاریخ,نوع,دسته‌بندی,فروشگاه/توضیحات,مبلغ (تومان),شماره کارت,بانک,مانده بعد از تراکنش\n")
             
             transactions.forEach { t ->
-                // Basic CSV escaping
                 val date = com.example.ui.components.PersianFormatters.formatDate(t.dateMillis)
-                val type = if (t.type == com.example.data.model.TransactionType.EXPENSE) "برداشت" else "واریز"
+                val type = if (t.type == TransactionType.EXPENSE) "برداشت" else "واریز"
                 val cat = t.categoryName.replace(",", "،")
                 val merch = t.merchantName.replace(",", "،")
                 val amount = t.amountToman
                 val card = t.cardNumber ?: ""
-                writer.write("$date,$type,$cat,$merch,$amount,$card\n")
+                val bank = t.bankName ?: ""
+                val balance = t.balanceAfterToman?.toString() ?: ""
+                writer.write("$date,$type,$cat,$merch,$amount,$card,$bank,$balance\n")
             }
             writer.flush()
         }

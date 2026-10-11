@@ -73,7 +73,10 @@ class BankSmsHistoryViewModel(application: Application) : AndroidViewModel(appli
                 dateMillis = sms.timestamp,
                 rawSmsText = sms.body,
                 isParsedFromSms = true,
-                status = TransactionStatus.PENDING_APPROVAL
+                status = TransactionStatus.PENDING_APPROVAL,
+                bankName = sms.bankName,
+                balanceAfterToman = result.balanceToman,
+                senderNumber = sms.sender
             )
         } else {
             // Even if parsing fails, we return a draft so the user can fill it
@@ -85,15 +88,21 @@ class BankSmsHistoryViewModel(application: Application) : AndroidViewModel(appli
                 dateMillis = sms.timestamp,
                 rawSmsText = sms.body,
                 isParsedFromSms = true,
-                status = TransactionStatus.PENDING_APPROVAL
+                status = TransactionStatus.PENDING_APPROVAL,
+                bankName = sms.bankName,
+                senderNumber = sms.sender
             )
         }
     }
     
     fun insertTransaction(transaction: Transaction) {
-        viewModelScope.launch {
-            repository.addTransaction(transaction)
-            refreshScan() // Re-scan to update the "registered" flag
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                repository.addTransaction(transaction)
+                refreshScan() // Re-scan to update the "registered" flag
+            } catch (e: Exception) {
+                android.util.Log.e("BankSmsHistoryVM", "Error inserting transaction", e)
+            }
         }
     }
 }

@@ -12,6 +12,12 @@ interface BankAccountDao {
     @Query("SELECT * FROM bank_accounts ORDER BY id DESC")
     fun getAllBankAccountsSync(): List<BankAccount>
 
+    @Query("SELECT * FROM bank_accounts WHERE id = :accountId LIMIT 1")
+    suspend fun getAccountById(accountId: Long): BankAccount?
+
+    @Query("SELECT * FROM bank_accounts ORDER BY id DESC")
+    suspend fun getAllBankAccountsList(): List<BankAccount>
+
     @Query("SELECT * FROM bank_accounts WHERE cardNumber LIKE '%' || :cardSuffix || '%' LIMIT 1")
     suspend fun findByCardSuffix(cardSuffix: String): BankAccount?
 

@@ -120,10 +120,12 @@ fun PendingReviewBottomSheet(
             ) {
                 Button(
                     onClick = {
-                        val newAmount = amountText.toLongOrNull() ?: transaction.amountToman
+                        val cleanDigits = amountText.replace(",", "").replace("،", "").replace(" ", "").trim()
+                        val englishDigits = com.example.ui.components.PersianFormatters.toEnglishDigits(cleanDigits)
+                        val newAmount = englishDigits.toLongOrNull() ?: transaction.amountToman
                         val updated = transaction.copy(
                             amountToman = newAmount,
-                            categoryName = categoryText,
+                            categoryName = categoryText.ifBlank { "متفرقه" },
                             merchantName = merchantText,
                             type = type,
                             cardNumber = selectedCard.takeIf { it.isNotBlank() },

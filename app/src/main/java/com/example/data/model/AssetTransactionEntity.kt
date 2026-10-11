@@ -26,5 +26,6 @@ data class AssetTransactionEntity(
     val type: AssetTransactionType,
     val quantity: Double,
     val unitPriceToman: Long,
-    val dateTimestamp: Long
+    val dateTimestamp: Long,
+    val notes: String? = null
 )

@@ -24,7 +24,9 @@ class SmsReceiver : BroadcastReceiver() {
                     val isMappedSender = activeSenders.any { sender.contains(it.senderNumber) || it.senderNumber.contains(sender) }
                     
                     if (isMappedSender || (activeSenders.isEmpty() && isBankSmsFallback(body, sender))) {
-                        Log.d("SmsReceiver", "Bank SMS detected from $sender: $body")
+                        // Secure logging: Mask sender details and never log the raw financial SMS body
+                        val maskedSender = com.example.util.SecurityUtils.maskSensitiveData(sender)
+                        Log.d("SmsReceiver", "Bank SMS detected from $maskedSender (length: ${body.length})")
                         repository.processIncomingSms(body, sender)
                         showNotification(context)
                     }

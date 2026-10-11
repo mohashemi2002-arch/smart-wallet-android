@@ -25,18 +25,26 @@ class PendingSmsViewModel(application: Application) : AndroidViewModel(applicati
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun approveTransaction(transaction: Transaction, newCardNumber: String?, newCategory: String) {
-        viewModelScope.launch {
-            val updated = transaction.copy(
-                cardNumber = newCardNumber ?: transaction.cardNumber,
-                categoryName = newCategory
-            )
-            repository.approvePendingTransaction(updated)
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val updated = transaction.copy(
+                    cardNumber = newCardNumber ?: transaction.cardNumber,
+                    categoryName = newCategory
+                )
+                repository.approvePendingTransaction(updated)
+            } catch (e: Exception) {
+                android.util.Log.e("PendingSmsVM", "Error approving transaction", e)
+            }
         }
     }
 
     fun rejectTransaction(transaction: Transaction) {
-        viewModelScope.launch {
-            repository.deleteTransaction(transaction)
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                repository.deleteTransaction(transaction)
+            } catch (e: Exception) {
+                android.util.Log.e("PendingSmsVM", "Error rejecting transaction", e)
+            }
         }
     }
 

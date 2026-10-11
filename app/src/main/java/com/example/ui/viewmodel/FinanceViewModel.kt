@@ -146,6 +146,10 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
     val assets: StateFlow<List<Asset>> = repository.allAssets
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val budgets: StateFlow<List<BudgetEntity>> = repository.allBudgets
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val parsedSmsRecords: StateFlow<List<ParsedSmsEntity>> = repository.allParsedSms
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val bankAccounts: StateFlow<List<BankAccount>> = repository.allBankAccounts
@@ -222,9 +226,31 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
                 cardNumber = parsed.cardNumber,
                 dateMillis = System.currentTimeMillis(),
                 rawSmsText = parsed.rawText,
-                isParsedFromSms = true
+                isParsedFromSms = true,
+                status = TransactionStatus.CONFIRMED,
+                bankName = parsed.bankName,
+                balanceAfterToman = parsed.balanceToman
             )
             repository.addTransaction(transaction)
+
+            // Also persist parsed SMS entity
+            val smsEntity = ParsedSmsEntity(
+                senderAddress = "",
+                bankName = parsed.bankName ?: parsed.merchantName.ifBlank { "بانک" },
+                rawSmsText = parsed.rawText,
+                amountToman = parsed.amountToman,
+                type = parsed.type,
+                cardNumber = parsed.cardNumber,
+                balanceToman = parsed.balanceToman,
+                dateMillis = System.currentTimeMillis(),
+                transactionTimeText = parsed.transactionTime,
+                categoryName = parsed.categoryName,
+                merchantName = parsed.merchantName,
+                confidence = parsed.confidence,
+                status = SmsProcessingStatus.CONFIRMED
+            )
+            repository.saveParsedSms(smsEntity)
+
             _parsedSmsState.value = null
             _smsInputText.value = ""
             _statusMessage.value = "تراکنش بانکی با موفقیت ثبت شد!"
@@ -260,26 +286,43 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun approvePendingTransaction(transaction: Transaction) {
-        viewModelScope.launch {
-            repository.approvePendingTransaction(transaction)
-            _statusMessage.value = "تراکنش پیامکی تایید و در موجودی کارت اعمال شد."
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                repository.approvePendingTransaction(transaction)
+                _statusMessage.value = "تراکنش پیامکی تایید و در موجودی کارت اعمال شد."
+            } catch (e: Exception) {
+                android.util.Log.e("FinanceViewModel", "Error approving pending transaction", e)
+                _statusMessage.value = "خطا در تایید تراکنش پیامکی"
+            }
         }
     }
 
     fun rejectPendingTransaction(transaction: Transaction) {
-        viewModelScope.launch {
-            repository.deleteTransaction(transaction)
-            _statusMessage.value = "تراکنش پیامکی رد و حذف شد."
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                repository.deleteTransaction(transaction)
+                _statusMessage.value = "تراکنش پیامکی رد و حذف شد."
+            } catch (e: Exception) {
+                android.util.Log.e("FinanceViewModel", "Error rejecting pending transaction", e)
+            }
         }
     }
 
-    fun addAsset(name: String, type: AssetType, quantity: Double, priceToman: Long, unit: String) {
+    fun addAsset(
+        name: String,
+        type: AssetType,
+        quantity: Double,
+        priceToman: Long,
+        unit: String,
+        purchasePriceToman: Long = priceToman
+    ) {
         viewModelScope.launch {
             val asset = Asset(
                 name = name,
                 type = type,
                 totalQuantity = quantity,
                 currentUnitPriceToman = priceToman,
+                purchaseUnitPriceToman = purchasePriceToman,
                 unit = unit
             )
             repository.addAsset(asset)
