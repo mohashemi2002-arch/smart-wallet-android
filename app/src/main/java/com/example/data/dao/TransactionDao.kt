@@ -21,6 +21,15 @@ interface TransactionDao {
     @Query("SELECT * FROM transactions WHERE status = 'CONFIRMED' AND dateMillis BETWEEN :startMillis AND :endMillis ORDER BY dateMillis DESC")
     fun getConfirmedTransactionsInRange(startMillis: Long, endMillis: Long): Flow<List<Transaction>>
 
+    @Query("SELECT * FROM transactions WHERE isParsedFromSms = 1 ORDER BY dateMillis DESC")
+    fun getTransactionsParsedFromSms(): Flow<List<Transaction>>
+
+    @Query("SELECT * FROM transactions WHERE categoryName = :categoryName ORDER BY dateMillis DESC")
+    fun getTransactionsByCategory(categoryName: String): Flow<List<Transaction>>
+
+    @Query("SELECT * FROM transactions WHERE id = :id LIMIT 1")
+    suspend fun getTransactionById(id: Long): Transaction?
+
     @Query("SELECT * FROM transactions ORDER BY dateMillis DESC")
     fun getAllTransactionsSync(): List<Transaction>
 
@@ -30,11 +39,17 @@ interface TransactionDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(transaction: Transaction): Long
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(transactions: List<Transaction>): List<Long>
+
     @Update
     suspend fun update(transaction: Transaction)
 
     @Delete
     suspend fun delete(transaction: Transaction)
+
+    @Query("DELETE FROM transactions WHERE id = :id")
+    suspend fun deleteById(id: Long)
 
     @Query("DELETE FROM transactions")
     suspend fun clearAll()

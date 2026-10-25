@@ -18,9 +18,11 @@ import com.example.data.model.*
         ChequeEntity::class,
         BankAccount::class,
         BankSmsSender::class,
-        MarketRateEntity::class
+        MarketRateEntity::class,
+        ParsedSmsEntity::class,
+        BudgetEntity::class
     ],
-    version = 8,
+    version = 9,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -33,6 +35,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun bankAccountDao(): BankAccountDao
     abstract fun bankSmsSenderDao(): BankSmsSenderDao
     abstract fun marketRateDao(): MarketRateDao
+    abstract fun parsedSmsDao(): ParsedSmsDao
+    abstract fun budgetDao(): BudgetDao
 
     companion object {
         @Volatile
@@ -45,8 +49,11 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "smart wallet_ai_database"
                 )
-                .addMigrations(AppDatabaseMigrations.MIGRATION_1_2)
-                .fallbackToDestructiveMigration()
+                .addMigrations(
+                    AppDatabaseMigrations.MIGRATION_1_2,
+                    AppDatabaseMigrations.MIGRATION_7_8,
+                    AppDatabaseMigrations.MIGRATION_8_9
+                )
                 .build()
                 INSTANCE = instance
                 instance

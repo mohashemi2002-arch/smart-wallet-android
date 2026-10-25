@@ -17,3 +17,6 @@ local.properties
 .env
 debug.keystore
 smart-wallet-release.base64.txt
+*.jks
+*.keystore
+smart-wallet-release.jks

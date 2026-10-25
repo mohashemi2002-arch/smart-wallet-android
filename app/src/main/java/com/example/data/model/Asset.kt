@@ -18,9 +18,20 @@ data class Asset(
     val name: String,
     val totalQuantity: Double,
     val currentUnitPriceToman: Long,
-    val unit: String = "", // Add unit for backward compatibility if needed, or remove
+    val purchaseUnitPriceToman: Long = 0L,
+    val unit: String = "",
+    val notes: String? = null,
     val lastUpdatedTimestamp: Long = System.currentTimeMillis()
 ) {
     val totalValueToman: Long
         get() = (totalQuantity * currentUnitPriceToman).toLong()
+
+    val totalInvestedToman: Long
+        get() = (totalQuantity * purchaseUnitPriceToman).toLong()
+
+    val unrealizedPnlToman: Long
+        get() = totalValueToman - totalInvestedToman
+
+    val unrealizedPnlPercent: Double
+        get() = if (totalInvestedToman > 0) ((unrealizedPnlToman.toDouble() / totalInvestedToman.toDouble()) * 100.0) else 0.0
 }

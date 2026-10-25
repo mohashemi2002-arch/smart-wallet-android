@@ -25,24 +25,30 @@ class UpdateChecker {
     private val adapter = moshi.adapter(UpdateMetadata::class.java)
 
     fun getUpdateMetadata(): UpdateMetadata? {
-        Log.d("OTA", "checking update from ${BuildConfig.UPDATE_JSON_URL}")
+        val updateUrl = BuildConfig.UPDATE_JSON_URL
+        if (updateUrl.isNullOrBlank()) {
+            Log.d("OTA", "Update URL is not configured")
+            return null
+        }
+        Log.d("OTA", "Checking update from $updateUrl")
         val request = Request.Builder()
-            .url(BuildConfig.UPDATE_JSON_URL)
+            .url(updateUrl)
             .build()
         try {
             client.newCall(request).execute().use { response ->
                 if (response.isSuccessful) {
                     val bodyStr = response.body?.string() ?: return null
                     val metadata = adapter.fromJson(bodyStr)
-                    Log.d("OTA", "update metadata downloaded successfully. latest version: ${metadata?.versionCode}")
+                    Log.d("OTA", "Update metadata downloaded successfully. Latest version: ${metadata?.versionCode}")
                     return metadata
+                } else if (response.code == 404) {
+                    Log.d("OTA", "No remote update manifest found (HTTP 404). App is up to date.")
                 } else {
-                    Log.e("OTA", "HTTP error ${response.code} when checking update")
+                    Log.w("OTA", "Server returned HTTP ${response.code} when checking update")
                 }
             }
         } catch (e: Exception) {
-            Log.e("OTA", "Network failure when checking update", e)
-            e.printStackTrace()
+            Log.w("OTA", "Network failure when checking update: ${e.message}")
         }
         return null
     }

@@ -2,6 +2,7 @@ import java.util.zip.ZipInputStream
 import java.io.FileOutputStream
 import java.net.URI
 import java.io.File
+import java.util.Properties
 import com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesStrategy
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
@@ -31,17 +32,37 @@ android {
   }
 
   signingConfigs {
-        create("release") {
-            val keystorePath = System.getenv("SIGNING_KEYSTORE_PATH") ?: "smart-wallet-release.jks"
-            val keystoreFile = file(keystorePath)
-            
-            if (keystoreFile.exists()) {
-                storeFile = keystoreFile
-                storePassword = System.getenv("SIGNING_KEYSTORE_PASSWORD")
-                keyAlias = System.getenv("SIGNING_KEY_ALIAS")
-                keyPassword = System.getenv("SIGNING_KEY_PASSWORD")
-            }
+    create("release") {
+      // 1. Check CI/CD Environment Variables (GitHub Secrets)
+      val envKeystorePath = System.getenv("SIGNING_KEYSTORE_PATH") ?: System.getenv("KEYSTORE_PATH")
+      val envStorePassword = System.getenv("SIGNING_KEYSTORE_PASSWORD") ?: System.getenv("STORE_PASSWORD")
+      val envKeyAlias = System.getenv("SIGNING_KEY_ALIAS") ?: System.getenv("KEY_ALIAS")
+      val envKeyPassword = System.getenv("SIGNING_KEY_PASSWORD") ?: System.getenv("KEY_PASSWORD")
+
+      // 2. Fallback to local.properties for secure local development (never committed to Git)
+      val localProps = Properties()
+      val localPropsFile = rootProject.file("local.properties")
+      if (localPropsFile.exists()) {
+        localPropsFile.inputStream().use { stream ->
+          localProps.load(stream)
         }
+      }
+
+      val keystorePath = envKeystorePath ?: localProps.getProperty("signing.keystore.path")
+      val storePasswordVal = envStorePassword ?: localProps.getProperty("signing.keystore.password")
+      val keyAliasVal = envKeyAlias ?: localProps.getProperty("signing.key.alias")
+      val keyPasswordVal = envKeyPassword ?: localProps.getProperty("signing.key.password")
+
+      if (!keystorePath.isNullOrBlank()) {
+        val keystoreFile = file(keystorePath)
+        if (keystoreFile.exists()) {
+          storeFile = keystoreFile
+          storePassword = storePasswordVal
+          keyAlias = keyAliasVal
+          keyPassword = keyPasswordVal
+        }
+      }
+    }
     create("debugConfig") {
       storeFile = file("${rootDir}/debug.keystore")
       storePassword = "android"
@@ -51,16 +72,21 @@ android {
   }
 
   buildTypes {
-        release {
-            isMinifyEnabled = true
-            isShrinkResources = true
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
-            signingConfig = signingConfigs.getByName("release")
-        }
+    release {
+      isMinifyEnabled = true
+      isShrinkResources = true
+      proguardFiles(
+        getDefaultProguardFile("proguard-android-optimize.txt"),
+        "proguard-rules.pro"
+      )
+      val releaseConfig = signingConfigs.getByName("release")
+      signingConfig = if (releaseConfig.storeFile != null && releaseConfig.storeFile!!.exists()) {
+        releaseConfig
+      } else {
+        signingConfigs.getByName("debugConfig")
+      }
     }
+  }
   compileOptions {
     sourceCompatibility = JavaVersion.VERSION_11
     targetCompatibility = JavaVersion.VERSION_11

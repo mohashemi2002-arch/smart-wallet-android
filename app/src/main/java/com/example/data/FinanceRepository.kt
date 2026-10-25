@@ -9,6 +9,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class FinanceRepository private constructor(context: Context) {
 
@@ -18,6 +19,8 @@ class FinanceRepository private constructor(context: Context) {
     val assetDao = db.assetDao()
     val bankAccountDao = db.bankAccountDao()
     val bankSmsSenderDao = db.bankSmsSenderDao()
+    val parsedSmsDao = db.parsedSmsDao()
+    val budgetDao = db.budgetDao()
 
     val allTransactions: Flow<List<Transaction>> = transactionDao.getAllTransactions()
     val confirmedTransactions: Flow<List<Transaction>> = transactionDao.getConfirmedTransactionsFlow()
@@ -30,6 +33,10 @@ class FinanceRepository private constructor(context: Context) {
     val allAssets: Flow<List<Asset>> = assetDao.getAllAssets()
     val allBankAccounts: Flow<List<BankAccount>> = bankAccountDao.getAllBankAccounts()
     val allBankSmsSenders: Flow<List<BankSmsSender>> = bankSmsSenderDao.getAllBankSmsSenders()
+    val allParsedSms: Flow<List<ParsedSmsEntity>> = parsedSmsDao.getAllParsedSms()
+    val pendingParsedSms: Flow<List<ParsedSmsEntity>> = parsedSmsDao.getPendingParsedSms()
+    val allBudgets: Flow<List<BudgetEntity>> = budgetDao.getAllBudgets()
+    val activeBudgets: Flow<List<BudgetEntity>> = budgetDao.getActiveBudgets()
 
     init {
         CoroutineScope(Dispatchers.IO).launch {
@@ -52,10 +59,25 @@ class FinanceRepository private constructor(context: Context) {
                 Category(name = "متفرقه", budgetLimitToman = 5000000, colorHex = "#607D8B", iconName = "category")
             )
             categoryDao.insertAll(defaultCategories)
+
+            // Seed initial matching budgets
+            val defaultBudgets = defaultCategories.map { cat ->
+                BudgetEntity(
+                    categoryName = cat.name,
+                    amountLimitToman = cat.budgetLimitToman,
+                    period = BudgetPeriod.MONTHLY,
+                    jalaliYear = 1404,
+                    jalaliMonth = 0,
+                    warningThresholdPercent = 80,
+                    criticalThresholdPercent = 100,
+                    isActive = true
+                )
+            }
+            budgetDao.insertAll(defaultBudgets)
         }
     }
 
-    suspend fun importSmartWalletExcel(rows: List<com.example.data.SmartWalletExcelRow>): Pair<Int, Int> {
+    suspend fun importSmartWalletExcel(rows: List<com.example.data.SmartWalletExcelRow>): Pair<Int, Int> = withContext(Dispatchers.IO) {
         var txCount = 0
         var accCount = 0
         
@@ -146,11 +168,31 @@ class FinanceRepository private constructor(context: Context) {
             }
         }
         
-        return Pair(txCount, accCount)
+        Pair(txCount, accCount)
     }
 
-    suspend fun processIncomingSms(smsText: String, senderAddress: String? = null): ParsedSmsResult {
+    suspend fun processIncomingSms(smsText: String, senderAddress: String? = null): ParsedSmsResult = withContext(Dispatchers.IO) {
         val result = SmsAiParser.parseSms(smsText, senderAddress = senderAddress)
+        
+        // 1. Create and persist ParsedSmsEntity in Room
+        val parsedSmsEntity = ParsedSmsEntity(
+            senderAddress = senderAddress ?: "",
+            bankName = result.bankName ?: result.merchantName.ifBlank { "بانک" },
+            rawSmsText = smsText,
+            amountToman = result.amountToman,
+            type = result.type,
+            cardNumber = result.cardNumber,
+            balanceToman = result.balanceToman,
+            dateMillis = System.currentTimeMillis(),
+            transactionTimeText = result.transactionTime,
+            categoryName = result.categoryName.ifBlank { "متفرقه" },
+            merchantName = result.merchantName,
+            confidence = result.confidence,
+            status = SmsProcessingStatus.PENDING
+        )
+        val parsedSmsId = parsedSmsDao.insert(parsedSmsEntity)
+
+        // 2. Create pending Transaction in Room
         val newTransaction = Transaction(
             amountToman = result.amountToman,
             type = result.type,
@@ -160,23 +202,30 @@ class FinanceRepository private constructor(context: Context) {
             dateMillis = System.currentTimeMillis(),
             rawSmsText = smsText,
             isParsedFromSms = true,
-            status = com.example.data.model.TransactionStatus.PENDING_APPROVAL // Set as pending for user approval
+            status = com.example.data.model.TransactionStatus.PENDING_APPROVAL,
+            bankName = result.bankName,
+            balanceAfterToman = result.balanceToman,
+            senderNumber = senderAddress
         )
-        transactionDao.insert(newTransaction)
-        return result
+        val transactionId = transactionDao.insert(newTransaction)
+
+        // 3. Link them together
+        parsedSmsDao.updateStatus(parsedSmsId, SmsProcessingStatus.PENDING, transactionId)
+
+        result
     }
 
-suspend fun confirmAndSyncBalance(
+    suspend fun confirmAndSyncBalance(
         transactionId: Long,
         accountId: Long,
         categoryName: String,
         amount: Long,
         type: TransactionType,
         cardNumber: String?
-    ) {
+    ) = withContext(Dispatchers.IO) {
         db.withTransaction {
             // 1. Update the transaction row to CONFIRMED
-            val tx = transactionDao.getAllTransactionsSync().find { it.id == transactionId }
+            val tx = transactionDao.getTransactionById(transactionId)
             if (tx != null) {
                 val updatedTx = tx.copy(
                     status = com.example.data.model.TransactionStatus.CONFIRMED,
@@ -187,32 +236,34 @@ suspend fun confirmAndSyncBalance(
             }
 
             // Ensure category exists
-            val categories = categoryDao.getAllCategoriesSync()
-            if (categories.none { it.name == categoryName }) {
+            val existingCategory = categoryDao.getCategoryByName(categoryName)
+            if (existingCategory == null) {
                 categoryDao.insert(Category(name = categoryName, colorHex = "#95A5A6"))
             }
 
             // 2. Adjust the corresponding bank account balance
-            when (type) {
-                TransactionType.EXPENSE -> {
-                    bankAccountDao.deductBalance(accountId, amount)
-                }
-                TransactionType.INCOME -> {
-                    bankAccountDao.addBalance(accountId, amount)
+            if (accountId > 0L) {
+                when (type) {
+                    TransactionType.EXPENSE -> {
+                        bankAccountDao.deductBalance(accountId, amount)
+                    }
+                    TransactionType.INCOME -> {
+                        bankAccountDao.addBalance(accountId, amount)
+                    }
                 }
             }
         }
     }
 
-    suspend fun reverseTransactionBalance(transaction: Transaction) {
-        if (transaction.status != com.example.data.model.TransactionStatus.CONFIRMED) return
+    suspend fun reverseTransactionBalance(transaction: Transaction) = withContext(Dispatchers.IO) {
+        if (transaction.status != com.example.data.model.TransactionStatus.CONFIRMED) return@withContext
         
         db.withTransaction {
             var account: BankAccount? = null
             if (transaction.cardNumber?.startsWith("ID:") == true) {
                 val accId = transaction.cardNumber.removePrefix("ID:").toLongOrNull()
                 if (accId != null) {
-                    account = bankAccountDao.getAllBankAccountsSync().find { it.id == accId }
+                    account = bankAccountDao.getAccountById(accId)
                 }
             } else if (!transaction.cardNumber.isNullOrBlank()) {
                 val cleanDigits = transaction.cardNumber.replace("*", "").replace("-", "").takeLast(4)
@@ -232,14 +283,14 @@ suspend fun confirmAndSyncBalance(
         }
     }
 
-    private suspend fun resolveAccountAndSyncBalance(transaction: Transaction) {
+    private suspend fun resolveAccountAndSyncBalance(transaction: Transaction) = withContext(Dispatchers.IO) {
         var finalCardNumber = transaction.cardNumber
         var matchedAccount: BankAccount? = null
 
         if (finalCardNumber?.startsWith("ID:") == true) {
             val accId = finalCardNumber.removePrefix("ID:").toLongOrNull()
             if (accId != null) {
-                matchedAccount = bankAccountDao.getAllBankAccountsSync().find { it.id == accId }
+                matchedAccount = bankAccountDao.getAccountById(accId)
                 if (matchedAccount != null) {
                     finalCardNumber = matchedAccount.cardNumber
                 }
@@ -252,7 +303,7 @@ suspend fun confirmAndSyncBalance(
                 matchedAccount = bankAccountDao.findByCardSuffix(cleanDigits)
                 if (matchedAccount == null) {
                     val newAccount = BankAccount(
-                        bankName = "حساب پیامکی",
+                        bankName = transaction.bankName?.ifBlank { "حساب پیامکی" } ?: "حساب پیامکی",
                         accountName = "حساب جدید",
                         cardNumber = finalCardNumber,
                         accountNumber = finalCardNumber,
@@ -283,15 +334,15 @@ suspend fun confirmAndSyncBalance(
         )
     }
 
-    suspend fun approvePendingTransaction(transaction: Transaction) {
+    suspend fun approvePendingTransaction(transaction: Transaction) = withContext(Dispatchers.IO) {
         // Prevent double execution if it was already confirmed in the database
-        val txInDb = transactionDao.getAllTransactionsSync().find { it.id == transaction.id }
-        if (txInDb?.status == com.example.data.model.TransactionStatus.CONFIRMED) return
+        val txInDb = transactionDao.getTransactionById(transaction.id)
+        if (txInDb?.status == com.example.data.model.TransactionStatus.CONFIRMED) return@withContext
         
         resolveAccountAndSyncBalance(transaction)
     }
 
-    suspend fun addTransaction(transaction: Transaction) {
+    suspend fun addTransaction(transaction: Transaction) = withContext(Dispatchers.IO) {
         val newId = transactionDao.insert(transaction)
         val inserted = transaction.copy(id = newId)
         if (inserted.status == com.example.data.model.TransactionStatus.CONFIRMED) {
@@ -299,52 +350,104 @@ suspend fun confirmAndSyncBalance(
         }
     }
 
-    suspend fun deleteTransaction(transaction: Transaction) {
+    suspend fun deleteTransaction(transaction: Transaction) = withContext(Dispatchers.IO) {
         reverseTransactionBalance(transaction)
         transactionDao.delete(transaction)
     }
 
-    suspend fun addBankAccount(bankAccount: BankAccount) {
+    suspend fun addBankAccount(bankAccount: BankAccount) = withContext(Dispatchers.IO) {
         bankAccountDao.insert(bankAccount)
     }
 
-    suspend fun updateBankAccount(bankAccount: BankAccount) {
+    suspend fun updateBankAccount(bankAccount: BankAccount) = withContext(Dispatchers.IO) {
         bankAccountDao.update(bankAccount)
     }
 
-    suspend fun deleteBankAccount(bankAccount: BankAccount) {
+    suspend fun deleteBankAccount(bankAccount: BankAccount) = withContext(Dispatchers.IO) {
         bankAccountDao.delete(bankAccount)
     }
 
-    suspend fun addBankSmsSender(sender: BankSmsSender) {
+    suspend fun addBankSmsSender(sender: BankSmsSender) = withContext(Dispatchers.IO) {
         bankSmsSenderDao.insert(sender)
     }
 
-    suspend fun updateBankSmsSender(sender: BankSmsSender) {
+    suspend fun updateBankSmsSender(sender: BankSmsSender) = withContext(Dispatchers.IO) {
         bankSmsSenderDao.update(sender)
     }
 
-    suspend fun deleteBankSmsSender(sender: BankSmsSender) {
+    suspend fun deleteBankSmsSender(sender: BankSmsSender) = withContext(Dispatchers.IO) {
         bankSmsSenderDao.delete(sender)
     }
 
-    suspend fun addAsset(asset: Asset) {
+    suspend fun addAsset(asset: Asset) = withContext(Dispatchers.IO) {
         assetDao.insert(asset)
     }
 
-    suspend fun updateAsset(asset: Asset) {
+    suspend fun updateAsset(asset: Asset) = withContext(Dispatchers.IO) {
         assetDao.update(asset)
     }
 
-    suspend fun deleteAsset(asset: Asset) {
+    suspend fun deleteAsset(asset: Asset) = withContext(Dispatchers.IO) {
         assetDao.delete(asset)
     }
 
 
 
 
-    suspend fun updateCategoryBudget(category: Category) {
+    suspend fun updateCategoryBudget(category: Category) = withContext(Dispatchers.IO) {
         categoryDao.update(category)
+        val existing = budgetDao.getBudgetByCategoryNameSync(category.name)
+        if (existing != null) {
+            budgetDao.update(existing.copy(amountLimitToman = category.budgetLimitToman))
+        } else {
+            budgetDao.insert(
+                BudgetEntity(
+                    categoryId = category.id,
+                    categoryName = category.name,
+                    amountLimitToman = category.budgetLimitToman,
+                    period = BudgetPeriod.MONTHLY,
+                    isActive = true
+                )
+            )
+        }
+    }
+
+    suspend fun saveBudget(budget: BudgetEntity): Long = withContext(Dispatchers.IO) {
+        val id = budgetDao.insert(budget)
+        // Also update matching category if exists
+        val cat = categoryDao.getCategoryByName(budget.categoryName)
+        if (cat != null && cat.budgetLimitToman != budget.amountLimitToman) {
+            categoryDao.update(cat.copy(budgetLimitToman = budget.amountLimitToman))
+        }
+        id
+    }
+
+    suspend fun updateBudget(budget: BudgetEntity) = withContext(Dispatchers.IO) {
+        budgetDao.update(budget)
+        val cat = categoryDao.getCategoryByName(budget.categoryName)
+        if (cat != null && cat.budgetLimitToman != budget.amountLimitToman) {
+            categoryDao.update(cat.copy(budgetLimitToman = budget.amountLimitToman))
+        }
+    }
+
+    suspend fun deleteBudget(budget: BudgetEntity) = withContext(Dispatchers.IO) {
+        budgetDao.delete(budget)
+    }
+
+    suspend fun saveParsedSms(entity: ParsedSmsEntity): Long {
+        return parsedSmsDao.insert(entity)
+    }
+
+    suspend fun updateParsedSms(entity: ParsedSmsEntity) {
+        parsedSmsDao.update(entity)
+    }
+
+    suspend fun deleteParsedSms(entity: ParsedSmsEntity) {
+        parsedSmsDao.delete(entity)
+    }
+
+    suspend fun updateParsedSmsStatus(id: Long, status: SmsProcessingStatus, linkedTransactionId: Long?) {
+        parsedSmsDao.updateStatus(id, status, linkedTransactionId)
     }
 
     companion object {

@@ -37,20 +37,22 @@ class PortfolioViewModel(application: Application) : AndroidViewModel(applicatio
             var invested = 0L
             var quantityHeld = 0.0
             
-            // Simple weighted calculation for invested amount (only counting BUYs for simplification)
+            // Simple weighted calculation for invested amount
             for (tx in transactions) {
                 if (tx.type == AssetTransactionType.BUY) {
                     invested += (tx.quantity * tx.unitPriceToman).toLong()
                     quantityHeld += tx.quantity
                 } else {
-                    // For SELL, we could reduce invested proportionately, but let's keep it simple
-                    // Just reduce the total invested by the proportion of quantity sold
                     if (quantityHeld > 0) {
                         val proportion = tx.quantity / quantityHeld
                         invested -= (invested * proportion).toLong()
                     }
                     quantityHeld -= tx.quantity
                 }
+            }
+
+            if (transactions.isEmpty() && asset.purchaseUnitPriceToman > 0) {
+                invested = asset.totalInvestedToman
             }
             
             val currentVal = asset.totalValueToman
@@ -62,16 +64,35 @@ class PortfolioViewModel(application: Application) : AndroidViewModel(applicatio
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
 
-    fun addAsset(name: String, type: com.example.data.model.AssetType, quantity: Double, priceToman: Long, unit: String) {
+    fun addAsset(
+        name: String,
+        type: com.example.data.model.AssetType,
+        quantity: Double,
+        priceToman: Long,
+        unit: String,
+        purchasePriceToman: Long = priceToman
+    ) {
         viewModelScope.launch {
             val asset = Asset(
                 name = name,
                 type = type,
                 totalQuantity = quantity,
                 currentUnitPriceToman = priceToman,
+                purchaseUnitPriceToman = purchasePriceToman,
                 unit = unit
             )
-            assetDao.insert(asset)
+            val assetId = assetDao.insert(asset)
+            if (quantity > 0) {
+                assetTxDao.insertTransaction(
+                    AssetTransactionEntity(
+                        assetId = assetId,
+                        type = AssetTransactionType.BUY,
+                        quantity = quantity,
+                        unitPriceToman = purchasePriceToman,
+                        dateTimestamp = System.currentTimeMillis()
+                    )
+                )
+            }
         }
     }
 
