@@ -63,15 +63,8 @@ jobs:
 
           echo "Release keystore restored and validated."
 
-      # مرحله جدید و حیاتی برای ساخت خودکار gradlew در صورت عدم وجود
-      - name: Bootstrap Gradle Wrapper
-        shell: bash
-        run: |
-          if [ ! -f "./gradlew" ]; then
-            echo "gradlew not found. Generating gradle wrapper..."
-            gradle wrapper --gradle-version 8.5
-          fi
-          chmod +x ./gradlew
+      - name: Grant Execute Permission for Gradle Wrapper
+        run: chmod +x ./gradlew || true
 
       - name: Build Signed Release APK
         env:
