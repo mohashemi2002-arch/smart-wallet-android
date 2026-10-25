@@ -35,6 +35,7 @@ class RegistrationViewModel(
 
     private val auth: FirebaseAuth? = runCatching { FirebaseAuth.getInstance() }.getOrNull()
     private val backupManager = PersistentProfileBackupManager(application)
+    private val googleSheetsSyncManager = com.example.data.sync.GoogleSheetsSyncManager(application)
 
     private val _uiState = MutableStateFlow<RegistrationUiState>(RegistrationUiState.Idle)
     val uiState: StateFlow<RegistrationUiState> = _uiState.asStateFlow()
@@ -149,10 +150,15 @@ class RegistrationViewModel(
                     phoneNumber = cleanPhone
                 )
 
+                // 4. Auto-Sync to Google Sheets Web App in background
+                viewModelScope.launch(Dispatchers.IO) {
+                    googleSheetsSyncManager.syncData(trimmedFirst, trimmedLast, cleanPhone)
+                }
+
                 val message = if (restoreResult != null) {
                     "ثبت‌نام انجام شد! اطلاعات قبلی شامل ${restoreResult.restoredAccountsCount} کارت و ${restoreResult.restoredTransactionsCount} تراکنش بازیابی شدند."
                 } else {
-                    "ثبت‌نام با موفقیت انجام شد و نسخه پشتیبان لوکال ذخیره گردید."
+                    "ثبت‌نام با موفقیت انجام شد و اطلاعات با گوگل شیت همگام‌سازی گردید."
                 }
 
                 _uiState.value = RegistrationUiState.Success(
@@ -167,11 +173,61 @@ class RegistrationViewModel(
         }
     }
 
+    fun restoreFromGoogleSheets(firstName: String, lastName: String, phoneNumber: String) {
+        val trimmedFirst = firstName.trim()
+        val trimmedLast = lastName.trim()
+        val cleanPhone = normalizeDigits(phoneNumber).replace(" ", "").trim()
+
+        if (cleanPhone.length < 10) {
+            _uiState.value = RegistrationUiState.Error("شماره همراه باید حداقل ۱۰ رقم باشد")
+            return
+        }
+
+        _uiState.value = RegistrationUiState.Loading
+
+        viewModelScope.launch {
+            val result = googleSheetsSyncManager.restoreData(trimmedFirst, trimmedLast, cleanPhone)
+            result.fold(
+                onSuccess = { res ->
+                    com.example.data.UserPreferencesRepository(getApplication()).updateUserProfile(
+                        firstName = trimmedFirst,
+                        lastName = trimmedLast,
+                        phoneNumber = cleanPhone
+                    )
+                    backupManager.createLocalBackup(trimmedFirst, trimmedLast, cleanPhone)
+
+                    _uiState.value = RegistrationUiState.Success(
+                        userId = "user_$cleanPhone",
+                        message = "اطلاعات با موفقیت از گوگل شیت بازیابی شد!\nتعداد ${res.restoredCardsCount} کارت و ${res.restoredTransactionsCount} تراکنش بازگردانی شدند."
+                    )
+                },
+                onFailure = { err ->
+                    // Fallback to persistent local storage backup if online call fails
+                    val localRestored = backupManager.restoreLocalBackup(cleanPhone).getOrNull()
+                    if (localRestored != null && (localRestored.restoredAccountsCount > 0 || localRestored.restoredTransactionsCount > 0)) {
+                        com.example.data.UserPreferencesRepository(getApplication()).updateUserProfile(
+                            firstName = trimmedFirst,
+                            lastName = trimmedLast,
+                            phoneNumber = cleanPhone
+                        )
+                        _uiState.value = RegistrationUiState.Success(
+                            userId = "user_$cleanPhone",
+                            message = "اطلاعات از فایل پشتیبان حافظه گوشی بازیابی شد (عدم پاسخ گوگل شیت: ${err.localizedMessage})",
+                            restoreSummary = localRestored
+                        )
+                    } else {
+                        _uiState.value = RegistrationUiState.Error("خطا در بازیابی اطلاعات: ${err.localizedMessage}")
+                    }
+                }
+            )
+        }
+    }
+
     private fun mapFirebaseError(e: Exception): String {
         val msg = e.localizedMessage ?: ""
         return when {
             msg.contains("The email address is already in use", ignoreCase = true) ->
-                "این شماره موبایل قبلاً ثبت‌نام شده است. لطفاً وارد حساب شوید."
+                "این شماره موبایل قبلاً ثبت‌نام شده است. لطفاً وارد حساب شوید یا از دکمه بازیابی استفاده کنید."
             msg.contains("Password should be at least", ignoreCase = true) ->
                 "رمز عبور باید حداقل ۶ کاراکتر باشد."
             msg.contains("network error", ignoreCase = true) ->

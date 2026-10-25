@@ -109,6 +109,54 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    fun syncWithGoogleSheets(onResult: (String) -> Unit) {
+        viewModelScope.launch {
+            val prefs = userPreferences.value
+            if (prefs.userPhoneNumber.isBlank()) {
+                onResult("لطفاً ابتدا نام و شماره موبایل خود را در بخش حساب کاربری ثبت کنید.")
+                return@launch
+            }
+            val syncManager = com.example.data.sync.GoogleSheetsSyncManager(getApplication())
+            val result = syncManager.syncData(
+                firstName = prefs.userFirstName,
+                lastName = prefs.userLastName,
+                phoneNumber = prefs.userPhoneNumber
+            )
+            result.fold(
+                onSuccess = { res ->
+                    onResult("همگام‌سازی ابری با Google Sheets موفقیت‌آمیز بود!\nتعداد ${res.syncedCardsCount} کارت و ${res.syncedTransactionsCount} تراکنش همگام شدند.")
+                },
+                onFailure = { err ->
+                    onResult("خطا در همگام‌سازی با گوگل شیت: ${err.localizedMessage}")
+                }
+            )
+        }
+    }
+
+    fun restoreFromGoogleSheets(onResult: (String) -> Unit) {
+        viewModelScope.launch {
+            val prefs = userPreferences.value
+            if (prefs.userPhoneNumber.isBlank()) {
+                onResult("لطفاً ابتدا نام و شماره موبایل خود را در بخش حساب کاربری وارد کنید.")
+                return@launch
+            }
+            val syncManager = com.example.data.sync.GoogleSheetsSyncManager(getApplication())
+            val result = syncManager.restoreData(
+                firstName = prefs.userFirstName,
+                lastName = prefs.userLastName,
+                phoneNumber = prefs.userPhoneNumber
+            )
+            result.fold(
+                onSuccess = { res ->
+                    onResult("بازیابی از Google Sheets با موفقیت انجام شد!\nتعداد ${res.restoredCardsCount} کارت و ${res.restoredTransactionsCount} تراکنش بازگردانی شدند.")
+                },
+                onFailure = { err ->
+                    onResult("خطا در بازیابی از گوگل شیت: ${err.localizedMessage}")
+                }
+            )
+        }
+    }
+
     fun wipeEntireDatabase(onComplete: () -> Unit) {
         viewModelScope.launch {
             withContext(Dispatchers.IO) {

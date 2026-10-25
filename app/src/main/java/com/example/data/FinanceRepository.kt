@@ -38,6 +38,26 @@ class FinanceRepository private constructor(context: Context) {
     val allBudgets: Flow<List<BudgetEntity>> = budgetDao.getAllBudgets()
     val activeBudgets: Flow<List<BudgetEntity>> = budgetDao.getActiveBudgets()
 
+    private val googleSheetsSyncManager = com.example.data.sync.GoogleSheetsSyncManager(context)
+    private val userPreferencesRepo = UserPreferencesRepository(context)
+
+    fun triggerAutoCloudSync() {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val prefs = userPreferencesRepo.userPreferencesFlow.first()
+                if (prefs.userPhoneNumber.isNotBlank()) {
+                    googleSheetsSyncManager.syncData(
+                        firstName = prefs.userFirstName,
+                        lastName = prefs.userLastName,
+                        phoneNumber = prefs.userPhoneNumber
+                    )
+                }
+            } catch (e: Exception) {
+                // Ignore sync failures silently in background
+            }
+        }
+    }
+
     init {
         CoroutineScope(Dispatchers.IO).launch {
             seedInitialDataIfNeeded()
@@ -265,6 +285,7 @@ class FinanceRepository private constructor(context: Context) {
                 }
             }
         }
+        triggerAutoCloudSync()
     }
 
     suspend fun reverseTransactionBalance(transaction: Transaction) = withContext(Dispatchers.IO) {
@@ -398,18 +419,23 @@ class FinanceRepository private constructor(context: Context) {
     suspend fun deleteTransaction(transaction: Transaction) = withContext(Dispatchers.IO) {
         reverseTransactionBalance(transaction)
         transactionDao.delete(transaction)
+        triggerAutoCloudSync()
     }
 
     suspend fun addBankAccount(bankAccount: BankAccount) = withContext(Dispatchers.IO) {
-        bankAccountDao.insert(bankAccount)
+        val id = bankAccountDao.insert(bankAccount)
+        triggerAutoCloudSync()
+        id
     }
 
     suspend fun updateBankAccount(bankAccount: BankAccount) = withContext(Dispatchers.IO) {
         bankAccountDao.update(bankAccount)
+        triggerAutoCloudSync()
     }
 
     suspend fun deleteBankAccount(bankAccount: BankAccount) = withContext(Dispatchers.IO) {
         bankAccountDao.delete(bankAccount)
+        triggerAutoCloudSync()
     }
 
     suspend fun addBankSmsSender(sender: BankSmsSender) = withContext(Dispatchers.IO) {

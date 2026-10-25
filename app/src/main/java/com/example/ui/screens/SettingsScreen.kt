@@ -16,6 +16,8 @@ import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.CloudUpload
+import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -303,6 +305,40 @@ fun SettingsScreen(
                     Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text("پشتیبان‌گیری و بازیابی اطلاعات", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = Color.White)
                         
+                        // 1. Google Sheets Cloud Sync & Restore
+                        Button(
+                            onClick = {
+                                Toast.makeText(context, "در حال همگام‌سازی با Google Sheets...", Toast.LENGTH_SHORT).show()
+                                settingsViewModel.syncWithGoogleSheets { msg ->
+                                    Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E88E5))
+                        ) {
+                            Icon(Icons.Default.CloudUpload, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("همگام‌سازی با Google Sheets (Sync)")
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                Toast.makeText(context, "در حال بازیابی از Google Sheets...", Toast.LENGTH_SHORT).show()
+                                settingsViewModel.restoreFromGoogleSheets { msg ->
+                                    Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF90CAF9))
+                        ) {
+                            Icon(Icons.Default.CloudDownload, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("بازیابی اطلاعات از Google Sheets (Restore)")
+                        }
+
+                        HorizontalDivider(color = Color(0xFF49454F), modifier = Modifier.padding(vertical = 4.dp))
+
+                        // 2. Persistent Local Storage Backup (Anti-Uninstall)
                         Button(
                             onClick = {
                                 settingsViewModel.createPersistentBackup { msg ->

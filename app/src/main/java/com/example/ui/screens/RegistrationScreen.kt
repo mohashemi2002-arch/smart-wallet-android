@@ -345,11 +345,43 @@ fun RegistrationScreen(
                         )
                     } else {
                         Text(
-                            text = "ثبت‌نام و ایجاد حساب",
+                            text = "ثبت‌نام و همگام‌سازی ابری",
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Restore from Google Sheets Button
+                OutlinedButton(
+                    onClick = {
+                        focusManager.clearFocus()
+                        viewModel.restoreFromGoogleSheets(firstName, lastName, phoneNumber)
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(54.dp)
+                        .testTag("restore_button"),
+                    shape = RoundedCornerShape(14.dp),
+                    enabled = uiState !is RegistrationUiState.Loading,
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = androidx.compose.ui.graphics.Color(0xFF81C784)
+                    ),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, androidx.compose.ui.graphics.Color(0xFF4CAF50).copy(alpha = 0.6f))
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CloudDownload,
+                        contentDescription = "بازیابی",
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "بازیابی اطلاعات از Google Sheets",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(18.dp))
