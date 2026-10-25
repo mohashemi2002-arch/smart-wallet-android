@@ -1,4 +1,3 @@
-
 name: Android OTA Release Build
 
 on:
@@ -64,8 +63,15 @@ jobs:
 
           echo "Release keystore restored and validated."
 
-      - name: Grant Execute Permission for Gradle Wrapper
-        run: chmod +x ./gradlew
+      # مرحله جدید و حیاتی برای ساخت خودکار gradlew در صورت عدم وجود
+      - name: Bootstrap Gradle Wrapper
+        shell: bash
+        run: |
+          if [ ! -f "./gradlew" ]; then
+            echo "gradlew not found. Generating gradle wrapper..."
+            gradle wrapper --gradle-version 8.5
+          fi
+          chmod +x ./gradlew
 
       - name: Build Signed Release APK
         env:
@@ -115,9 +121,9 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           tag_name: ${{ env.VERSION_TAG }}
-          name: "نسخه جدید کیف پول هوشمند ${{ env.VERSION_TAG }}"
+          name: "نسخه جدید پولکی ${{ env.VERSION_TAG }}"
           body: |
-            بروزرسانی خودکار اپلیکیشن Smart Wallet (Smart Wallet)
+            بروزرسانی خودکار اپلیکیشن پولکی (Smart Wallet)
             - نسخه: ${{ env.VERSION_TAG }}
             - versionCode: ${{ env.RELEASE_VERSION_CODE }}
             - شماره اجرای GitHub Actions: ${{ github.run_number }}
