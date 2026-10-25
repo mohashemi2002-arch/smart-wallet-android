@@ -50,15 +50,15 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val updateManager = remember { AppUpdateManager(context) }
-    var updateRelease by remember { mutableStateOf<UpdateMetadata?>(null) }
+    val otaManager = remember { com.example.updater.OtaUpdateManager(context) }
+    var otaRelease by remember { mutableStateOf<com.example.updater.OtaReleaseInfo?>(null) }
     var isCheckingUpdate by remember { mutableStateOf(false) }
 
-    updateRelease?.let { release ->
-        UpdatePromptDialog(
-            metadata = release,
-            updateManager = updateManager,
-            onDismiss = { updateRelease = null }
+    otaRelease?.let { release ->
+        com.example.updater.OtaUpdateDialog(
+            releaseInfo = release,
+            otaManager = otaManager,
+            onDismiss = { otaRelease = null }
         )
     }
 
@@ -99,12 +99,12 @@ fun SettingsScreen(
                     modifier = Modifier.fillMaxWidth().clickable {
                         scope.launch {
                             isCheckingUpdate = true
-                            val release = updateManager.checkForUpdates(isManualCheck = true)
+                            val release = otaManager.checkForOtaUpdate()
                             isCheckingUpdate = false
                             if (release != null) {
-                                updateRelease = release
+                                otaRelease = release
                             } else {
-                                Toast.makeText(context, "شما از آخرین نسخه استفاده می‌کنید.", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "برنامه شما به آخرین نسخه بروز است (نسخه فعلی: v${com.example.BuildConfig.VERSION_NAME})", Toast.LENGTH_LONG).show()
                             }
                         }
                     },
@@ -118,13 +118,17 @@ fun SettingsScreen(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Column {
-                            Text("بررسی بروزرسانی", style = MaterialTheme.typography.titleMedium, color = Color(0xFFE6E1E5))
-                            Text(if (isCheckingUpdate) "در حال بررسی..." else "نسخه فعلی: ${com.example.BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.bodySmall, color = Color(0xFFCAC4D0))
+                            Text("بررسی بروزرسانی برنامه (GitHub OTA)", style = MaterialTheme.typography.titleMedium, color = Color(0xFFE6E1E5))
+                            Text(
+                                if (isCheckingUpdate) "در حال بررسی نسخه در گیتهاب..." else "نسخه فعلی: v${com.example.BuildConfig.VERSION_NAME}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color(0xFFCAC4D0)
+                            )
                         }
                         if (isCheckingUpdate) {
-                            CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color(0xFFCAC4D0))
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color(0xFF8AB4F8))
                         } else {
-                            Icon(Icons.Filled.SystemUpdate, contentDescription = "بررسی بروزرسانی", tint = Color(0xFFCAC4D0))
+                            Icon(Icons.Filled.SystemUpdate, contentDescription = "بررسی بروزرسانی", tint = Color(0xFF8AB4F8))
                         }
                     }
                 }

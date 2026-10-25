@@ -69,6 +69,25 @@ fun DashboardScreen(
     
     var showDatePickerDialog by remember { mutableStateOf(false) }
     val activeDateFilter by viewModel.activeDateFilter.collectAsState()
+
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val otaManager = remember { com.example.updater.OtaUpdateManager(context) }
+    var pendingOtaRelease by remember { mutableStateOf<com.example.updater.OtaReleaseInfo?>(null) }
+
+    LaunchedEffect(Unit) {
+        val release = otaManager.checkForOtaUpdate()
+        if (release != null) {
+            pendingOtaRelease = release
+        }
+    }
+
+    pendingOtaRelease?.let { release ->
+        com.example.updater.OtaUpdateDialog(
+            releaseInfo = release,
+            otaManager = otaManager,
+            onDismiss = { pendingOtaRelease = null }
+        )
+    }
     
     if (showDatePickerDialog) {
         com.example.ui.components.JalaliCalendarDialog(

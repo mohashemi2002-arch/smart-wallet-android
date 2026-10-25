@@ -24,42 +24,56 @@ android {
     applicationId = "com.aistudio.smartwallet.ai.qmfzzm"
     minSdk = 24
     targetSdk = 35
-    versionCode = 14
-    versionName = "1.5.6"
+    val runNumber = System.getenv("GITHUB_RUN_NUMBER")
+    versionCode = runNumber?.toIntOrNull() ?: 1
+    versionName = "1.0.${runNumber ?: "1"}"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     buildConfigField("String", "UPDATE_JSON_URL", "\"https://raw.githubusercontent.com/mohashemi2002-arch/smart-wallet-android/main/update.json\"")
+    buildConfigField("String", "GITHUB_OWNER", "\"mohashemi2002-arch\"")
+    buildConfigField("String", "GITHUB_REPO", "\"smart-wallet-android\"")
   }
 
   signingConfigs {
     create("release") {
-      // 1. Check CI/CD Environment Variables (GitHub Secrets)
-      val envKeystorePath = System.getenv("SIGNING_KEYSTORE_PATH") ?: System.getenv("KEYSTORE_PATH")
-      val envStorePassword = System.getenv("SIGNING_KEYSTORE_PASSWORD") ?: System.getenv("STORE_PASSWORD")
-      val envKeyAlias = System.getenv("SIGNING_KEY_ALIAS") ?: System.getenv("KEY_ALIAS")
-      val envKeyPassword = System.getenv("SIGNING_KEY_PASSWORD") ?: System.getenv("KEY_PASSWORD")
+      val otaKeystore = file("${rootDir}/app/keystore/ota_release.jks")
+      val otaKeystoreAlt = file("keystore/ota_release.jks")
+      val otaFile = if (otaKeystore.exists()) otaKeystore else if (otaKeystoreAlt.exists()) otaKeystoreAlt else null
 
-      // 2. Fallback to local.properties for secure local development (never committed to Git)
-      val localProps = Properties()
-      val localPropsFile = rootProject.file("local.properties")
-      if (localPropsFile.exists()) {
-        localPropsFile.inputStream().use { stream ->
-          localProps.load(stream)
+      if (otaFile != null) {
+        storeFile = otaFile
+        storePassword = "android123"
+        keyAlias = "ota_key"
+        keyPassword = "android123"
+      } else {
+        // 1. Check CI/CD Environment Variables (GitHub Secrets)
+        val envKeystorePath = System.getenv("SIGNING_KEYSTORE_PATH") ?: System.getenv("KEYSTORE_PATH")
+        val envStorePassword = System.getenv("SIGNING_KEYSTORE_PASSWORD") ?: System.getenv("STORE_PASSWORD")
+        val envKeyAlias = System.getenv("SIGNING_KEY_ALIAS") ?: System.getenv("KEY_ALIAS")
+        val envKeyPassword = System.getenv("SIGNING_KEY_PASSWORD") ?: System.getenv("KEY_PASSWORD")
+
+        // 2. Fallback to local.properties
+        val localProps = Properties()
+        val localPropsFile = rootProject.file("local.properties")
+        if (localPropsFile.exists()) {
+          localPropsFile.inputStream().use { stream ->
+            localProps.load(stream)
+          }
         }
-      }
 
-      val keystorePath = envKeystorePath ?: localProps.getProperty("signing.keystore.path")
-      val storePasswordVal = envStorePassword ?: localProps.getProperty("signing.keystore.password")
-      val keyAliasVal = envKeyAlias ?: localProps.getProperty("signing.key.alias")
-      val keyPasswordVal = envKeyPassword ?: localProps.getProperty("signing.key.password")
+        val keystorePath = envKeystorePath ?: localProps.getProperty("signing.keystore.path")
+        val storePasswordVal = envStorePassword ?: localProps.getProperty("signing.keystore.password")
+        val keyAliasVal = envKeyAlias ?: localProps.getProperty("signing.key.alias")
+        val keyPasswordVal = envKeyPassword ?: localProps.getProperty("signing.key.password")
 
-      if (!keystorePath.isNullOrBlank()) {
-        val keystoreFile = file(keystorePath)
-        if (keystoreFile.exists()) {
-          storeFile = keystoreFile
-          storePassword = storePasswordVal
-          keyAlias = keyAliasVal
-          keyPassword = keyPasswordVal
+        if (!keystorePath.isNullOrBlank()) {
+          val keystoreFile = file(keystorePath)
+          if (keystoreFile.exists()) {
+            storeFile = keystoreFile
+            storePassword = storePasswordVal
+            keyAlias = keyAliasVal
+            keyPassword = keyPasswordVal
+          }
         }
       }
     }

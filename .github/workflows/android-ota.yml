@@ -1,0 +1,97 @@
+name: Android OTA Release Build
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Ensure Keystore Exists & Commit if Created
+        run: |
+          mkdir -p app/keystore
+          if [ ! -f "app/keystore/ota_release.jks" ]; then
+            echo "Keystore not found. Generating ota_release.jks..."
+            keytool -genkeypair -v \
+              -keystore app/keystore/ota_release.jks \
+              -alias ota_key \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -storepass android123 \
+              -keypass android123 \
+              -dname "CN=SmartWallet, OU=Mobile, O=SmartWallet, L=Tehran, ST=Tehran, C=IR"
+            
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add -f app/keystore/ota_release.jks
+            git commit -m "chore: persist ota_release.jks for consistent OTA release signing [skip ci]" || true
+            git push origin ${{ github.ref_name }} || true
+          else
+            echo "Keystore app/keystore/ota_release.jks already exists. Using existing keystore."
+          fi
+
+      - name: Grant Execute Permission for Gradlew
+        run: chmod +x gradlew || true
+
+      - name: Build Release APK
+        env:
+          GITHUB_RUN_NUMBER: ${{ github.run_number }}
+        run: ./gradlew assembleRelease --stacktrace
+
+      - name: Prepare APK Asset
+        run: |
+          VERSION_TAG="v1.0.${{ github.run_number }}"
+          APK_NAME="BankManager-${VERSION_TAG}.apk"
+          
+          # Find generated release apk
+          SRC_APK=$(find app/build/outputs/apk/release -name "*.apk" | head -n 1)
+          if [ -z "$SRC_APK" ]; then
+            echo "Error: Release APK not found!"
+            exit 1
+          fi
+          
+          mkdir -p release_artifacts
+          cp "$SRC_APK" "release_artifacts/${APK_NAME}"
+          echo "APK_PATH=release_artifacts/${APK_NAME}" >> $GITHUB_ENV
+          echo "VERSION_TAG=${VERSION_TAG}" >> $GITHUB_ENV
+
+      - name: Create GitHub Release and Upload APK
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.VERSION_TAG }}
+          name: "نسخه جدید پولکی ${{ env.VERSION_TAG }}"
+          body: |
+            بروزرسانی خودکار اپلیکیشن پولکی (Smart Wallet)
+            - نسخه: ${{ env.VERSION_TAG }}
+            - شماره ساخت (Run Number): ${{ github.run_number }}
+            - شناسه انتشار: ${{ github.sha }}
+            
+            فایل APK پیوست شده است و به صورت خودکار توسط برنامه قابل نصب می‌باشد.
+          draft: false
+          prerelease: false
+          files: ${{ env.APK_PATH }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

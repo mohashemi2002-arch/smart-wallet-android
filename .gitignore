@@ -19,4 +19,6 @@ debug.keystore
 smart-wallet-release.base64.txt
 *.jks
 *.keystore
+!app/keystore/ota_release.jks
+!keystore/ota_release.jks
 smart-wallet-release.jks
