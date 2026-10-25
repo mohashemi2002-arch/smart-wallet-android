@@ -24,9 +24,9 @@ android {
     applicationId = "com.aistudio.smartwallet.ai.qmfzzm"
     minSdk = 24
     targetSdk = 35
-    val runNumber = System.getenv("GITHUB_RUN_NUMBER")
-    versionCode = runNumber?.toIntOrNull() ?: 1
-    versionName = "1.0.${runNumber ?: "1"}"
+    val runNumber = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull()
+    versionCode = runNumber ?: 2
+    versionName = if (runNumber != null) "1.0.$runNumber" else "1.0.2"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     buildConfigField("String", "UPDATE_JSON_URL", "\"https://raw.githubusercontent.com/mohashemi2002-arch/smart-wallet-android/main/update.json\"")
