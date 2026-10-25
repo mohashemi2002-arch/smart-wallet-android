@@ -25,8 +25,8 @@ android {
     minSdk = 24
     targetSdk = 35
     val runNumber = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull()
-    versionCode = runNumber ?: 2
-    versionName = if (runNumber != null) "1.0.$runNumber" else "1.0.2"
+    versionCode = runNumber ?: 3
+    versionName = if (runNumber != null) "1.0.$runNumber" else "1.0.3"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     buildConfigField("String", "UPDATE_JSON_URL", "\"https://raw.githubusercontent.com/mohashemi2002-arch/smart-wallet-android/main/update.json\"")

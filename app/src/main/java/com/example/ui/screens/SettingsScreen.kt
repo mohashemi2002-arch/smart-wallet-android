@@ -190,7 +190,7 @@ fun SettingsScreen(
                             Text(profileTitle, style = MaterialTheme.typography.titleMedium, color = Color(0xFFE6E1E5))
                             Text(profileSub, style = MaterialTheme.typography.bodySmall, color = Color(0xFFCAC4D0))
                         }
-                        Icon(Icons.Default.Person, contentDescription = "ثبت‌نام", tint = Color(0xFF7FA2FF))
+                        Icon(Icons.Default.Person, contentDescription = "ثبت‌نام", tint = Color(0xFFD0BCFF))
                     }
                 }
             }
