@@ -27,7 +27,11 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-          cache: gradle
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.3.1'
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
@@ -63,8 +67,15 @@ jobs:
 
           echo "Release keystore restored and validated."
 
-      - name: Grant Execute Permission for Gradle Wrapper
-        run: chmod +x ./gradlew || true
+      - name: Bootstrap Gradle Wrapper (9.3.1)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! -f "./gradlew" ]]; then
+            echo "gradlew missing. Generating wrapper for Gradle 9.3.1..."
+            gradle wrapper --gradle-version 9.3.1
+          fi
+          chmod +x ./gradlew
 
       - name: Build Signed Release APK
         env:
