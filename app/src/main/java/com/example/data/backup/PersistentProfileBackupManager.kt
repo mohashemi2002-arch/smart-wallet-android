@@ -1,11 +1,14 @@
 package com.example.data.backup
 
+import android.content.ContentUris
+import android.content.ContentValues
 import android.content.Context
+import android.os.Build
 import android.os.Environment
+import android.provider.MediaStore
 import android.util.Log
 import com.example.data.database.AppDatabase
 import com.example.data.model.BankAccount
-import com.example.data.model.Category
 import com.example.data.model.Transaction
 import com.example.data.model.TransactionStatus
 import com.example.data.model.TransactionType
@@ -14,7 +17,6 @@ import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
-import java.io.FileInputStream
 import java.io.FileOutputStream
 
 data class RestoreSummary(
@@ -50,65 +52,165 @@ class PersistentProfileBackupManager(
         }
     }
 
-    private fun getBackupDirectories(): List<File> {
-        val dirs = mutableListOf<File>()
+    private fun writeBackupJson(fileName: String, jsonContent: String): File {
+        var primaryFile: File? = null
 
-        // 1. Primary: Shared Public Documents Directory (Persists after App Uninstall)
+        // 1. Android 10+ (API 29+) MediaStore API for Shared Public Documents (Survives Uninstall)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            try {
+                val contentResolver = context.contentResolver
+                val projection = arrayOf(MediaStore.MediaColumns._ID)
+                val selection = "${MediaStore.MediaColumns.DISPLAY_NAME} = ?"
+                val selectionArgs = arrayOf(fileName)
+
+                // Delete older version if already present in MediaStore
+                contentResolver.query(
+                    MediaStore.Files.getContentUri("external"),
+                    projection,
+                    selection,
+                    selectionArgs,
+                    null
+                )?.use { cursor ->
+                    while (cursor.moveToNext()) {
+                        val id = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.MediaColumns._ID))
+                        val deleteUri = ContentUris.withAppendedId(MediaStore.Files.getContentUri("external"), id)
+                        contentResolver.delete(deleteUri, null, null)
+                    }
+                }
+
+                val values = ContentValues().apply {
+                    put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+                    put(MediaStore.MediaColumns.MIME_TYPE, "application/json")
+                    put(MediaStore.MediaColumns.RELATIVE_PATH, "${Environment.DIRECTORY_DOCUMENTS}/$BACKUP_DIR_NAME")
+                }
+
+                val uri = contentResolver.insert(MediaStore.Files.getContentUri("external"), values)
+                if (uri != null) {
+                    contentResolver.openOutputStream(uri)?.use { os ->
+                        os.write(jsonContent.toByteArray(Charsets.UTF_8))
+                        os.flush()
+                    }
+                    Log.d(TAG, "Successfully wrote backup to MediaStore Documents URI: $uri")
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "MediaStore write failed (will use direct files): ${e.message}")
+            }
+        }
+
+        // 2. Direct Public Documents Directory
         try {
             val docs = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
-            val smartWalletDocs = File(docs, BACKUP_DIR_NAME)
-            if (!smartWalletDocs.exists()) smartWalletDocs.mkdirs()
-            if (smartWalletDocs.exists() && smartWalletDocs.canWrite()) {
-                dirs.add(smartWalletDocs)
+            val dir = File(docs, BACKUP_DIR_NAME)
+            if (!dir.exists()) dir.mkdirs()
+            if (dir.exists() && dir.canWrite()) {
+                val f = File(dir, fileName)
+                f.writeText(jsonContent, Charsets.UTF_8)
+                primaryFile = f
+                Log.d(TAG, "Wrote backup to public Documents: ${f.absolutePath}")
             }
         } catch (e: Exception) {
-            Log.w(TAG, "Documents dir not accessible: ${e.message}")
+            Log.w(TAG, "Public Documents direct file write skipped: ${e.message}")
         }
 
-        // 2. Secondary: Public Downloads Directory
+        // 3. Direct Public Downloads Directory
         try {
             val downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-            val smartWalletDownloads = File(downloads, BACKUP_DIR_NAME)
-            if (!smartWalletDownloads.exists()) smartWalletDownloads.mkdirs()
-            if (smartWalletDownloads.exists() && smartWalletDownloads.canWrite()) {
-                dirs.add(smartWalletDownloads)
+            val dir = File(downloads, BACKUP_DIR_NAME)
+            if (!dir.exists()) dir.mkdirs()
+            if (dir.exists() && dir.canWrite()) {
+                val f = File(dir, fileName)
+                f.writeText(jsonContent, Charsets.UTF_8)
+                if (primaryFile == null) primaryFile = f
+                Log.d(TAG, "Wrote backup to public Downloads: ${f.absolutePath}")
             }
         } catch (e: Exception) {
-            Log.w(TAG, "Downloads dir not accessible: ${e.message}")
+            Log.w(TAG, "Public Downloads direct file write skipped: ${e.message}")
         }
 
-        // 3. Fallback: External Files Directory
+        // 4. External App Storage Directory (Survives internal cache clears)
         try {
             val extFiles = context.getExternalFilesDir(null)
             if (extFiles != null) {
-                val appBackupDir = File(extFiles, BACKUP_DIR_NAME)
-                if (!appBackupDir.exists()) appBackupDir.mkdirs()
-                dirs.add(appBackupDir)
+                val dir = File(extFiles, BACKUP_DIR_NAME)
+                if (!dir.exists()) dir.mkdirs()
+                val f = File(dir, fileName)
+                f.writeText(jsonContent, Charsets.UTF_8)
+                if (primaryFile == null) primaryFile = f
+                Log.d(TAG, "Wrote backup to ExternalFilesDir: ${f.absolutePath}")
             }
         } catch (e: Exception) {
-            Log.w(TAG, "ExtFiles dir not accessible: ${e.message}")
+            Log.w(TAG, "ExternalFilesDir write skipped: ${e.message}")
         }
 
-        return dirs
+        // 5. Internal Storage Directory (Always guaranteed to succeed)
+        val internalDir = File(context.filesDir, BACKUP_DIR_NAME)
+        if (!internalDir.exists()) internalDir.mkdirs()
+        val internalFile = File(internalDir, fileName)
+        internalFile.writeText(jsonContent, Charsets.UTF_8)
+        Log.d(TAG, "Wrote backup to internal files: ${internalFile.absolutePath}")
+
+        return primaryFile ?: internalFile
     }
 
-    private fun getBackupFileForPhone(phone: String, forWriting: Boolean = false): File? {
+    private fun readBackupJsonString(phone: String): String? {
         val cleanPhone = normalizePhone(phone)
         val fileName = "smartwallet_backup_${cleanPhone}.json"
 
-        val dirs = getBackupDirectories()
-        if (!forWriting) {
-            for (dir in dirs) {
+        // 1. Check direct file candidates
+        val candidateDirs = listOfNotNull(
+            File(context.filesDir, BACKUP_DIR_NAME),
+            context.getExternalFilesDir(null)?.let { File(it, BACKUP_DIR_NAME) },
+            try { File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS), BACKUP_DIR_NAME) } catch (e: Exception) { null },
+            try { File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), BACKUP_DIR_NAME) } catch (e: Exception) { null }
+        )
+
+        for (dir in candidateDirs) {
+            try {
                 val f = File(dir, fileName)
-                if (f.exists() && f.length() > 0) return f
+                if (f.exists() && f.length() > 0) {
+                    val content = f.readText(Charsets.UTF_8)
+                    if (content.isNotBlank()) return content
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not read file in ${dir.absolutePath}: ${e.message}")
             }
         }
-        return dirs.firstOrNull()?.let { File(it, fileName) }
+
+        // 2. On Android 10+, query MediaStore
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            try {
+                val contentResolver = context.contentResolver
+                val projection = arrayOf(MediaStore.MediaColumns._ID)
+                val selection = "${MediaStore.MediaColumns.DISPLAY_NAME} = ?"
+                val selectionArgs = arrayOf(fileName)
+
+                contentResolver.query(
+                    MediaStore.Files.getContentUri("external"),
+                    projection,
+                    selection,
+                    selectionArgs,
+                    null
+                )?.use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        val id = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.MediaColumns._ID))
+                        val uri = ContentUris.withAppendedId(MediaStore.Files.getContentUri("external"), id)
+                        contentResolver.openInputStream(uri)?.use { stream ->
+                            val text = stream.bufferedReader(Charsets.UTF_8).readText()
+                            if (text.isNotBlank()) return text
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "MediaStore read failed: ${e.message}")
+            }
+        }
+
+        return null
     }
 
     suspend fun checkBackupExists(phone: String): Boolean = withContext(Dispatchers.IO) {
-        val file = getBackupFileForPhone(phone, forWriting = false)
-        file != null && file.exists() && file.length() > 0
+        val content = readBackupJsonString(phone)
+        !content.isNullOrBlank()
     }
 
     suspend fun createLocalBackup(
@@ -118,20 +220,18 @@ class PersistentProfileBackupManager(
     ): Result<File> = withContext(Dispatchers.IO) {
         runCatching {
             val cleanPhone = normalizePhone(phoneNumber)
-            val targetFile = getBackupFileForPhone(cleanPhone, forWriting = true)
-                ?: throw IllegalStateException("حافظه مشترک گوشی در دسترس نیست")
+            val fileName = "smartwallet_backup_${cleanPhone}.json"
 
             val accounts = database.bankAccountDao().getAllBankAccountsList()
             val transactions = database.transactionDao().getAllTransactionsSync()
-            val categories = database.categoryDao().getAllCategoriesSync()
 
             val root = JSONObject()
             root.put("version", 2)
             root.put("backupTimestamp", System.currentTimeMillis())
 
             val profileObj = JSONObject().apply {
-                put("firstName", firstName)
-                put("lastName", lastName)
+                put("firstName", firstName.trim())
+                put("lastName", lastName.trim())
                 put("phoneNumber", cleanPhone)
             }
             root.put("profile", profileObj)
@@ -179,12 +279,8 @@ class PersistentProfileBackupManager(
             }
             root.put("transactions", txArray)
 
-            // Write to file
-            FileOutputStream(targetFile).use { fos ->
-                fos.write(root.toString(2).toByteArray(Charsets.UTF_8))
-            }
-            Log.d(TAG, "Persistent backup successfully written to: ${targetFile.absolutePath}")
-            targetFile
+            // Multi-strategy write (MediaStore + Documents + Downloads + External + Internal)
+            writeBackupJson(fileName, root.toString(2))
         }
     }
 
@@ -193,12 +289,9 @@ class PersistentProfileBackupManager(
     ): Result<RestoreSummary> = withContext(Dispatchers.IO) {
         runCatching {
             val cleanPhone = normalizePhone(phoneNumber)
-            val file = getBackupFileForPhone(cleanPhone, forWriting = false)
-                ?: throw IllegalStateException("فایل پشتیبان برای شماره $cleanPhone یافت نشد")
+            val jsonString = readBackupJsonString(cleanPhone)
+                ?: throw IllegalStateException("فایل پشتیبان برای شماره $cleanPhone در حافظه دستگاه یافت نشد")
 
-            val jsonString = FileInputStream(file).use { fis ->
-                fis.bufferedReader(Charsets.UTF_8).readText()
-            }
             val root = JSONObject(jsonString)
 
             val profileObj = root.optJSONObject("profile")
@@ -215,7 +308,7 @@ class PersistentProfileBackupManager(
                 val accNumber = obj.optString("accountNumber").ifBlank { null }
                 accountsToRestore.add(
                     BankAccount(
-                        id = 0L, // Auto-generate clean IDs
+                        id = 0L,
                         bankName = obj.optString("bankName", "بانک"),
                         accountName = obj.optString("accountName", "حساب"),
                         cardNumber = obj.optString("cardNumber", ""),
