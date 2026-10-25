@@ -1,0 +1,22 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="96dp"
+    android:height="96dp"
+    android:viewportWidth="96"
+    android:viewportHeight="96">
+    <!-- Blue circle background -->
+    <path
+        android:fillColor="#0052FF"
+        android:pathData="M48,6 C71.196,6 90,24.804 90,48 C90,71.196 71.196,90 48,90 C24.804,90 6,71.196 6,48 C6,24.804 24.804,6 48,6 Z" />
+    <!-- 'b' stem and loop -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M26,24 L34,24 L34,40 C36.2,37.5 39.5,36 43,36 C49.6,36 54,41.2 54,49 C54,56.8 49.6,62 43,62 C39.5,62 36.2,60.5 34,58 L34,62 L26,62 Z M40,43 C36.7,43 34,45.7 34,49 C34,52.3 36.7,55 40,55 C43.3,55 46,52.3 46,49 C46,45.7 43.3,43 40,43 Z" />
+    <!-- 'l' letter -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M58,24 L66,24 L66,62 L58,62 Z" />
+    <!-- dot / circular accent -->
+    <path
+        android:fillColor="#00E5FF"
+        android:pathData="M73,54 A4,4 0 1,1 73,62 A4,4 0 1,1 73,54 Z" />
+</vector>

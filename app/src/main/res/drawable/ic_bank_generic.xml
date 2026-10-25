@@ -1,0 +1,26 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="96dp"
+    android:height="96dp"
+    android:viewportWidth="96"
+    android:viewportHeight="96">
+    <!-- Subtle circular background -->
+    <path
+        android:fillColor="#1E293B"
+        android:pathData="M48,6 C71.196,6 90,24.804 90,48 C90,71.196 71.196,90 48,90 C24.804,90 6,71.196 6,48 C6,24.804 24.804,6 48,6 Z" />
+    <!-- Bank Pediment / Roof -->
+    <path
+        android:fillColor="#38BDF8"
+        android:pathData="M48,22 L24,34 L72,34 Z" />
+    <!-- Architrave -->
+    <path
+        android:fillColor="#F8FAFC"
+        android:pathData="M24,36 L72,36 L72,40 L24,40 Z" />
+    <!-- 4 Pillars -->
+    <path
+        android:fillColor="#F8FAFC"
+        android:pathData="M28,42 L34,42 L34,60 L28,60 Z M39,42 L45,42 L45,60 L39,60 Z M51,42 L57,42 L57,60 L51,60 Z M62,42 L68,42 L68,60 L62,60 Z" />
+    <!-- Base steps -->
+    <path
+        android:fillColor="#38BDF8"
+        android:pathData="M22,62 L74,62 L74,66 L22,66 Z M18,68 L78,68 L78,72 L18,72 Z" />
+</vector>

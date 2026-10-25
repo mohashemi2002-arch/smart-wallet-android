@@ -19,8 +19,8 @@ object BankLogoHelper {
             name.contains("کشاورزی") -> "keshavarzi"
             name.contains("مسکن") -> "maskan"
             name.contains("رفاه") -> "refah"
-            name.contains("سامان") -> "saman"
             name.contains("بلو") || name.contains("Blu") || name.contains("blu") -> "blubank"
+            name.contains("سامان") -> "saman"
             name.contains("پاسارگاد") -> "pasargad"
             name.contains("پارسیان") -> "parsian"
             name.contains("شهر") -> "shahr"
@@ -47,15 +47,50 @@ object BankLogoHelper {
         }
     }
 
-    @SuppressLint("DiscouragedApi")
-    fun getLogoResourceId(context: Context, bankName: String?, cardNumber: String?): Int? {
+    @androidx.annotation.DrawableRes
+    fun getLogoResourceId(bankName: String?, cardNumber: String?): Int? {
         val slug = getBankSlug(bankName, cardNumber)
-        val resourceId = context.resources.getIdentifier(
-            "ic_bank_$slug",
-            "drawable",
-            context.packageName
-        )
-        return if (resourceId != 0) resourceId else null
+        return when (slug) {
+            "melli" -> com.example.R.drawable.ic_bank_melli
+            "saderat" -> com.example.R.drawable.ic_bank_saderat
+            "mellat" -> com.example.R.drawable.ic_bank_mellat
+            "tejarat" -> com.example.R.drawable.ic_bank_tejarat
+            "sepah" -> com.example.R.drawable.ic_bank_sepah
+            "keshavarzi" -> com.example.R.drawable.ic_bank_keshavarzi
+            "maskan" -> com.example.R.drawable.ic_bank_maskan
+            "refah" -> com.example.R.drawable.ic_bank_refah
+            "saman" -> com.example.R.drawable.ic_bank_saman
+            "blubank" -> com.example.R.drawable.ic_bank_blubank
+            "pasargad" -> com.example.R.drawable.ic_bank_pasargad
+            "parsian" -> com.example.R.drawable.ic_bank_parsian
+            "shahr" -> com.example.R.drawable.ic_bank_shahr
+            "ayandeh" -> com.example.R.drawable.ic_bank_ayandeh
+            "dey" -> com.example.R.drawable.ic_bank_dey
+            "sina" -> com.example.R.drawable.ic_bank_sina
+            "en" -> com.example.R.drawable.ic_bank_en
+            "karafarin" -> com.example.R.drawable.ic_bank_karafarin
+            "sarmayeh" -> com.example.R.drawable.ic_bank_sarmayeh
+            "gardeshgari" -> com.example.R.drawable.ic_bank_gardeshgari
+            "iz" -> com.example.R.drawable.ic_bank_iz
+            "khavarmiyaneh" -> com.example.R.drawable.ic_bank_khavarmiyaneh
+            "resalat" -> com.example.R.drawable.ic_bank_resalat
+            "mehr" -> com.example.R.drawable.ic_bank_mehr
+            "post" -> com.example.R.drawable.ic_bank_post
+            "tt" -> com.example.R.drawable.ic_bank_tt
+            "bim" -> com.example.R.drawable.ic_bank_bim
+            "edbi" -> com.example.R.drawable.ic_bank_edbi
+            "melal" -> com.example.R.drawable.ic_bank_melal
+            "cbi" -> com.example.R.drawable.ic_bank_generic
+            "noor" -> com.example.R.drawable.ic_bank_en
+            "caspian" -> com.example.R.drawable.ic_bank_melal
+            "generic" -> com.example.R.drawable.ic_bank_generic
+            else -> com.example.R.drawable.ic_bank_generic
+        }
+    }
+
+    @androidx.annotation.DrawableRes
+    fun getLogoResourceId(context: Context, bankName: String?, cardNumber: String?): Int? {
+        return getLogoResourceId(bankName, cardNumber)
     }
 
     fun getBrandColor(bankName: String?, cardNumber: String?): Color {
