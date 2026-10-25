@@ -47,7 +47,8 @@ fun DashboardScreen(
     onNavigateToBudget: () -> Unit,
     onNavigateToPortfolio: () -> Unit,
     onNavigateToDebts: () -> Unit,
-    onNavigateToMarket: (() -> Unit)? = null
+    onNavigateToMarket: (() -> Unit)? = null,
+    onNavigateToRegistration: () -> Unit = {}
 ) {
     val netWorth by viewModel.totalNetWorthToman.collectAsState()
     val transactions by viewModel.transactions.collectAsState()
@@ -123,18 +124,27 @@ fun DashboardScreen(
                             .padding(horizontal = 16.dp),
                         verticalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
-                        // Header bar: Search Icon & Total Net Worth
+                        // Header bar: Search Icon, Account Icon & Total Net Worth
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            IconButton(onClick = { showAllTransactionsDialog = true }) {
-                                Icon(
-                                    imageVector = Icons.Default.Search,
-                                    contentDescription = "جستجو",
-                                    tint = Color.White
-                                )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                IconButton(onClick = { showAllTransactionsDialog = true }) {
+                                    Icon(
+                                        imageVector = Icons.Default.Search,
+                                        contentDescription = "جستجو",
+                                        tint = Color.White
+                                    )
+                                }
+                                IconButton(onClick = onNavigateToRegistration) {
+                                    Icon(
+                                        imageVector = Icons.Default.Person,
+                                        contentDescription = "ثبت‌نام و حساب کاربری",
+                                        tint = Color.White
+                                    )
+                                }
                             }
 
                             Row(
@@ -169,6 +179,8 @@ fun DashboardScreen(
                                 BankCardHeaderPill(
                                     bankName = acc.bankName,
                                     cardNumber = acc.cardNumber,
+                                    accountNumber = acc.accountNumber,
+                                    accountName = acc.accountName,
                                     balanceText = acc.balanceToman.let { com.example.ui.components.PersianCurrencyFormatter.formatToman(it, true) } + if (currencyUnit == CurrencyUnit.RIAL) " ریال" else " تومان",
                                     bgColor = Color(0xFF2C384A),
                                     iconColor = Color(0xFF7FA2FF),
@@ -204,6 +216,71 @@ fun DashboardScreen(
                                         )
                                     }
                                 }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Registration & Cloud Backup Banner
+            item {
+                PaddingBox {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onNavigateToRegistration() },
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E2F4D)),
+                        shape = RoundedCornerShape(20.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF5C82E6).copy(alpha = 0.5f))
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(42.dp)
+                                        .background(Color(0xFF5C82E6).copy(alpha = 0.25f), CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Person,
+                                        contentDescription = "ثبت‌نام",
+                                        tint = Color(0xFF8AB4F8),
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
+                                Column {
+                                    Text(
+                                        text = "حساب کاربری و همگام‌سازی ابری",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White,
+                                        fontSize = 14.sp
+                                    )
+                                    Text(
+                                        text = "جهت ایجاد حساب و ذخیره آنلاین اطلاعات کلیک کنید",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = Color(0xFFBAC7D5),
+                                        fontSize = 11.sp
+                                    )
+                                }
+                            }
+                            Button(
+                                onClick = onNavigateToRegistration,
+                                shape = RoundedCornerShape(10.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF5C82E6)),
+                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
+                            ) {
+                                Text("ثبت‌نام", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
                             }
                         }
                     }
@@ -624,6 +701,8 @@ fun DashboardScreen(
 fun BankCardHeaderPill(
     bankName: String,
     cardNumber: String,
+    accountNumber: String? = null,
+    accountName: String? = null,
     balanceText: String,
     bgColor: Color,
     iconColor: Color,
@@ -633,27 +712,42 @@ fun BankCardHeaderPill(
         onClick = onClick,
         shape = RoundedCornerShape(20.dp),
         color = bgColor,
-        modifier = Modifier.height(72.dp)
+        modifier = Modifier.height(74.dp)
     ) {
         Row(
             modifier = Modifier
-                .padding(horizontal = 14.dp, vertical = 10.dp),
+                .padding(horizontal = 14.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Column(horizontalAlignment = Alignment.End) {
+                val title = when {
+                    !accountName.isNullOrBlank() -> accountName
+                    !accountNumber.isNullOrBlank() -> "$bankName (حساب: $accountNumber)"
+                    cardNumber.length >= 4 -> "$bankName (*${cardNumber.takeLast(4)})"
+                    else -> bankName
+                }
                 Text(
-                    text = bankName,
+                    text = title,
                     color = Color.White,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 12.sp
+                    fontSize = 12.sp,
+                    maxLines = 1
                 )
-                Spacer(Modifier.height(2.dp))
+                if (!accountNumber.isNullOrBlank() && !accountName.isNullOrBlank()) {
+                    Text(
+                        text = "حساب: $accountNumber",
+                        color = Color(0xFFBAC7D5),
+                        fontSize = 10.sp,
+                        maxLines = 1
+                    )
+                }
+                Spacer(Modifier.height(1.dp))
                 Text(
                     text = balanceText,
-                    color = Color.White.copy(alpha = 0.9f),
+                    color = Color(0xFF8AB4F8),
                     fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold
+                    fontWeight = FontWeight.Bold
                 )
             }
             com.example.ui.components.BankLogoImage(

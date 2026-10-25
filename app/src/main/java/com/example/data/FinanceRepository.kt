@@ -174,6 +174,11 @@ class FinanceRepository private constructor(context: Context) {
     suspend fun processIncomingSms(smsText: String, senderAddress: String? = null): ParsedSmsResult = withContext(Dispatchers.IO) {
         val result = SmsAiParser.parseSms(smsText, senderAddress = senderAddress)
         
+        // If OTP SMS, do not create transaction or adjust balance
+        if (SmsAiParser.isOtpSms(smsText)) {
+            return@withContext result
+        }
+
         // 1. Create and persist ParsedSmsEntity in Room
         val parsedSmsEntity = ParsedSmsEntity(
             senderAddress = senderAddress ?: "",
@@ -181,7 +186,7 @@ class FinanceRepository private constructor(context: Context) {
             rawSmsText = smsText,
             amountToman = result.amountToman,
             type = result.type,
-            cardNumber = result.cardNumber,
+            cardNumber = result.cardNumber ?: result.accountNumber?.let { "حساب:$it" },
             balanceToman = result.balanceToman,
             dateMillis = System.currentTimeMillis(),
             transactionTimeText = result.transactionTime,
@@ -198,7 +203,7 @@ class FinanceRepository private constructor(context: Context) {
             type = result.type,
             categoryName = result.categoryName,
             merchantName = result.merchantName,
-            cardNumber = result.cardNumber,
+            cardNumber = result.cardNumber ?: result.accountNumber?.let { "حساب:$it" },
             dateMillis = System.currentTimeMillis(),
             rawSmsText = smsText,
             isParsedFromSms = true,
@@ -221,7 +226,8 @@ class FinanceRepository private constructor(context: Context) {
         categoryName: String,
         amount: Long,
         type: TransactionType,
-        cardNumber: String?
+        cardNumber: String?,
+        directBalanceToman: Long? = null
     ) = withContext(Dispatchers.IO) {
         db.withTransaction {
             // 1. Update the transaction row to CONFIRMED
@@ -230,7 +236,8 @@ class FinanceRepository private constructor(context: Context) {
                 val updatedTx = tx.copy(
                     status = com.example.data.model.TransactionStatus.CONFIRMED,
                     categoryName = categoryName,
-                    cardNumber = cardNumber
+                    cardNumber = cardNumber,
+                    balanceAfterToman = directBalanceToman ?: tx.balanceAfterToman
                 )
                 transactionDao.update(updatedTx)
             }
@@ -241,14 +248,19 @@ class FinanceRepository private constructor(context: Context) {
                 categoryDao.insert(Category(name = categoryName, colorHex = "#95A5A6"))
             }
 
-            // 2. Adjust the corresponding bank account balance
+            // 2. Adjust or Synchronize the corresponding bank account balance
             if (accountId > 0L) {
-                when (type) {
-                    TransactionType.EXPENSE -> {
-                        bankAccountDao.deductBalance(accountId, amount)
-                    }
-                    TransactionType.INCOME -> {
-                        bankAccountDao.addBalance(accountId, amount)
+                if (directBalanceToman != null && directBalanceToman > 0L) {
+                    // Exact sync with the SMS "مانده:" field (handles bank fees, interest, etc.)
+                    bankAccountDao.setDirectBalance(accountId, directBalanceToman)
+                } else {
+                    when (type) {
+                        TransactionType.EXPENSE -> {
+                            bankAccountDao.deductBalance(accountId, amount)
+                        }
+                        TransactionType.INCOME -> {
+                            bankAccountDao.addBalance(accountId, amount)
+                        }
                     }
                 }
             }
@@ -287,6 +299,7 @@ class FinanceRepository private constructor(context: Context) {
         var finalCardNumber = transaction.cardNumber
         var matchedAccount: BankAccount? = null
 
+        // 1. Direct ID reference (e.g. from picker: "ID:3")
         if (finalCardNumber?.startsWith("ID:") == true) {
             val accId = finalCardNumber.removePrefix("ID:").toLongOrNull()
             if (accId != null) {
@@ -297,27 +310,59 @@ class FinanceRepository private constructor(context: Context) {
             }
         }
 
-        if (matchedAccount == null && !finalCardNumber.isNullOrBlank()) {
-            val cleanDigits = finalCardNumber!!.replace("*", "").replace("-", "").takeLast(4)
-            if (cleanDigits.isNotEmpty()) {
-                matchedAccount = bankAccountDao.findByCardSuffix(cleanDigits)
-                if (matchedAccount == null) {
-                    val newAccount = BankAccount(
-                        bankName = transaction.bankName?.ifBlank { "حساب پیامکی" } ?: "حساب پیامکی",
-                        accountName = "حساب جدید",
-                        cardNumber = finalCardNumber,
-                        accountNumber = finalCardNumber,
-                        balanceToman = 0L,
-                        cardColorHex = "#1E88E5",
-                        accountType = "BANK_CARD"
-                    )
-                    val insertedId = bankAccountDao.insert(newAccount)
-                    matchedAccount = newAccount.copy(id = insertedId)
+        val allAccounts = bankAccountDao.getAllBankAccountsList()
+
+        // 2. Intelligent Account Number Matching (Exact or Suffix)
+        if (matchedAccount == null && !transaction.rawSmsText.isNullOrBlank()) {
+            val parsed = SmsAiParser.parseSmsWithRegex(transaction.rawSmsText, transaction.senderNumber)
+            val extractedAccount = parsed.accountNumber?.filter { it.isDigit() }
+            if (!extractedAccount.isNullOrBlank()) {
+                matchedAccount = allAccounts.firstOrNull { acc ->
+                    val regAcc = acc.accountNumber?.filter { it.isDigit() } ?: ""
+                    regAcc.isNotEmpty() && (regAcc == extractedAccount || regAcc.endsWith(extractedAccount) || extractedAccount.endsWith(regAcc))
                 }
             }
         }
+
+        // 3. Match by Card Number suffix (Last 4 digits)
+        if (matchedAccount == null && !finalCardNumber.isNullOrBlank()) {
+            val cleanDigits = finalCardNumber.filter { it.isDigit() }
+            if (cleanDigits.length >= 4) {
+                val suffix = cleanDigits.takeLast(4)
+                matchedAccount = allAccounts.firstOrNull { acc ->
+                    val accCardDigits = acc.cardNumber.filter { it.isDigit() }
+                    accCardDigits.endsWith(suffix)
+                }
+            }
+        }
+
+        // 4. Match by Bank Name fallback if single account exists for that bank
+        if (matchedAccount == null && !transaction.bankName.isNullOrBlank()) {
+            val bankMatches = allAccounts.filter { 
+                it.bankName.contains(transaction.bankName) || transaction.bankName.contains(it.bankName)
+            }
+            if (bankMatches.size == 1) {
+                matchedAccount = bankMatches.first()
+            }
+        }
+
+        // 5. Fallback auto-creation if not found
+        if (matchedAccount == null && !finalCardNumber.isNullOrBlank()) {
+            val cleanDigits = finalCardNumber.filter { it.isDigit() }
+            val newAccount = BankAccount(
+                bankName = transaction.bankName?.ifBlank { "حساب پیامکی" } ?: "حساب پیامکی",
+                accountName = "حساب جدید",
+                cardNumber = if (cleanDigits.length >= 4) "6037-XXXX-XXXX-${cleanDigits.takeLast(4)}" else "کارت پیامکی",
+                accountNumber = if (finalCardNumber.startsWith("حساب:")) finalCardNumber.removePrefix("حساب:") else null,
+                balanceToman = transaction.balanceAfterToman ?: 0L,
+                cardColorHex = "#1E88E5",
+                accountType = "BANK_CARD"
+            )
+            val insertedId = bankAccountDao.insert(newAccount)
+            matchedAccount = newAccount.copy(id = insertedId)
+        }
         
-        val accountId = matchedAccount?.id ?: 0L // If 0, deductBalance might do nothing (which is fine if no account linked)
+        val accountId = matchedAccount?.id ?: 0L
         
         var finalCategoryName = transaction.categoryName
         if (finalCategoryName.isBlank()) {
@@ -330,12 +375,12 @@ class FinanceRepository private constructor(context: Context) {
             categoryName = finalCategoryName,
             amount = transaction.amountToman,
             type = transaction.type,
-            cardNumber = finalCardNumber
+            cardNumber = finalCardNumber,
+            directBalanceToman = transaction.balanceAfterToman
         )
     }
 
     suspend fun approvePendingTransaction(transaction: Transaction) = withContext(Dispatchers.IO) {
-        // Prevent double execution if it was already confirmed in the database
         val txInDb = transactionDao.getTransactionById(transaction.id)
         if (txInDb?.status == com.example.data.model.TransactionStatus.CONFIRMED) return@withContext
         

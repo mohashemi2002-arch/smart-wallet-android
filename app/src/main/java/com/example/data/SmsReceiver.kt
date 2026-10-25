@@ -21,6 +21,12 @@ class SmsReceiver : BroadcastReceiver() {
                     val body = sms.messageBody ?: continue
                     val sender = sms.originatingAddress ?: ""
                     
+                    // Filter out OTP SMS (رمز پویا / رمز دوم)
+                    if (SmsAiParser.isOtpSms(body)) {
+                        Log.d("SmsReceiver", "Ignored OTP SMS from $sender")
+                        continue
+                    }
+
                     val isMappedSender = activeSenders.any { sender.contains(it.senderNumber) || it.senderNumber.contains(sender) }
                     
                     if (isMappedSender || (activeSenders.isEmpty() && isBankSmsFallback(body, sender))) {

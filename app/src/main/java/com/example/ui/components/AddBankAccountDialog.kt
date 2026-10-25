@@ -46,6 +46,7 @@ fun AddBankAccountDialog(
 ) {
     var accountType by remember { mutableStateOf("BANK_CARD") } // "BANK_CARD" or "OTHER_SOURCE"
     var cardNumber by remember { mutableStateOf("") }
+    var accountNumber by remember { mutableStateOf("") }
     var accountName by remember { mutableStateOf("") }
     var readSmsEnabled by remember { mutableStateOf(true) }
     var initialBalanceEnabled by remember { mutableStateOf(true) }
@@ -213,6 +214,35 @@ fun AddBankAccountDialog(
                         }
                     }
 
+                    // Account Number Field (شماره حساب / کد حساب)
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(text = "شماره یا کد حساب بانکی (اختیاری)", fontSize = 12.sp, color = Color(0xFFB0BEC5))
+                        OutlinedTextField(
+                            value = accountNumber,
+                            onValueChange = { accountNumber = it.filter { c -> c.isDigit() || c in '۰'..'۹' } },
+                            placeholder = { Text("مثال: 80001 یا 02003 یا 640101018243027001", color = Color.Gray) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("account_number_input"),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            shape = RoundedCornerShape(12.dp),
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedContainerColor = Color(0xFF1A212D),
+                                unfocusedContainerColor = Color(0xFF1A212D),
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White,
+                                focusedBorderColor = Color(0xFF3B6FE8),
+                                unfocusedBorderColor = Color(0xFF2E3848)
+                            )
+                        )
+                        Text(
+                            text = "برای تطبیق هوشمند پیامک بانک‌هایی که شماره حساب می‌فرستند (صادرات، مهر ایران، ملی)",
+                            fontSize = 11.sp,
+                            color = Color(0xFF8A9AAD)
+                        )
+                    }
+
                     // Card Name Field
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(text = "نام کارت (اختیاری)", fontSize = 12.sp, color = Color(0xFFB0BEC5))
@@ -371,7 +401,7 @@ fun AddBankAccountDialog(
                                     finalBankName,
                                     finalAccName,
                                     cardNumber.ifBlank { "6037-XXXX-XXXX-1111" },
-                                    null,
+                                    accountNumber.ifBlank { null },
                                     tomanAmount,
                                     selectedColorHex,
                                     smsShortcode.ifBlank { null },

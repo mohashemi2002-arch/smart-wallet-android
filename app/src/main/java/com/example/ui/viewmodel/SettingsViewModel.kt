@@ -72,6 +72,43 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    fun createPersistentBackup(onResult: (String) -> Unit) {
+        viewModelScope.launch {
+            val prefs = userPreferences.value
+            val phone = prefs.userPhoneNumber.ifBlank { "09000000000" }
+            val first = prefs.userFirstName.ifBlank { "کاربر" }
+            val last = prefs.userLastName.ifBlank { "اصلی" }
+
+            val backupManager = com.example.data.backup.PersistentProfileBackupManager(getApplication())
+            val result = backupManager.createLocalBackup(first, last, phone)
+            result.fold(
+                onSuccess = { file ->
+                    onResult("نسخه پشتیبان پایدار با موفقیت در پوشه اسناد ذخیره شد:\n${file.name}")
+                },
+                onFailure = { err ->
+                    onResult("خطا در ذخیره فایل پشتیبان: ${err.localizedMessage}")
+                }
+            )
+        }
+    }
+
+    fun restorePersistentBackup(customPhone: String? = null, onResult: (String) -> Unit) {
+        viewModelScope.launch {
+            val prefs = userPreferences.value
+            val phone = (customPhone ?: prefs.userPhoneNumber).ifBlank { "09000000000" }
+            val backupManager = com.example.data.backup.PersistentProfileBackupManager(getApplication())
+            val result = backupManager.restoreLocalBackup(phone)
+            result.fold(
+                onSuccess = { summary ->
+                    onResult("اطلاعات با موفقیت بازیابی شد!\nتعداد ${summary.restoredAccountsCount} حساب و ${summary.restoredTransactionsCount} تراکنش بازگردانی شدند.")
+                },
+                onFailure = { err ->
+                    onResult("خطا در بازیابی اطلاعات: ${err.localizedMessage}")
+                }
+            )
+        }
+    }
+
     fun wipeEntireDatabase(onComplete: () -> Unit) {
         viewModelScope.launch {
             withContext(Dispatchers.IO) {

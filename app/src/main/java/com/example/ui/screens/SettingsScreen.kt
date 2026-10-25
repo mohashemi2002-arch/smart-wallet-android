@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material.icons.filled.FileDownload
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -41,6 +42,7 @@ import kotlinx.coroutines.launch
 fun SettingsScreen(
     onNavigateBack: () -> Unit,
     onNavigateToSmsSenders: () -> Unit = {},
+    onNavigateToRegistration: () -> Unit = {},
     financeViewModel: FinanceViewModel = viewModel(),
     settingsViewModel: SettingsViewModel = viewModel()
 ) {
@@ -158,6 +160,37 @@ fun SettingsScreen(
 
             item {
                 Card(
+                    modifier = Modifier.fillMaxWidth().clickable { onNavigateToRegistration() },
+                    shape = RoundedCornerShape(28.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF2B2930)),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF49454F))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(18.dp).fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column {
+                            val profileTitle = if (preferences.userPhoneNumber.isNotBlank()) {
+                                "پروفایل: ${preferences.userFirstName} ${preferences.userLastName}".trim()
+                            } else {
+                                "حساب کاربری و همگام‌سازی ابری"
+                            }
+                            val profileSub = if (preferences.userPhoneNumber.isNotBlank()) {
+                                "شماره: ${preferences.userPhoneNumber} (متصل به پشتیبان محلی و ابری)"
+                            } else {
+                                "ثبت‌نام و اتصال حساب کاربری جهت پشتیبان‌گیری ابری و لوکال"
+                            }
+                            Text(profileTitle, style = MaterialTheme.typography.titleMedium, color = Color(0xFFE6E1E5))
+                            Text(profileSub, style = MaterialTheme.typography.bodySmall, color = Color(0xFFCAC4D0))
+                        }
+                        Icon(Icons.Default.Person, contentDescription = "ثبت‌نام", tint = Color(0xFF7FA2FF))
+                    }
+                }
+            }
+
+            item {
+                Card(
                     modifier = Modifier.fillMaxWidth().clickable { onNavigateToSmsSenders() },
                     shape = RoundedCornerShape(28.dp),
                     colors = CardDefaults.cardColors(containerColor = Color(0xFF2B2930)),
@@ -268,7 +301,38 @@ fun SettingsScreen(
                     border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF49454F))
                 ) {
                     Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text("پشتیبان‌گیری", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = Color.White)
+                        Text("پشتیبان‌گیری و بازیابی اطلاعات", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = Color.White)
+                        
+                        Button(
+                            onClick = {
+                                settingsViewModel.createPersistentBackup { msg ->
+                                    Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF388E3C))
+                        ) {
+                            Icon(Icons.Default.FileDownload, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("ایجاد پشتیبان پایدار در حافظه دستگاه (ضد حذف)")
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                settingsViewModel.restorePersistentBackup { msg ->
+                                    Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF81C784))
+                        ) {
+                            Icon(Icons.Default.Upload, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("بازیابی اطلاعات از فایل پشتیبان حافظه گوشی")
+                        }
+
+                        HorizontalDivider(color = Color(0xFF49454F), modifier = Modifier.padding(vertical = 4.dp))
+
                         OutlinedButton(
                             onClick = {
                                 exportDataText = financeViewModel.generateExport()

@@ -77,6 +77,11 @@ class BankSmsHistoryScanner(
                     }?.value
 
                     if (matchedBankName != null) {
+                        // Filter out OTP SMS (رمز پویا / رمز دوم)
+                        if (com.example.data.SmsAiParser.isOtpSms(body)) {
+                            continue
+                        }
+
                         // Check if already registered by seeing if this raw text is contained in any existing transaction
                         val isAlreadyRegistered = registeredSmsTexts.any { body.contains(it) || it.contains(body) }
                         

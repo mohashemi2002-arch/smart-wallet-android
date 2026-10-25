@@ -139,8 +139,16 @@ fun SmartWalletApp(financeViewModel: FinanceViewModel = viewModel()) {
     var showPendingSmsInbox by remember { mutableStateOf(false) }
     var showSmsSenderSettings by remember { mutableStateOf(false) }
     var showBankSmsHistory by remember { mutableStateOf(false) }
+    var showRegistration by remember { mutableStateOf(false) }
 
-    if (showSmsSenderSettings) {
+    if (showRegistration) {
+        androidx.activity.compose.BackHandler { showRegistration = false }
+        com.example.ui.screens.RegistrationScreen(
+            onNavigateBack = { showRegistration = false },
+            onNavigateToLogin = { showRegistration = false },
+            onRegistrationSuccess = { showRegistration = false }
+        )
+    } else if (showSmsSenderSettings) {
         com.example.ui.screens.SmsSenderSettingsScreen(onNavigateBack = { showSmsSenderSettings = false })
     } else if (showBankSmsHistory) {
         val historyViewModel: com.example.ui.viewmodel.BankSmsHistoryViewModel = viewModel()
@@ -194,7 +202,8 @@ fun SmartWalletApp(financeViewModel: FinanceViewModel = viewModel()) {
                     onNavigateToBudget = { selectedTab = ScreenTab.BUDGET },
                     onNavigateToPortfolio = { selectedTab = ScreenTab.PORTFOLIO },
                     onNavigateToDebts = { selectedTab = ScreenTab.CALENDAR },
-                    onNavigateToMarket = { selectedTab = ScreenTab.MARKET }
+                    onNavigateToMarket = { selectedTab = ScreenTab.MARKET },
+                    onNavigateToRegistration = { showRegistration = true }
                 )
                 ScreenTab.PORTFOLIO -> PortfolioScreen(
                     viewModel = financeViewModel,
@@ -217,7 +226,8 @@ fun SmartWalletApp(financeViewModel: FinanceViewModel = viewModel()) {
                 )
                 ScreenTab.SETTINGS -> SettingsScreen(
                     onNavigateBack = { selectedTab = ScreenTab.DASHBOARD },
-                    onNavigateToSmsSenders = { showSmsSenderSettings = true }
+                    onNavigateToSmsSenders = { showSmsSenderSettings = true },
+                    onNavigateToRegistration = { showRegistration = true }
                 )
             }
         }

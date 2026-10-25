@@ -37,6 +37,7 @@ fun EditAccountBottomSheet(
     var accountName by remember { mutableStateOf(account.accountName) }
     var bankName by remember { mutableStateOf(account.bankName) }
     var cardNumber by remember { mutableStateOf(account.cardNumber) }
+    var accountNumber by remember { mutableStateOf(account.accountNumber ?: "") }
     var balanceTextRial by remember { mutableStateOf((account.balanceToman * 10).toString()) }
     var smsShortcode by remember { mutableStateOf(account.smsShortcode ?: "") }
     var showSmsPicker by remember { mutableStateOf(false) }
@@ -83,6 +84,15 @@ fun EditAccountBottomSheet(
                 value = cardNumber,
                 onValueChange = { cardNumber = it },
                 label = { Text("شماره کارت") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            OutlinedTextField(
+                value = accountNumber,
+                onValueChange = { accountNumber = it.filter { c -> c.isDigit() || c in '۰'..'۹' } },
+                label = { Text("شماره یا کد حساب (مثلاً 80001 یا 02003)") },
+                placeholder = { Text("مثال: 640101018243027001 یا 80001") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.fillMaxWidth()
             )
@@ -148,6 +158,7 @@ fun EditAccountBottomSheet(
                                 bankName = bankName,
                                 accountName = accountName,
                                 cardNumber = cardNumber,
+                                accountNumber = accountNumber.ifBlank { null },
                                 balanceToman = newBalance,
                                 smsShortcode = smsShortcode.ifBlank { null }
                             ))

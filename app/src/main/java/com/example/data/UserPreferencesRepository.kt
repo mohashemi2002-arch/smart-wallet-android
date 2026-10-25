@@ -16,7 +16,10 @@ data class UserPreferences(
     val currencyMode: CurrencyMode = CurrencyMode.TOMAN,
     val biometricEnabled: Boolean = false,
     val autoLockTimeout: AutoLockTimeout = AutoLockTimeout.IMMEDIATE,
-    val privacyModeEnabled: Boolean = false
+    val privacyModeEnabled: Boolean = false,
+    val userFirstName: String = "",
+    val userLastName: String = "",
+    val userPhoneNumber: String = ""
 )
 
 class UserPreferencesRepository(private val context: Context) {
@@ -33,12 +36,18 @@ class UserPreferencesRepository(private val context: Context) {
                 preferences[PreferencesKeys.AUTO_LOCK_TIMEOUT] ?: AutoLockTimeout.IMMEDIATE.name
             )
             val privacyModeEnabled = preferences[PreferencesKeys.PRIVACY_MODE_ENABLED] ?: false
+            val firstName = preferences[PreferencesKeys.USER_FIRST_NAME] ?: ""
+            val lastName = preferences[PreferencesKeys.USER_LAST_NAME] ?: ""
+            val phone = preferences[PreferencesKeys.USER_PHONE] ?: ""
 
             UserPreferences(
                 currencyMode = currencyMode,
                 biometricEnabled = biometricEnabled,
                 autoLockTimeout = autoLockTimeout,
-                privacyModeEnabled = privacyModeEnabled
+                privacyModeEnabled = privacyModeEnabled,
+                userFirstName = firstName,
+                userLastName = lastName,
+                userPhoneNumber = phone
             )
         }
 
@@ -66,10 +75,21 @@ class UserPreferencesRepository(private val context: Context) {
         }
     }
 
+    suspend fun updateUserProfile(firstName: String, lastName: String, phoneNumber: String) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.USER_FIRST_NAME] = firstName
+            preferences[PreferencesKeys.USER_LAST_NAME] = lastName
+            preferences[PreferencesKeys.USER_PHONE] = phoneNumber
+        }
+    }
+
     private object PreferencesKeys {
         val CURRENCY_MODE = stringPreferencesKey("currency_mode")
         val BIOMETRIC_ENABLED = booleanPreferencesKey("biometric_enabled")
         val AUTO_LOCK_TIMEOUT = stringPreferencesKey("auto_lock_timeout")
         val PRIVACY_MODE_ENABLED = booleanPreferencesKey("privacy_mode_enabled")
+        val USER_FIRST_NAME = stringPreferencesKey("user_first_name")
+        val USER_LAST_NAME = stringPreferencesKey("user_last_name")
+        val USER_PHONE = stringPreferencesKey("user_phone")
     }
 }
