@@ -378,7 +378,7 @@ fun RegistrationScreen(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "بازیابی اطلاعات از Google Sheets",
+                        text = "بازیابی اطلاعات از فضای ابری",
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold
                     )

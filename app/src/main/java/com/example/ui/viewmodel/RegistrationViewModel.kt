@@ -158,7 +158,7 @@ class RegistrationViewModel(
                 val message = if (restoreResult != null) {
                     "ثبت‌نام انجام شد! اطلاعات قبلی شامل ${restoreResult.restoredAccountsCount} کارت و ${restoreResult.restoredTransactionsCount} تراکنش بازیابی شدند."
                 } else {
-                    "ثبت‌نام با موفقیت انجام شد و اطلاعات با گوگل شیت همگام‌سازی گردید."
+                    "ثبت‌نام با موفقیت انجام شد و اطلاعات با فضای ابری همگام‌سازی گردید."
                 }
 
                 _uiState.value = RegistrationUiState.Success(
@@ -198,7 +198,7 @@ class RegistrationViewModel(
 
                     _uiState.value = RegistrationUiState.Success(
                         userId = "user_$cleanPhone",
-                        message = "اطلاعات با موفقیت از گوگل شیت بازیابی شد!\nتعداد ${res.restoredCardsCount} کارت و ${res.restoredTransactionsCount} تراکنش بازگردانی شدند."
+                        message = "اطلاعات با موفقیت از فضای ابری بازیابی شد!\nتعداد ${res.restoredCardsCount} کارت و ${res.restoredTransactionsCount} تراکنش بازگردانی شدند."
                     )
                 },
                 onFailure = { err ->
@@ -212,7 +212,7 @@ class RegistrationViewModel(
                         )
                         _uiState.value = RegistrationUiState.Success(
                             userId = "user_$cleanPhone",
-                            message = "اطلاعات از فایل پشتیبان حافظه گوشی بازیابی شد (عدم پاسخ گوگل شیت: ${err.localizedMessage})",
+                            message = "اطلاعات از فایل پشتیبان حافظه گوشی بازیابی شد (عدم پاسخ فضای ابری: ${err.localizedMessage})",
                             restoreSummary = localRestored
                         )
                     } else {

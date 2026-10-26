@@ -124,10 +124,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             )
             result.fold(
                 onSuccess = { res ->
-                    onResult("همگام‌سازی ابری با Google Sheets موفقیت‌آمیز بود!\nتعداد ${res.syncedCardsCount} کارت و ${res.syncedTransactionsCount} تراکنش همگام شدند.")
+                    onResult("همگام‌سازی با فضای ابری موفقیت‌آمیز بود!\nتعداد ${res.syncedCardsCount} کارت و ${res.syncedTransactionsCount} تراکنش همگام شدند.")
                 },
                 onFailure = { err ->
-                    onResult("خطا در همگام‌سازی با گوگل شیت: ${err.localizedMessage}")
+                    onResult("خطا در همگام‌سازی با فضای ابری: ${err.localizedMessage}")
                 }
             )
         }
@@ -148,10 +148,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             )
             result.fold(
                 onSuccess = { res ->
-                    onResult("بازیابی از Google Sheets با موفقیت انجام شد!\nتعداد ${res.restoredCardsCount} کارت و ${res.restoredTransactionsCount} تراکنش بازگردانی شدند.")
+                    onResult("بازیابی از فضای ابری با موفقیت انجام شد!\nتعداد ${res.restoredCardsCount} کارت و ${res.restoredTransactionsCount} تراکنش بازگردانی شدند.")
                 },
                 onFailure = { err ->
-                    onResult("خطا در بازیابی از گوگل شیت: ${err.localizedMessage}")
+                    onResult("خطا در بازیابی از فضای ابری: ${err.localizedMessage}")
                 }
             )
         }

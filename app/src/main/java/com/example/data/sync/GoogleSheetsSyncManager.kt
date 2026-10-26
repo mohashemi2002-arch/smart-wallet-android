@@ -140,12 +140,12 @@ class GoogleSheetsSyncManager(
             Log.d(TAG, "Google Sheets Sync Response code: ${response.code}, body: $responseBody")
 
             if (!response.isSuccessful && response.code != 302) {
-                throw IllegalStateException("خطا در ارتباط با سرور گوگل شیت: کد ${response.code}")
+                throw IllegalStateException("خطا در ارتباط با سرور فضای ابری: کد ${response.code}")
             }
 
             GoogleSheetsSyncResult(
                 success = true,
-                message = "همگام‌سازی با گوگل شیت با موفقیت انجام شد.",
+                message = "همگام‌سازی با فضای ابری با موفقیت انجام شد.",
                 syncedCardsCount = accounts.size,
                 syncedTransactionsCount = transactions.size
             )
@@ -185,7 +185,7 @@ class GoogleSheetsSyncManager(
             Log.d(TAG, "Google Sheets Restore Response code: ${response.code}, body: $responseBody")
 
             if (!response.isSuccessful && response.code != 302) {
-                throw IllegalStateException("خطا در ارتباط با گوگل شیت: کد ${response.code}")
+                throw IllegalStateException("خطا در ارتباط با فضای ابری: کد ${response.code}")
             }
 
             if (responseBody.isBlank()) {
@@ -296,7 +296,7 @@ class GoogleSheetsSyncManager(
 
             GoogleSheetsRestoreResult(
                 success = true,
-                message = "اطلاعات با موفقیت از گوگل شیت بازیابی شد!\nتعداد $restoredCards کارت و $restoredTxs تراکنش بازگردانی شدند.",
+                message = "اطلاعات با موفقیت از فضای ابری بازیابی شد!\nتعداد $restoredCards کارت و $restoredTxs تراکنش بازگردانی شدند.",
                 restoredCardsCount = restoredCards,
                 restoredTransactionsCount = restoredTxs
             )

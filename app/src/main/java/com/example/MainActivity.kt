@@ -35,27 +35,25 @@ class MainActivity : FragmentActivity() {
     ) { _ -> }
 
     private lateinit var securityManager: com.example.domain.util.AppSecurityManager
+    private lateinit var authManager: com.example.domain.util.AuthManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         checkAndRequestPermissions()
         securityManager = com.example.domain.util.AppSecurityManager(this)
+        authManager = com.example.domain.util.AuthManager(this)
         securityManager.applyScreenSecurity(window)
 
         com.example.domain.worker.WorkerInitializer.enqueueFinancialReminders(this)
         setContent {
-            val isUnlocked by securityManager.isUnlocked.collectAsState()
             SmartWalletTheme {
-                if (isUnlocked) {
-                    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                    com.example.ui.auth.AuthGatekeeper(
+                        authManager = authManager,
+                        activity = this@MainActivity
+                    ) {
                         SmartWalletApp()
-                    }
-                } else {
-                    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
-                        com.example.ui.screens.LockScreen(
-                            onUnlockClick = { securityManager.promptBiometric(this@MainActivity) }
-                        )
                     }
                 }
             }

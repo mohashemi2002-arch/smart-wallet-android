@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -265,6 +266,21 @@ fun SettingsScreen(
                                 modifier = Modifier.weight(1f)
                             )
                         }
+
+                        Spacer(Modifier.height(6.dp))
+
+                        OutlinedButton(
+                            onClick = {
+                                com.example.domain.util.AuthManager(context).lock()
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFE2E8F0)),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF475569))
+                        ) {
+                            Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("قفل کردن فوری برنامه")
+                        }
                     }
                 }
             }
@@ -309,10 +325,10 @@ fun SettingsScreen(
                     Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text("پشتیبان‌گیری و بازیابی اطلاعات", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = Color.White)
                         
-                        // 1. Google Sheets Cloud Sync & Restore
+                        // 1. Cloud Sync & Restore
                         Button(
                             onClick = {
-                                Toast.makeText(context, "در حال همگام‌سازی با Google Sheets...", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "در حال همگام‌سازی با فضای ابری...", Toast.LENGTH_SHORT).show()
                                 settingsViewModel.syncWithGoogleSheets { msg ->
                                     Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
                                 }
@@ -322,12 +338,12 @@ fun SettingsScreen(
                         ) {
                             Icon(Icons.Default.CloudUpload, contentDescription = null)
                             Spacer(Modifier.width(8.dp))
-                            Text("همگام‌سازی با Google Sheets (Sync)")
+                            Text("همگام‌سازی با فضای ابری (Sync)")
                         }
 
                         OutlinedButton(
                             onClick = {
-                                Toast.makeText(context, "در حال بازیابی از Google Sheets...", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "در حال بازیابی از فضای ابری...", Toast.LENGTH_SHORT).show()
                                 settingsViewModel.restoreFromGoogleSheets { msg ->
                                     Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
                                 }
@@ -337,7 +353,7 @@ fun SettingsScreen(
                         ) {
                             Icon(Icons.Default.CloudDownload, contentDescription = null)
                             Spacer(Modifier.width(8.dp))
-                            Text("بازیابی اطلاعات از Google Sheets (Restore)")
+                            Text("بازیابی اطلاعات از فضای ابری (Restore)")
                         }
 
                         HorizontalDivider(color = Color(0xFF49454F), modifier = Modifier.padding(vertical = 4.dp))
