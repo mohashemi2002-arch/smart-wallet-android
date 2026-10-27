@@ -18,10 +18,19 @@ class GoogleSheetsSyncTest {
 
         val rootJson = JSONObject().apply {
             put("action", "sync")
+            put("phoneNumber", cleanPhone)
+            put("firstName", "محمد")
+            put("lastName", "حسینی")
+            put("username", "mohammad")
+            put("passwordHash", "hashedPass123")
+            put("pinHash", "hashedPin456")
             put("user", JSONObject().apply {
                 put("phoneNumber", cleanPhone)
                 put("firstName", "محمد")
                 put("lastName", "حسینی")
+                put("username", "mohammad")
+                put("passwordHash", "hashedPass123")
+                put("pinHash", "hashedPin456")
             })
             put("cards", JSONArray().apply {
                 put(JSONObject().apply {
@@ -42,10 +51,16 @@ class GoogleSheetsSyncTest {
         }
 
         assertEquals("sync", rootJson.getString("action"))
+        assertEquals("mohammad", rootJson.getString("username"))
+        assertEquals("hashedPass123", rootJson.getString("passwordHash"))
+        assertEquals("hashedPin456", rootJson.getString("pinHash"))
         val user = rootJson.getJSONObject("user")
         assertEquals("09123456789", user.getString("phoneNumber"))
         assertEquals("محمد", user.getString("firstName"))
         assertEquals("حسینی", user.getString("lastName"))
+        assertEquals("mohammad", user.getString("username"))
+        assertEquals("hashedPass123", user.getString("passwordHash"))
+        assertEquals("hashedPin456", user.getString("pinHash"))
 
         val cards = rootJson.getJSONArray("cards")
         assertEquals(1, cards.length())

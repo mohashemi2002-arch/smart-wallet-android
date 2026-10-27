@@ -416,6 +416,46 @@ class FinanceRepository private constructor(context: Context) {
         }
     }
 
+    suspend fun updateTransaction(transaction: Transaction) = withContext(Dispatchers.IO) {
+        transactionDao.update(transaction)
+        triggerAutoCloudSync()
+    }
+
+    suspend fun performAccountTransfer(
+        sourceAccountId: Long,
+        destinationAccountId: Long,
+        amountToman: Long,
+        dateMillis: Long = System.currentTimeMillis(),
+        notes: String? = null
+    ) = withContext(Dispatchers.IO) {
+        db.withTransaction {
+            val src = bankAccountDao.getAccountById(sourceAccountId)
+            val dest = bankAccountDao.getAccountById(destinationAccountId)
+
+            bankAccountDao.deductBalance(sourceAccountId, amountToman)
+            bankAccountDao.addBalance(destinationAccountId, amountToman)
+
+            val srcName = src?.bankName ?: "بانک مبدا"
+            val destName = dest?.bankName ?: "بانک مقصد"
+            val transferNotes = notes ?: "انتقال از $srcName به $destName"
+
+            val tx = Transaction(
+                amountToman = amountToman,
+                type = TransactionType.EXPENSE,
+                categoryName = "جابجایی",
+                merchantName = transferNotes,
+                cardNumber = src?.cardNumber,
+                bankName = srcName,
+                dateMillis = dateMillis,
+                isParsedFromSms = false,
+                status = com.example.data.model.TransactionStatus.CONFIRMED,
+                notes = transferNotes
+            )
+            transactionDao.insert(tx)
+        }
+        triggerAutoCloudSync()
+    }
+
     suspend fun deleteTransaction(transaction: Transaction) = withContext(Dispatchers.IO) {
         reverseTransactionBalance(transaction)
         transactionDao.delete(transaction)

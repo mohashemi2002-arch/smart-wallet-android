@@ -279,6 +279,51 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    fun addOrUpdateTransaction(
+        id: Long = 0L,
+        amountToman: Long,
+        type: TransactionType,
+        categoryName: String,
+        merchantName: String,
+        sourceAccount: BankAccount? = null,
+        destinationAccount: BankAccount? = null,
+        dateMillis: Long = System.currentTimeMillis()
+    ) {
+        viewModelScope.launch {
+            if (categoryName == "جابجایی" && sourceAccount != null && destinationAccount != null) {
+                repository.performAccountTransfer(
+                    sourceAccountId = sourceAccount.id,
+                    destinationAccountId = destinationAccount.id,
+                    amountToman = amountToman,
+                    dateMillis = dateMillis,
+                    notes = merchantName
+                )
+                _statusMessage.value = "جابجایی بین‌بانکی با موفقیت ثبت شد."
+            } else {
+                val tx = Transaction(
+                    id = id,
+                    amountToman = amountToman,
+                    type = type,
+                    categoryName = categoryName,
+                    merchantName = merchantName,
+                    cardNumber = sourceAccount?.cardNumber,
+                    bankName = sourceAccount?.bankName,
+                    dateMillis = dateMillis,
+                    isParsedFromSms = false,
+                    status = TransactionStatus.CONFIRMED,
+                    notes = merchantName
+                )
+                if (id > 0L) {
+                    repository.updateTransaction(tx)
+                    _statusMessage.value = "تراکنش با موفقیت ویرایش شد."
+                } else {
+                    repository.addTransaction(tx)
+                    _statusMessage.value = "تراکنش دستی با موفقیت ثبت شد."
+                }
+            }
+        }
+    }
+
     fun deleteTransaction(transaction: Transaction) {
         viewModelScope.launch {
             repository.deleteTransaction(transaction)

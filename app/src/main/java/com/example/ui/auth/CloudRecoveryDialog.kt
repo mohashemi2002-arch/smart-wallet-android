@@ -168,11 +168,12 @@ fun CloudRecoveryDialog(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // New Password
+                // New Password (Optional)
                 OutlinedTextField(
                     value = newPassword,
                     onValueChange = { newPassword = it },
-                    label = { Text("رمز عبور جدید") },
+                    label = { Text("رمز عبور جدید (اختیاری)") },
+                    placeholder = { Text("بازیابی از فضای ابری در صورت خالی بودن", fontSize = 12.sp) },
                     leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = Color(0xFF94A3B8)) },
                     trailingIcon = {
                         IconButton(onClick = { passwordVisible = !passwordVisible }) {
@@ -196,11 +197,12 @@ fun CloudRecoveryDialog(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // New 4-digit PIN
+                // New 4-digit PIN (Optional)
                 OutlinedTextField(
                     value = newPin,
                     onValueChange = { if (it.length <= 4 && it.all { c -> c.isDigit() }) newPin = it },
-                    label = { Text("پین کد ۴ رقمی جدید") },
+                    label = { Text("پین کد ۴ رقمی جدید (اختیاری)") },
+                    placeholder = { Text("بازیابی از فضای ابری در صورت خالی بودن", fontSize = 12.sp) },
                     leadingIcon = { Icon(Icons.Default.Pin, contentDescription = null, tint = Color(0xFF94A3B8)) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
                     singleLine = true,
@@ -232,11 +234,11 @@ fun CloudRecoveryDialog(
                             errorMessage = "شماره همراه معتبر وارد کنید (حداقل ۱۰ رقم)"
                             return@Button
                         }
-                        if (newPassword.trim().length < 4) {
+                        if (newPassword.isNotBlank() && newPassword.trim().length < 4) {
                             errorMessage = "رمز عبور جدید باید حداقل ۴ کاراکتر باشد"
                             return@Button
                         }
-                        if (newPin.trim().length != 4) {
+                        if (newPin.isNotBlank() && newPin.trim().length != 4) {
                             errorMessage = "پین کد جدید باید دقیقاً ۴ رقم باشد"
                             return@Button
                         }

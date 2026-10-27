@@ -66,6 +66,7 @@ fun DashboardScreen(
     var showEditAccountDialog by remember { mutableStateOf(false) }
     var showQuickNoteDialog by remember { mutableStateOf(false) }
     var selectedBankAccount by remember { mutableStateOf<com.example.data.model.BankAccount?>(null) }
+    var transactionToEditFromDashboard by remember { mutableStateOf<Transaction?>(null) }
     
     var showDatePickerDialog by remember { mutableStateOf(false) }
     val activeDateFilter by viewModel.activeDateFilter.collectAsState()
@@ -632,7 +633,8 @@ fun DashboardScreen(
                                         isIncome = isInc,
                                         iconBgColor = iconInfo.first,
                                         iconVector = iconInfo.second,
-                                        onDelete = { viewModel.deleteTransaction(tx) }
+                                        onDelete = { viewModel.deleteTransaction(tx) },
+                                        onClick = { transactionToEditFromDashboard = tx }
                                     )
                                     
                                     if (index < transactions.take(3).size - 1) {
@@ -653,19 +655,57 @@ fun DashboardScreen(
             allTransactions = allTransactions,
             currencyUnit = currencyUnit,
             viewModel = viewModel,
+            bankAccounts = bankAccounts,
             onDismiss = { showAllTransactionsDialog = false },
             onDeleteTransaction = { tx -> viewModel.deleteTransaction(tx) }
         )
     }
 
-    // Dialog: Add Manual Transaction
+    // Dialog: Add Manual Transaction (3-way selector: خرج, دخل, جابجایی)
     if (showAddDialog) {
-        AddTransactionDialog(
-            categories = listOf("نقدی", "خوردنی", "عوارض آزادراهی", "بنزین", "خانواده", "خودرو", "شارژ ساختمان"),
+        com.example.ui.components.AddOrEditTransactionDialog(
+            transactionToEdit = null,
+            bankAccounts = bankAccounts,
+            currencyUnit = currencyUnit,
             onDismiss = { showAddDialog = false },
-            onConfirm = { amount, type, category, merchant ->
-                viewModel.addManualTransaction(amount, type, category, merchant)
+            onConfirm = { amount, type, category, merchant, src, dest, dateMillis ->
+                viewModel.addOrUpdateTransaction(
+                    amountToman = amount,
+                    type = type,
+                    categoryName = category,
+                    merchantName = merchant,
+                    sourceAccount = src,
+                    destinationAccount = dest,
+                    dateMillis = dateMillis
+                )
                 showAddDialog = false
+            }
+        )
+    }
+
+    // Dialog: Edit Transaction from Dashboard
+    transactionToEditFromDashboard?.let { txToEdit ->
+        com.example.ui.components.AddOrEditTransactionDialog(
+            transactionToEdit = txToEdit,
+            bankAccounts = bankAccounts,
+            currencyUnit = currencyUnit,
+            onDismiss = { transactionToEditFromDashboard = null },
+            onDelete = { tx ->
+                viewModel.deleteTransaction(tx)
+                transactionToEditFromDashboard = null
+            },
+            onConfirm = { amount, type, category, merchant, src, dest, dateMillis ->
+                viewModel.addOrUpdateTransaction(
+                    id = txToEdit.id,
+                    amountToman = amount,
+                    type = type,
+                    categoryName = category,
+                    merchantName = merchant,
+                    sourceAccount = src,
+                    destinationAccount = dest,
+                    dateMillis = dateMillis
+                )
+                transactionToEditFromDashboard = null
             }
         )
     }
@@ -814,7 +854,8 @@ fun RecentTransactionRow(
     isIncome: Boolean,
     iconBgColor: Color,
     iconVector: androidx.compose.ui.graphics.vector.ImageVector,
-    onDelete: (() -> Unit)? = null
+    onDelete: (() -> Unit)? = null,
+    onClick: (() -> Unit)? = null
 ) {
     val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
     var hasVibrated by remember { mutableStateOf(false) }
@@ -868,7 +909,11 @@ fun RecentTransactionRow(
         }
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().background(Color(0xFF252E3E)),
+            modifier = Modifier
+                .fillMaxWidth()
+                .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)
+                .background(Color(0xFF252E3E), RoundedCornerShape(12.dp))
+                .padding(vertical = 8.dp, horizontal = 10.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {

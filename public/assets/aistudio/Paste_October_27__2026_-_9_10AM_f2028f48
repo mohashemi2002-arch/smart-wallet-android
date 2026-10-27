@@ -1,0 +1,667 @@
+# Smart Wallet Android — Non-Destructive Cloud Sync Fix & UI Enhancement
+
+## 1. Project Context and Critical Instructions
+
+You are working on an existing Android personal finance application named **Smart Wallet**, developed using Kotlin and Jetpack Compose.
+
+The application already has working implementations of the following features:
+
+- SMS transaction parsing and automatic bank balance synchronization.
+- Room database and local data persistence.
+- Over-the-air (OTA) application updates.
+- Authentication and access control through `AuthGatekeeper`.
+- Cloud synchronization and recovery using Google Sheets and Google Apps Script.
+- Existing transaction management, bank accounts, and financial calculations.
+
+Your task is to fix the specified cloud synchronization issues and enhance the transaction and category management UI without compromising the existing architecture or functionality.
+
+### Mandatory non-destructive development rules
+
+**These rules take precedence over every implementation decision.**
+
+1. **Preserve all existing working functionality.** Do not delete, disable, replace, or unnecessarily refactor existing features, including SMS parsing, Room database operations, OTA updates, authentication, cloud synchronization, bank balance calculations, and navigation.
+2. Modify only the files and components required to implement the requested changes.
+3. Before modifying code, inspect the existing project structure, relevant source files, ViewModels, repositories, database entities, authentication preferences, navigation graph, and cloud synchronization implementation.
+4. Reuse existing architectural patterns, components, dependencies, and design conventions wherever possible.
+5. Preserve existing database schemas and migrations. Do not introduce destructive migrations, database resets, or data-clearing operations.
+6. Do not replace existing implementations with simplified versions, mock implementations, placeholders, or incomplete rewrites.
+7. Preserve existing APIs, function signatures, navigation routes, data models, and UI behavior unless a change is strictly necessary.
+8. Do not overwrite unrelated user modifications or remove existing code simply to simplify implementation.
+9. Do not assume that a feature is missing before inspecting the actual source code.
+10. If a requested change conflicts with an existing implementation, identify the conflict and implement the smallest backward-compatible solution.
+
+**Preferred approach:** Make minimal, targeted, additive changes and preserve all existing behavior.
+
+---
+
+## 2. Task One — Fix Authentication Credential Cloud Synchronization
+
+### 2.1. Problem Description
+
+The application currently stores authentication information locally, but the following fields are not reliably included in the Google Sheets cloud synchronization payload:
+
+- `username`
+- `passwordHash`
+- `pinHash`
+
+These values must be synchronized securely and restored during cloud recovery.
+
+### 2.2. Inspect the Existing Implementation
+
+Inspect the relevant authentication and synchronization components, including, where present:
+
+- `AuthPreferences`
+- `AuthGatekeeper`
+- `GoogleSheetsSync`
+- Cloud synchronization repositories and payload builders.
+- Registration and sign-up handlers.
+- PIN and password change handlers.
+- Cloud backup, restore, and recovery handlers.
+- Google Apps Script request and response processing.
+
+Determine the actual data flow before making modifications.
+
+### 2.3. Update the Cloud Sync and Registration Payload
+
+Whenever the application sends an applicable `sync` or `register` request to the existing Google Apps Script Web App endpoint, ensure that the payload includes the required authentication and profile fields.
+
+The payload must include the following fields in the appropriate existing JSON structures:
+
+| Field          | Source                           |
+| -------------- | -------------------------------- |
+| `phoneNumber`  | Existing user profile data       |
+| `firstName`    | Existing user profile data       |
+| `lastName`     | Existing user profile data       |
+| `username`     | Saved authentication preferences |
+| `passwordHash` | Saved password hash              |
+| `pinHash`      | Saved PIN hash                   |
+
+Include these fields in the nested `user` JSON object and at the top level where required by the existing backend contract.
+
+Requirements:
+
+- Preserve the existing request structure and all currently synchronized financial data.
+- Use the actual saved values rather than hardcoded values, placeholders, or newly generated credentials.
+- Preserve the existing SHA-256 hash representation and encoding.
+- Never transmit plaintext passwords or plaintext PINs.
+- Ensure that credential fields are not accidentally omitted because of null filtering, serialization rules, or an outdated data model.
+- Do not log passwords, PINs, authentication hashes, or other sensitive credentials.
+- Keep the existing Google Apps Script URL, request method, authentication flow, and backend action names unchanged unless a specific incompatibility requires a documented, minimal adjustment.
+
+### 2.4. Automatically Synchronize After Authentication Changes
+
+Trigger a reliable background cloud synchronization after the following operations complete successfully:
+
+1. User registration or sign-up (`ثبت نام`).
+2. Password changes.
+3. PIN changes.
+
+Implementation requirements:
+
+- Persist the updated authentication data locally before starting synchronization.
+- Trigger synchronization only after the relevant local operation succeeds.
+- Use the existing synchronization mechanism, coroutine scope, and background execution architecture.
+- If WorkManager or another persistent background mechanism already exists, reuse it where appropriate.
+- Avoid duplicate synchronization jobs, race conditions, and unnecessary repeated network requests.
+- Ensure that the latest credentials are included in the payload.
+- Handle network failures gracefully without losing local data.
+- Preserve existing login, registration, PIN verification, and password verification behavior.
+
+A temporary network failure must not prevent the user from completing a valid local authentication change.
+
+### 2.5. Restore Authentication Data During Cloud Recovery
+
+During `بازیابی اطلاعات از فضای ابری`, restore the following fields when valid values are present in the cloud response:
+
+- `username`
+- `passwordHash`
+- `pinHash`
+
+Requirements:
+
+1. Parse the response using the existing response-processing architecture.
+2. Validate and map the fields without breaking compatibility with older backups that may not contain them.
+3. Persist restored values through the existing `AuthPreferences` mechanism.
+4. Ensure the restored authentication data is available before the application attempts to authenticate the restored user.
+5. Preserve existing account identification, financial data recovery, and database restoration behavior.
+6. Never overwrite valid local credentials with missing, null, or empty fields from an incomplete cloud response.
+7. Define and preserve the existing account conflict and recovery behavior. Do not silently associate one user's credentials or financial data with another account.
+8. Do not store plaintext credentials or weaken existing authentication security.
+
+### 2.6. Verify the Google Apps Script Backend Contract
+
+Inspect the existing Apps Script integration and verify that the backend actually accepts, persists, and returns these fields.
+
+If the backend currently ignores the new fields, make the smallest compatible backend adjustment necessary.
+
+The backend must:
+
+- Persist the required fields in the intended `Users` sheet columns.
+- Handle registration and synchronization consistently.
+- Return the appropriate fields during recovery.
+- Preserve existing spreadsheet columns, user identifiers, and unrelated synchronization operations.
+- Avoid creating duplicate user records during repeated synchronization.
+- Maintain compatibility with existing clients and previously stored user records.
+
+Do not assume that modifying the Android request alone guarantees that Google Sheets stores the fields.
+
+### 2.7. Security Considerations
+
+The requested synchronization involves authentication secrets, even when represented as hashes.
+
+- Do not transmit plaintext passwords or PINs.
+- Do not expose authentication hashes in application logs, error messages, analytics, or debugging output.
+- Avoid storing unnecessary copies of sensitive values.
+- Verify that the existing hashing and verification flow remains consistent after restoration.
+- Do not invent a new authentication scheme or modify the existing scheme unnecessarily.
+- If the existing design permits offline guessing of low-entropy PINs or passwords from exported hashes, identify the risk and recommend a backward-compatible security improvement rather than silently changing credential formats.
+
+---
+
+## 3. Task Two — Modernize Transaction Management UI
+
+Redesign and enhance the existing transaction-management interface using Kotlin and Jetpack Compose.
+
+### 3.1. General Design Requirements
+
+Implement a polished, modern, dark-themed Persian financial interface with:
+
+- Complete right-to-left (RTL) layout support.
+- Persian labels and appropriate Persian date formatting.
+- Consistent spacing, typography, corner radii, and icon sizing.
+- Dark rounded cards with clear visual hierarchy.
+- Accessible touch targets and responsive layouts.
+- Consistent use of Material icons or existing vector assets.
+- Properly formatted financial amounts and currency values.
+- Smooth, conventional Compose interactions and modal transitions.
+
+Reuse the existing theme, typography, color system, and reusable UI components where practical.
+
+Do not introduce unnecessary dependencies or replace the existing navigation architecture.
+
+---
+
+## 4. Transaction Entry and Editing Screen
+
+Enhance the existing `ثبت تراکنش` and `ویرایش تراکنش` screens.
+
+### 4.1. Transaction Type Selector
+
+At the top of the screen, provide a modern segmented control with three options:
+
+- `خرج` — Expense.
+- `دخل` — Income.
+- `جابجایی` — Transfer.
+
+Requirements:
+
+- Clearly highlight the currently selected transaction type.
+- Update the visible fields and available categories according to the selected type.
+- Preserve existing transaction validation and financial calculation logic.
+- Ensure editing an existing transaction correctly restores its original type and values.
+
+### 4.2. Transfer Source and Destination Cards
+
+When `جابجایی` is selected, display two rounded dark cards side by side:
+
+- `مبدا` — Source account.
+- `مقصد` — Destination account.
+
+Place a left-pointing arrow (`←`) between the cards, respecting the intended RTL layout.
+
+Each card must display:
+
+1. A circular bank logo or vector representation.
+2. A bank logo approximately 36–44 dp in diameter.
+3. The bank or account name beneath the logo.
+4. A clear visual distinction between the source and destination accounts.
+
+Support the existing bank accounts and available logos, including examples such as:
+
+- بانک ملی
+- بانک قرض‌الحسنه مهر ایران
+- بانک صادرات
+- بانک ملت
+
+Use existing bank-logo assets and mappings wherever available. Preserve correct image scaling, aspect ratio, circular clipping, and visual alignment.
+
+If a logo is unavailable, display a clean vector fallback rather than a broken image.
+
+The account-selection interaction must continue using the application's existing account data and validation rules.
+
+Prevent invalid transfers, including transfers between the same account when the existing business rules prohibit them.
+
+### 4.3. All Transactions List
+
+Enhance the `همه‌ی تراکنش‌ها` screen.
+
+#### Date grouping
+
+Group transactions by their Persian calendar date.
+
+Example date header:
+
+`یک‌شنبه، ۲۵ مرداد ۱۴۰۵`
+
+Display the corresponding daily total on the left side of the header.
+
+Requirements:
+
+- Derive grouping and totals from the actual transaction records.
+- Respect the existing transaction ordering and filtering behavior.
+- Use the correct sign and financial semantics for income, expenses, and transfers.
+- Do not count a transfer as income or expense in the daily net total unless the existing application explicitly defines a different reporting rule.
+- Preserve the application's existing balance calculations.
+
+#### Expense and income items
+
+Each transaction row should display:
+
+- Category name on the right.
+- Custom category icon beside the category name.
+- Formatted transaction amount on the left.
+- Appropriate visual differentiation between income and expense.
+
+Use the application's existing amount-formatting and currency utilities.
+
+#### Transfer items
+
+For transfer transactions, display a compact subtitle identifying the source and destination accounts.
+
+Example:
+
+`از [لوگوی بانک مبدا] به حساب [لوگوی بانک مقصد]`
+
+Use small bank logos approximately 18–20 dp in diameter.
+
+Ensure that the subtitle remains readable, compact, correctly aligned in RTL, and consistent with the main transaction row.
+
+Do not change the underlying transaction entity or existing transfer representation unnecessarily.
+
+---
+
+## 5. Dynamic Transaction Categories
+
+Implement a category-selection interface that supports both built-in and user-created categories.
+
+### 5.1. Category Selection Bottom Sheet
+
+When the user selects a category field in `خرج` or `دخل`, open a modern Material 3 `ModalBottomSheet`.
+
+Title:
+
+`دسته‌بندی`
+
+Place an edit pencil icon in the top-left area of the sheet.
+
+Display categories as full-width rounded dark cards containing:
+
+- Category name aligned to the right.
+- Category icon aligned to the left.
+- The category's assigned color.
+- Clear selected-state feedback.
+
+Include relevant built-in examples such as:
+
+**Income categories**
+
+- حقوق
+- پاداش
+- سایر دخل‌ها
+
+**Expense categories**
+
+- نقدی
+- خوردنی
+- بنزین
+- خودرو
+- خونه
+- عوارض آزادراهی
+
+Preserve any other categories already present in the application.
+
+### 5.2. Add Category Button
+
+At the bottom of the category list, provide a prominent rounded action card.
+
+For income:
+
+`+ افزودن دسته‌بندی دخل`
+
+For expenses:
+
+`+ افزودن دسته‌بندی خرج`
+
+Selecting the action opens the category creation screen.
+
+The category-selection sheet must also support the existing category-editing flow through its edit control.
+
+### 5.3. Persistent Custom Categories
+
+Users must be able to create and edit custom categories, and their changes must remain available after application restarts.
+
+Requirements:
+
+- Persist category names, category type, icon identifiers, and color values.
+- Separate income and expense categories.
+- Preserve category IDs so existing transactions continue referencing the correct categories.
+- Prevent accidental duplicate categories where appropriate.
+- Ensure that renaming or editing a category does not corrupt historical transactions.
+- Preserve built-in categories and their existing behavior.
+- Use a non-destructive storage strategy.
+
+Prefer a backward-compatible local persistence mechanism. A JSON-backed SharedPreferences or DataStore implementation is acceptable for a small category collection; Room is also acceptable if it fits the existing architecture and can be introduced without destructive migrations.
+
+Do not reset, recreate, or destructively migrate the existing Room database just to add category metadata.
+
+---
+
+## 6. Category Creation and Editing Screen
+
+Create or enhance the screen titled:
+
+- `افزودن دسته‌بندی دخل`
+- `افزودن دسته‌بندی خرج`
+
+Use the appropriate title based on the category type.
+
+### 6.1. Category Preview
+
+At the top of the screen, display a large rounded preview box.
+
+The preview must contain:
+
+- The currently selected icon.
+- The selected category color applied to the icon or its background.
+- A small floating pencil/edit badge positioned at a corner.
+
+The preview must update immediately when the user changes the icon or color.
+
+### 6.2. Category Name and Save
+
+Below the preview, display:
+
+- A text field labeled `نام`.
+- A prominent `ثبت` button.
+
+Requirements:
+
+- Validate that the category name is not empty.
+- Apply sensible whitespace normalization and duplicate-name validation.
+- Save the category using the selected type, icon, and color.
+- Return the saved category to the selection sheet and refresh the UI immediately.
+- Persist the result so it remains available after restarting the application.
+- When editing an existing category, preload its saved values instead of creating a duplicate.
+- Prevent accidental loss of changes during ordinary recomposition or configuration changes.
+
+---
+
+## 7. Category Icon and Color Selection
+
+Clicking the category preview or its floating pencil badge must open a modern action sheet offering two actions:
+
+1. `تغییر شکلک` — Change Icon.
+2. `تغییر رنگ` — Change Color.
+
+Use the existing Material 3 bottom-sheet conventions.
+
+### 7.1. Change Icon Bottom Sheet
+
+Title:
+
+`شکلک‌ها`
+
+Display a responsive five-column grid of clean Material or vector icons.
+
+Include a diverse selection representing common financial categories, such as:
+
+- Wallet.
+- Gift.
+- Bank.
+- Cash.
+- Heart.
+- Car.
+- Home.
+- Fast food.
+- Gas station.
+- Shopping cart.
+- Coffee.
+- Cutlery.
+- Gamepad.
+- Cigarette.
+- Wi-Fi.
+- Education.
+
+Additional suitable icons may be included.
+
+Implementation requirements:
+
+- Use valid Material or vector icon identifiers supported by the project's existing dependencies.
+- Do not assume that every requested icon exists in the current Material Icons package.
+- Reuse available icons or provide compatible vector assets where necessary.
+- Avoid introducing a large icon dependency solely to obtain a few missing symbols.
+- Highlight the currently selected icon inside a colored circular background.
+- Make the selected icon visually distinct from unselected icons.
+- Apply the selection immediately to the preview.
+- Preserve a stable icon identifier so the category renders correctly after restarting the application or restoring local data.
+
+### 7.2. Change Color Bottom Sheet
+
+Title:
+
+`رنگ دسته‌بندی`
+
+Display a five-column by five-row grid containing 25 curated colors.
+
+The palette should include balanced selections of:
+
+- Greens.
+- Blues.
+- Teals.
+- Pinks.
+- Purples.
+- Oranges.
+- Reds.
+- Yellows.
+- Neutral tones.
+
+Implementation requirements:
+
+- Use consistent circular color swatches.
+- Display a visible selection ring around the active color.
+- Ensure the selection indicator remains visible against both light and dark colors.
+- Update the preview immediately after selecting a color.
+- Store the selected color using a stable representation, such as an ARGB integer or hexadecimal value.
+- Restore the selected color correctly after application restart.
+
+---
+
+## 8. Architecture and Data Integrity Requirements
+
+All UI enhancements must integrate with the existing application rather than replacing its underlying implementation.
+
+### 8.1. Jetpack Compose and State Management
+
+- Follow the existing ViewModel and repository patterns.
+- Keep persistent business logic out of composable functions where the existing architecture separates these responsibilities.
+- Use observable state consistently with the current implementation.
+- Avoid unnecessary recompositions, duplicated state, and stale UI values.
+- Preserve lifecycle-aware state collection.
+- Ensure bottom sheets and category selectors respond correctly to state changes.
+
+### 8.2. Room Database
+
+- Preserve all existing Room entities, DAOs, database configuration, and migrations.
+- Do not modify transaction schemas unless absolutely necessary.
+- Prefer separate local metadata storage when possible.
+- If a schema change is unavoidable, implement a valid, non-destructive migration and update the database version and migration registration correctly.
+- Never use destructive migration fallbacks to make the application compile.
+- Preserve all existing transaction and bank-account records.
+
+### 8.3. Existing Financial Logic
+
+Do not modify the existing financial calculation logic unless a specific requested feature requires a targeted correction.
+
+Preserve:
+
+- Income and expense calculations.
+- Bank account balance updates.
+- Internal transfers.
+- SMS-derived transactions.
+- Duplicate transaction prevention.
+- Transaction editing and deletion.
+- Existing currency and amount formatting.
+- Cloud synchronization and recovery of financial records.
+
+Ensure that selecting a category or changing its icon/color never changes the transaction amount or bank balance.
+
+### 8.4. Authentication and Cloud Sync Compatibility
+
+Verify that the authentication synchronization changes do not interfere with:
+
+- `AuthGatekeeper`.
+- Login and registration.
+- PIN and password verification.
+- Room database initialization.
+- Existing Google Sheets synchronization.
+- Cloud backup and recovery.
+- OTA update functionality.
+
+---
+
+## 9. Implementation Workflow
+
+Follow this sequence to reduce the risk of regressions.
+
+### Phase 1 — Inspect and establish a baseline
+
+1. Inspect the repository structure and current Git working-tree status.
+2. Identify the relevant Kotlin files, Compose screens, ViewModels, repositories, authentication preferences, and Google Apps Script code.
+3. Identify the current transaction and category data models.
+4. Determine how bank logos and icons are currently resolved.
+5. Inspect the existing build configuration, dependency versions, and database migrations.
+6. Run the available baseline build and relevant tests when the environment permits.
+7. Identify any existing errors before introducing changes.
+
+Do not overwrite existing user modifications or reset the working tree.
+
+### Phase 2 — Fix cloud synchronization
+
+1. Trace how authentication data is stored locally.
+2. Trace the registration, synchronization, and recovery payloads.
+3. Correct the payload builder.
+4. Update the backend only if required.
+5. Add synchronization triggers after successful registration and credential changes.
+6. Implement backward-compatible credential restoration.
+7. Validate error handling and account ownership.
+
+### Phase 3 — Implement category persistence
+
+1. Select the smallest compatible storage solution.
+2. Implement built-in and custom category models.
+3. Add stable icon and color metadata.
+4. Implement repository and state-management integration.
+5. Verify persistence and historical transaction integrity.
+
+### Phase 4 — Implement category UI
+
+1. Build the category-selection bottom sheet.
+2. Add the income and expense category actions.
+3. Implement category creation and editing.
+4. Add the icon-selection grid.
+5. Add the 25-color palette.
+6. Integrate persistence and immediate UI updates.
+
+### Phase 5 — Enhance transaction screens
+
+1. Implement the three-way transaction type selector.
+2. Enhance source and destination account cards.
+3. Integrate bank logos and fallbacks.
+4. Group transactions by Persian date.
+5. Add daily totals and category icons.
+6. Add compact transfer subtitles.
+
+### Phase 6 — Validate the complete implementation
+
+Run the relevant Gradle build and tests using the repository's existing configuration.
+
+Verify at minimum:
+
+- Kotlin compilation.
+- Compose compilation.
+- Existing unit tests.
+- Authentication and synchronization tests.
+- Category persistence tests.
+- Transaction rendering and editing.
+- Transfer validation.
+- Cloud recovery compatibility.
+- Database migration safety.
+
+If a build or test fails, determine whether the failure was pre-existing or introduced by the changes. Fix regressions caused by the implementation without masking failures or weakening existing tests.
+
+Do not claim that the application builds or works correctly unless the corresponding checks have actually completed successfully.
+
+---
+
+## 10. Acceptance Criteria
+
+The implementation is complete only when the following requirements have been verified.
+
+### Cloud synchronization
+
+- [ ] Registration payload includes the required profile and authentication fields.
+- [ ] Sync payload includes `username`, `passwordHash`, and `pinHash` in the required JSON locations.
+- [ ] Google Sheets actually persists the required fields.
+- [ ] Successful registration triggers background synchronization.
+- [ ] Password and PIN changes trigger synchronization after local persistence.
+- [ ] Cloud recovery restores valid authentication fields into `AuthPreferences`.
+- [ ] Older backups without these fields remain compatible.
+- [ ] No plaintext passwords or PINs are transmitted or logged.
+- [ ] Existing authentication and financial synchronization remain functional.
+
+### Transaction UI
+
+- [ ] Expense, income, and transfer tabs work correctly.
+- [ ] Transfer cards show source and destination accounts with appropriately sized logos.
+- [ ] Transaction history is grouped by Persian date.
+- [ ] Daily totals use the correct financial semantics.
+- [ ] Income and expense items display category names, icons, and amounts.
+- [ ] Transfer items display compact source/destination bank logos.
+
+### Categories
+
+- [ ] The category-selection bottom sheet displays the correct categories.
+- [ ] Income and expense categories remain separate.
+- [ ] Users can create and edit custom categories.
+- [ ] Custom categories persist after restarting the application.
+- [ ] Icon selection uses a five-column grid.
+- [ ] Color selection uses a 5×5 grid of 25 colors.
+- [ ] Preview updates immediately after icon or color changes.
+- [ ] Existing transactions remain associated with their correct categories.
+- [ ] Category changes do not modify transaction amounts or account balances.
+
+### Regression prevention
+
+- [ ] Existing SMS parsing remains functional.
+- [ ] Existing Room database data is preserved.
+- [ ] Existing authentication and `AuthGatekeeper` behavior remains intact.
+- [ ] Existing OTA updates remain functional.
+- [ ] Existing cloud synchronization and recovery remain functional.
+- [ ] No unrelated files or working features have been removed.
+- [ ] Build and test results are reported accurately.
+
+---
+
+## 11. Final Deliverables
+
+After implementation, provide a concise but technically complete report containing:
+
+1. **Root cause:** Explain the original cloud synchronization issue and its actual cause.
+2. **Files changed:** List each modified or newly created file and its purpose.
+3. **Cloud sync changes:** Explain the payload, backend persistence, background synchronization, and recovery changes.
+4. **UI changes:** Summarize the transaction, bank logo, category, icon, and color-selection enhancements.
+5. **Data safety:** Explain how existing Room data, transactions, and user preferences were preserved.
+6. **Validation results:** Report the actual build and test results, including any failures or limitations.
+7. **Remaining work:** Clearly identify any incomplete functionality or external backend changes still required.
+
+**Final priority:** Preserve the existing application, fix the specified synchronization defects, implement the requested UI enhancements, and verify the result without destructive refactoring or data loss.

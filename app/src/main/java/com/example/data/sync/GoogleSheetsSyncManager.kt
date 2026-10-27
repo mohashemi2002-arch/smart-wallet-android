@@ -25,7 +25,10 @@ data class GoogleSheetsRestoreResult(
     val success: Boolean,
     val message: String,
     val restoredCardsCount: Int = 0,
-    val restoredTransactionsCount: Int = 0
+    val restoredTransactionsCount: Int = 0,
+    val username: String? = null,
+    val passwordHash: String? = null,
+    val pinHash: String? = null
 )
 
 class GoogleSheetsSyncManager(
@@ -71,19 +74,40 @@ class GoogleSheetsSyncManager(
     suspend fun syncData(
         firstName: String,
         lastName: String,
-        phoneNumber: String
+        phoneNumber: String,
+        username: String? = null,
+        passwordHash: String? = null,
+        pinHash: String? = null
     ): Result<GoogleSheetsSyncResult> = withContext(Dispatchers.IO) {
         runCatching {
             val cleanPhone = normalizePhone(phoneNumber)
+            val authPrefs = context.getSharedPreferences("smart_wallet_auth_prefs", Context.MODE_PRIVATE)
+            val finalUsername = (username?.trim()?.takeIf { it.isNotEmpty() }
+                ?: authPrefs.getString("username", "") ?: "").trim()
+            val finalPasswordHash = (passwordHash?.takeIf { it.isNotEmpty() }
+                ?: authPrefs.getString("password_hash", "") ?: "")
+            val finalPinHash = (pinHash?.takeIf { it.isNotEmpty() }
+                ?: authPrefs.getString("pin_hash", "") ?: "")
+
             val accounts = database.bankAccountDao().getAllBankAccountsList()
             val transactions = database.transactionDao().getAllTransactionsSync()
 
             val rootJson = JSONObject().apply {
                 put("action", "sync")
+                put("phoneNumber", cleanPhone)
+                put("firstName", firstName.trim())
+                put("lastName", lastName.trim())
+                put("username", finalUsername)
+                put("passwordHash", finalPasswordHash)
+                put("pinHash", finalPinHash)
+
                 put("user", JSONObject().apply {
                     put("phoneNumber", cleanPhone)
                     put("firstName", firstName.trim())
                     put("lastName", lastName.trim())
+                    put("username", finalUsername)
+                    put("passwordHash", finalPasswordHash)
+                    put("pinHash", finalPinHash)
                 })
 
                 val cardsArray = JSONArray()
@@ -193,6 +217,14 @@ class GoogleSheetsSyncManager(
             }
 
             val json = JSONObject(responseBody)
+            val userObj = json.optJSONObject("user")
+            val restoredUsername = userObj?.optString("username")?.takeIf { it.isNotBlank() }
+                ?: json.optString("username").takeIf { it.isNotBlank() }
+            val restoredPasswordHash = userObj?.optString("passwordHash")?.takeIf { it.isNotBlank() }
+                ?: json.optString("passwordHash").takeIf { it.isNotBlank() }
+            val restoredPinHash = userObj?.optString("pinHash")?.takeIf { it.isNotBlank() }
+                ?: json.optString("pinHash").takeIf { it.isNotBlank() }
+
             val cardsArray = json.optJSONArray("cards") ?: JSONArray()
             val txArray = json.optJSONArray("transactions") ?: JSONArray()
 
@@ -298,7 +330,10 @@ class GoogleSheetsSyncManager(
                 success = true,
                 message = "اطلاعات با موفقیت از فضای ابری بازیابی شد!\nتعداد $restoredCards کارت و $restoredTxs تراکنش بازگردانی شدند.",
                 restoredCardsCount = restoredCards,
-                restoredTransactionsCount = restoredTxs
+                restoredTransactionsCount = restoredTxs,
+                username = restoredUsername,
+                passwordHash = restoredPasswordHash,
+                pinHash = restoredPinHash
             )
         }
     }

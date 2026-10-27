@@ -133,16 +133,59 @@ class AuthManager(private val context: Context) {
                 lastName = lastName.trim(),
                 phoneNumber = phoneNumber.trim()
             )
-            // Background sync with cloud storage
-            try {
-                syncManager.syncData(firstName.trim(), lastName.trim(), phoneNumber.trim())
-            } catch (e: Exception) {
-                Log.w(TAG, "Initial cloud sync failed: ${e.message}")
-            }
+            triggerBackgroundSync()
         }
 
         _isAuthenticated.value = true
         return Result.success(Unit)
+    }
+
+    /**
+     * Changes user password, persists it, and syncs to cloud storage.
+     */
+    fun changePassword(newPassword: String): Result<Unit> {
+        val trimmed = newPassword.trim()
+        if (trimmed.length < 4) {
+            return Result.failure(IllegalArgumentException("رمز عبور باید حداقل ۴ کاراکتر باشد"))
+        }
+        val passHash = hashSha256(trimmed)
+        prefs.edit().putString(KEY_PASSWORD_HASH, passHash).apply()
+        triggerBackgroundSync()
+        return Result.success(Unit)
+    }
+
+    /**
+     * Changes user 4-digit PIN, persists it, and syncs to cloud storage.
+     */
+    fun changePin(newPin: String): Result<Unit> {
+        val cleanPin = newPin.trim()
+        if (cleanPin.length != 4 || !cleanPin.all { it.isDigit() }) {
+            return Result.failure(IllegalArgumentException("پین کد امنیتی باید دقیقاً ۴ رقم باشد"))
+        }
+        val pinHash = hashSha256(cleanPin)
+        prefs.edit().putString(KEY_PIN_HASH, pinHash).apply()
+        triggerBackgroundSync()
+        return Result.success(Unit)
+    }
+
+    /**
+     * Triggers background cloud sync with up-to-date credentials.
+     */
+    fun triggerBackgroundSync() {
+        scope.launch {
+            try {
+                syncManager.syncData(
+                    firstName = savedFirstName,
+                    lastName = savedLastName,
+                    phoneNumber = savedPhoneNumber,
+                    username = savedUsername,
+                    passwordHash = prefs.getString(KEY_PASSWORD_HASH, ""),
+                    pinHash = prefs.getString(KEY_PIN_HASH, "")
+                )
+            } catch (e: Exception) {
+                Log.w(TAG, "Background cloud sync failed: ${e.message}")
+            }
+        }
     }
 
     /**
@@ -251,15 +294,28 @@ class AuthManager(private val context: Context) {
     ): Result<String> {
         val result = syncManager.restoreData(firstName, lastName, phoneNumber)
         return result.mapCatching { restoreSummary ->
-            // Update local credentials
-            val passHash = hashSha256(newPassword.trim())
-            val pinHash = hashSha256(newPin.trim())
+            val finalUsername = when {
+                newUsername.isNotBlank() -> newUsername.trim()
+                !restoreSummary.username.isNullOrBlank() -> restoreSummary.username
+                savedUsername.isNotBlank() -> savedUsername
+                else -> firstName.trim()
+            }
+            val finalPasswordHash = when {
+                newPassword.isNotBlank() -> hashSha256(newPassword.trim())
+                !restoreSummary.passwordHash.isNullOrBlank() -> restoreSummary.passwordHash
+                else -> prefs.getString(KEY_PASSWORD_HASH, "") ?: ""
+            }
+            val finalPinHash = when {
+                newPin.isNotBlank() -> hashSha256(newPin.trim())
+                !restoreSummary.pinHash.isNullOrBlank() -> restoreSummary.pinHash
+                else -> prefs.getString(KEY_PIN_HASH, "") ?: ""
+            }
 
             prefs.edit()
                 .putBoolean(KEY_HAS_ACCOUNT, true)
-                .putString(KEY_USERNAME, newUsername.trim().ifEmpty { firstName.trim() })
-                .putString(KEY_PASSWORD_HASH, passHash)
-                .putString(KEY_PIN_HASH, pinHash)
+                .putString(KEY_USERNAME, finalUsername)
+                .putString(KEY_PASSWORD_HASH, finalPasswordHash)
+                .putString(KEY_PIN_HASH, finalPinHash)
                 .putString(KEY_FIRST_NAME, firstName.trim())
                 .putString(KEY_LAST_NAME, lastName.trim())
                 .putString(KEY_PHONE_NUMBER, phoneNumber.trim())
