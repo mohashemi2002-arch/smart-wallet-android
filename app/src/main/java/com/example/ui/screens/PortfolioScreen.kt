@@ -6,6 +6,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -16,6 +17,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.data.model.Asset
+import com.example.ui.theme.AppColors
 import com.example.ui.viewmodel.FinanceViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -26,8 +28,11 @@ fun PortfolioScreen(
     onNavigateToMarket: () -> Unit = {}
 ) {
     val assets by viewModel.assets.collectAsState()
-    val totalAssetValue by viewModel.totalAssetValue.collectAsState()
-    val assetCount by viewModel.assetCount.collectAsState()
+    val totalAssetValue by viewModel.totalAssetsValueToman.collectAsState()
+    val averageReturnPercent = assets
+        .takeIf { it.isNotEmpty() }
+        ?.map { it.unrealizedPnlPercent }
+        ?.average() ?: 0.0
 
     LazyColumn(
         modifier = Modifier
@@ -83,9 +88,9 @@ fun PortfolioScreen(
                     modifier = Modifier.weight(1f)
                 )
                 SummaryAssetCard(
-                    title = "تغییرات قیمت",
-                    value = "+۲.۵٪",
-                    tint = MaterialTheme.colorScheme.success,
+                    title = "میانگین بازدهی",
+                    value = "${if (averageReturnPercent > 0) "+" else ""}${String.format(java.util.Locale.US, "%.2f", averageReturnPercent)}%",
+                    tint = if (averageReturnPercent >= 0) AppColors.Success else MaterialTheme.colorScheme.error,
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -206,11 +211,11 @@ private fun AssetRowCard(asset: Asset) {
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
-                    text = "تعداد: ${asset.quantity}",
+                    text = "تعداد: ${asset.totalQuantity}",
                     style = MaterialTheme.typography.bodyMedium
                 )
                 Text(
-                    text = "قیمت واحد: ${formatMoney(asset.pricePerUnit)}",
+                    text = "قیمت واحد: ${formatMoney(asset.currentUnitPriceToman)}",
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
@@ -220,14 +225,14 @@ private fun AssetRowCard(asset: Asset) {
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = "قیمت کل: ${formatMoney(asset.totalValue)}",
+                    text = "قیمت کل: ${formatMoney(asset.totalValueToman)}",
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "${asset.priceChangePercent}%",
+                    text = "${String.format(java.util.Locale.US, "%.2f", asset.unrealizedPnlPercent)}%",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = if (asset.priceChangePercent >= 0) Color.Green else Color.Red
+                    color = if (asset.unrealizedPnlPercent >= 0) AppColors.Success else MaterialTheme.colorScheme.error
                 )
             }
         }
@@ -235,14 +240,7 @@ private fun AssetRowCard(asset: Asset) {
 }
 
 private fun formatMoney(value: Long): String {
-    return if (value < 1000) {
-        value.toString()
-    } else {
-        val formatted = value.toString().reversed()
-        val formattedValue = formattedValue.reversed().chunked(3)
-        val formattedValueArray = formattedValue.joinToString(",")
-        return formattedValueArray
-    }
+    return java.text.NumberFormat.getIntegerInstance(java.util.Locale.US).format(value)
 }
 
 private fun Long.valueOrZero(): Long = this

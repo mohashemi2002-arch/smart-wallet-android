@@ -16,7 +16,11 @@ enum class AppTheme {
 }
 
 data class UserPreferences(
-    val appTheme: AppTheme = AppTheme.SYSTEM
+    val appTheme: AppTheme = AppTheme.SYSTEM,
+    val biometricEnabled: Boolean = true,
+    val userFirstName: String = "",
+    val userLastName: String = "",
+    val userPhoneNumber: String = ""
 )
 
 class UserPreferencesRepository(private val context: Context) {
@@ -29,7 +33,11 @@ class UserPreferencesRepository(private val context: Context) {
             }.getOrDefault(AppTheme.SYSTEM)
 
             UserPreferences(
-                appTheme = theme
+                appTheme = theme,
+                biometricEnabled = prefs[PreferencesKeys.BIOMETRIC_ENABLED] ?: true,
+                userFirstName = prefs[PreferencesKeys.USER_FIRST_NAME] ?: "",
+                userLastName = prefs[PreferencesKeys.USER_LAST_NAME] ?: "",
+                userPhoneNumber = prefs[PreferencesKeys.USER_PHONE_NUMBER] ?: ""
             )
         }
 
@@ -39,7 +47,29 @@ class UserPreferencesRepository(private val context: Context) {
         }
     }
 
+    suspend fun updateBiometricEnabled(enabled: Boolean) {
+        dataStore.edit { pref ->
+            pref[PreferencesKeys.BIOMETRIC_ENABLED] = enabled
+        }
+    }
+
+    suspend fun updateUserProfile(
+        firstName: String,
+        lastName: String,
+        phoneNumber: String
+    ) {
+        dataStore.edit { pref ->
+            pref[PreferencesKeys.USER_FIRST_NAME] = firstName.trim()
+            pref[PreferencesKeys.USER_LAST_NAME] = lastName.trim()
+            pref[PreferencesKeys.USER_PHONE_NUMBER] = phoneNumber.trim()
+        }
+    }
+
     private object PreferencesKeys {
         val APP_THEME = stringPreferencesKey("app_theme")
+        val BIOMETRIC_ENABLED = booleanPreferencesKey("biometric_enabled")
+        val USER_FIRST_NAME = stringPreferencesKey("user_first_name")
+        val USER_LAST_NAME = stringPreferencesKey("user_last_name")
+        val USER_PHONE_NUMBER = stringPreferencesKey("user_phone_number")
     }
 }

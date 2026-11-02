@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.data.AppTheme
 import com.example.data.UserPreferences
 import com.example.data.UserPreferencesRepository
+import com.example.domain.util.AuthManager
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -25,5 +26,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             repository.updateAppTheme(theme)
         }
+    }
+
+    fun updateBiometricEnabled(enabled: Boolean) {
+        // Keep the authentication layer's SharedPreferences and DataStore in sync.
+        AuthManager(getApplication()).isBiometricEnabled = enabled
     }
 }

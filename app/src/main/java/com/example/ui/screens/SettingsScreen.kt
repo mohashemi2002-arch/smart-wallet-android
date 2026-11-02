@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -120,7 +121,7 @@ fun SettingsScreen(
                         )
                         Switch(
                             checked = preferences.biometricEnabled,
-                            onCheckedChange = { settingsViewModel.updateBiometricEnabled(true) }
+                            onCheckedChange = { enabled -> settingsViewModel.updateBiometricEnabled(enabled) }
                         )
                     }
                 }
@@ -169,9 +170,8 @@ fun SettingsScreen(
 
         item {
             Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .shape(RoundedCornerShape(20.dp)),
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surface
                 ),

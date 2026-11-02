@@ -15,7 +15,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.data.model.Account
+import com.example.data.model.BankAccount
 import com.example.data.model.Transaction
 import com.example.ui.viewmodel.FinanceViewModel
 
@@ -30,12 +30,11 @@ fun DashboardScreen(
     onNavigateToMarket: () -> Unit = {},
     onNavigateToRegistration: () -> Unit = {}
 ) {
-    val accounts by viewModel.accounts.collectAsState()
+    val accounts by viewModel.bankAccounts.collectAsState()
     val transactions by viewModel.transactions.collectAsState()
-    val categories by viewModel.categories.collectAsState()
-    val totalBalance by viewModel.totalBalance.collectAsState()
-    val monthlyIncome by viewModel.monthlyIncome.collectAsState()
-    val monthlyExpense by viewModel.monthlyExpense.collectAsState()
+    val totalBalance by viewModel.totalNetWorthToman.collectAsState()
+    val monthlyIncome by viewModel.totalIncomeToman.collectAsState()
+    val monthlyExpense by viewModel.totalExpenseToman.collectAsState()
 
     LazyColumn(
         modifier = Modifier
@@ -218,7 +217,7 @@ private fun SummaryCard(
 }
 
 @Composable
-private fun BankAccountsSection(accounts: List<Account>) {
+private fun BankAccountsSection(accounts: List<BankAccount>) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
@@ -259,12 +258,12 @@ private fun BankAccountsSection(accounts: List<Account>) {
                             verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             Text(
-                                text = account.name,
+                                text = account.accountName,
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = formatMoney(account.balance),
+                                text = formatMoney(account.balanceToman),
                                 style = MaterialTheme.typography.titleMedium,
                                 color = MaterialTheme.colorScheme.primary
                             )
@@ -420,7 +419,7 @@ private fun RecentTransactionsSection(transactions: List<Transaction>) {
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        text = transaction.title ?: transaction.categoryName,
+                        text = transaction.merchantName.ifBlank { transaction.categoryName },
                         style = MaterialTheme.typography.bodyMedium
                     )
                     Text(
