@@ -22,3 +22,4 @@ smart-wallet-release.base64.txt
 !app/keystore/ota_release.jks
 !keystore/ota_release.jks
 smart-wallet-release.jks
+*.txt
