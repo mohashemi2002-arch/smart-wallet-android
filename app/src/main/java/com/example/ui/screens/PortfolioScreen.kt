@@ -1,197 +1,248 @@
 package com.example.ui.screens
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.data.model.Asset
-import com.example.data.model.AssetType
 import com.example.ui.viewmodel.FinanceViewModel
-import com.example.ui.viewmodel.PortfolioViewModel
-import com.example.ui.components.PersianFormatters
-import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PortfolioScreen(
-    viewModel: FinanceViewModel, // kept for backward compatibility signature if needed, but not heavily used here
-    portfolioViewModel: PortfolioViewModel = viewModel(),
-    onBack: () -> Unit,
-    onNavigateToMarket: () -> Unit
+    viewModel: FinanceViewModel = viewModel(),
+    onBack: () -> Unit = {},
+    onNavigateToMarket: () -> Unit = {}
 ) {
-    val totalPortfolioValue by portfolioViewModel.totalPortfolioValue.collectAsState()
-    val assetMetrics by portfolioViewModel.assetMetrics.collectAsState()
-    var selectedAssetForUpdate by remember { mutableStateOf<Asset?>(null) }
-    var showAddDialog by remember { mutableStateOf(false) }
+    val assets by viewModel.assets.collectAsState()
+    val totalAssetValue by viewModel.totalAssetValue.collectAsState()
+    val assetCount by viewModel.assetCount.collectAsState()
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("کیف پول دارایی", fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "بازگشت")
-                    }
-                },
-                actions = {
-                    IconButton(onClick = onNavigateToMarket) {
-                        Icon(Icons.Default.Refresh, contentDescription = "بروزرسانی نرخ‌ها")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            )
-        },
-        floatingActionButton = {
-            FloatingActionButton(onClick = { showAddDialog = true }) {
-                Icon(Icons.Default.Add, contentDescription = "ثبت دارایی")
-            }
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .padding(horizontal = 16.dp),
+        contentPadding = PaddingValues(top = 16.dp, bottom = 96.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+
+        item {
+            TopBarPortfolio(onBack = onBack)
         }
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
-            // Top Card: Total Net Worth
+
+        item {
             Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primary
+                )
             ) {
                 Column(
-                    modifier = Modifier.padding(20.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(24.dp),
+                    verticalArrangement = Arrangement.spacedBy(18.dp)
                 ) {
                     Text(
-                        text = "ارزش کل دارایی‌ها",
-                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
-                        style = MaterialTheme.typography.titleMedium
+                        text = "ارزش کل دارایی",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.White.copy(alpha = 0.8f)
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = PersianFormatters.formatMoney(totalPortfolioValue),
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        style = MaterialTheme.typography.headlineLarge,
-                        fontWeight = FontWeight.Bold
+                        text = "${formatMoney(totalAssetValue.valueOrZero())} تومان",
+                        style = MaterialTheme.typography.displayMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
                     )
                 }
             }
+        }
 
-            Text(
-                text = "سبد دارایی شما",
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
-
-            LazyColumn(
-                modifier = Modifier.fillMaxWidth().weight(1f),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(assetMetrics) { metric ->
-                    Card(
-                        modifier = Modifier.fillMaxWidth().clickable { selectedAssetForUpdate = metric.asset },
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(16.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column {
-                                Text(metric.asset.name, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = "${PersianFormatters.toPersianDigits(metric.asset.totalQuantity.toString())} ${metric.asset.unit}",
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                                    style = MaterialTheme.typography.bodyMedium
-                                )
-                            }
-                            Column(horizontalAlignment = Alignment.End) {
-                                Text(
-                                    text = PersianFormatters.formatMoney(metric.currentValueToman),
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                val pnlColor = if (metric.pnlToman >= 0) Color(0xFF4CAF50) else Color(0xFFF44336)
-                                val pnlSign = if (metric.pnlToman >= 0) "+" else ""
-                                Text(
-                                    text = "$pnlSign${PersianFormatters.toPersianDigits(String.format(Locale.US, "%.1f", metric.pnlPercentage))} %",
-                                    color = pnlColor,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-                    }
-                }
-                item { Spacer(modifier = Modifier.height(96.dp)) }
+                SummaryAssetCard(
+                    title = "تعداد دارایی‌ها",
+                    value = "${assets.size}",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.weight(1f)
+                )
+                SummaryAssetCard(
+                    title = "تغییرات قیمت",
+                    value = "+۲.۵٪",
+                    tint = MaterialTheme.colorScheme.success,
+                    modifier = Modifier.weight(1f)
+                )
             }
         }
 
-        if (selectedAssetForUpdate != null) {
-            var newPriceText by remember { mutableStateOf("") }
-            AlertDialog(
-                onDismissRequest = { selectedAssetForUpdate = null },
-                title = { Text("بروزرسانی قیمت ${selectedAssetForUpdate!!.name}") },
-                text = {
-                    OutlinedTextField(
-                        value = newPriceText,
-                        onValueChange = { newPriceText = it.filter { c -> c.isDigit() } },
-                        label = { Text("قیمت روز جدید (تومان)") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                },
-                confirmButton = {
-                    Button(onClick = {
-                        val newPrice = newPriceText.toLongOrNull() ?: 0L
-                        if (newPrice > 0) {
-                            portfolioViewModel.updateAssetPrice(selectedAssetForUpdate!!, newPrice)
-                        }
-                        selectedAssetForUpdate = null
-                    }) {
-                        Text("ثبت قیمت")
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { selectedAssetForUpdate = null }) {
-                        Text("انصراف")
-                    }
-                }
-            )
+        item {
+            AssetListSection(assets = assets, onNavigateToMarket = onNavigateToMarket)
         }
+    }
+}
 
-        if (showAddDialog) {
-            com.example.ui.components.AddAssetBottomSheet(
-                onDismiss = { showAddDialog = false },
-                onConfirm = { name, type, quantity, priceToman, unit ->
-                    portfolioViewModel.addAsset(name, type, quantity, priceToman, unit)
-                    showAddDialog = false
-                }
+@Composable
+private fun TopBarPortfolio(onBack: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(onClick = onBack) {
+            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "بازگشت")
+        }
+        Text(
+            text = "دارایی‌ها",
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold
+        )
+    }
+}
+
+@Composable
+private fun SummaryAssetCard(
+    title: String,
+    value: String,
+    tint: Color,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = value,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = tint
             )
         }
     }
 }
+
+@Composable
+private fun AssetListSection(
+    assets: List<Asset>,
+    onNavigateToMarket: () -> Unit
+) {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(max = 300.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        items(assets) { asset ->
+            AssetRowCard(asset = asset)
+        }
+    }
+}
+
+@Composable
+private fun AssetRowCard(asset: Asset) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = asset.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                IconButton(onClick = {}) {
+                    Icon(Icons.Default.Edit, contentDescription = "ویرایش")
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = "تعداد: ${asset.quantity}",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Text(
+                    text = "قیمت واحد: ${formatMoney(asset.pricePerUnit)}",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "قیمت کل: ${formatMoney(asset.totalValue)}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "${asset.priceChangePercent}%",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (asset.priceChangePercent >= 0) Color.Green else Color.Red
+                )
+            }
+        }
+    }
+}
+
+private fun formatMoney(value: Long): String {
+    return if (value < 1000) {
+        value.toString()
+    } else {
+        val formatted = value.toString().reversed()
+        val formattedValue = formattedValue.reversed().chunked(3)
+        val formattedValueArray = formattedValue.joinToString(",")
+        return formattedValueArray
+    }
+}
+
+private fun Long.valueOrZero(): Long = this

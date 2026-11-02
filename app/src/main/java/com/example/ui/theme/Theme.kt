@@ -1,40 +1,57 @@
 package com.example.ui.theme
 
-import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.material3.*
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 
-private val BentoColorScheme = darkColorScheme(
-    primary = BentoPrimary,
-    onPrimary = BentoOnPrimary,
-    primaryContainer = BentoPrimaryContainer,
-    onPrimaryContainer = BentoOnPrimaryContainer,
-    secondary = BentoSecondary,
-    onSecondary = BentoOnSecondary,
-    secondaryContainer = BentoSecondaryContainer,
-    onSecondaryContainer = BentoOnSecondaryContainer,
-    background = BentoBackground,
-    surface = BentoSurface,
-    surfaceVariant = BentoSurfaceVariant,
-    onBackground = BentoTextPrimary,
-    onSurface = BentoTextPrimary,
-    onSurfaceVariant = BentoTextSecondary,
-    outline = BentoBorder
+private val SmartWalletLightColors = lightColorScheme(
+    primary = AppColors.Primary,
+    onPrimary = Color.White,
+    primaryContainer = AppColors.LightPrimarySoft,
+    onPrimaryContainer = AppColors.LightTextPrimary,
+    secondary = AppColors.Secondary,
+    onSecondary = Color.White,
+    background = AppColors.LightBackground,
+    onBackground = AppColors.LightTextPrimary,
+    surface = AppColors.LightSurface,
+    onSurface = AppColors.LightTextPrimary,
+    surfaceVariant = AppColors.LightSurfaceVariant,
+    onSurfaceVariant = AppColors.LightTextSecondary,
+    outline = AppColors.LightBorder,
+    error = AppColors.Error,
+    onError = Color.White
+)
+
+private val SmartWalletDarkColors = darkColorScheme(
+    primary = AppColors.Primary,
+    onPrimary = Color.White,
+    primaryContainer = AppColors.DarkPrimarySoft,
+    onPrimaryContainer = AppColors.DarkTextPrimary,
+    secondary = AppColors.Secondary,
+    onSecondary = Color.White,
+    background = AppColors.DarkBackground,
+    onBackground = AppColors.DarkTextPrimary,
+    surface = AppColors.DarkSurface,
+    onSurface = AppColors.DarkTextPrimary,
+    surfaceVariant = AppColors.DarkSurfaceVariant,
+    onSurfaceVariant = AppColors.DarkTextSecondary,
+    outline = AppColors.DarkBorder,
+    error = AppColors.Error,
+    onError = Color.White
 )
 
 @Composable
 fun SmartWalletTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = false,
-    content: @Composable () -> Unit,
+    content: @Composable () -> Unit
 ) {
+    val colors = if (darkTheme) SmartWalletDarkColors else SmartWalletLightColors
     MaterialTheme(
-        colorScheme = BentoColorScheme,
-        typography = Typography,
+        colorScheme = colors,
+        typography = AppTypography,
         content = content
     )
 }
-
