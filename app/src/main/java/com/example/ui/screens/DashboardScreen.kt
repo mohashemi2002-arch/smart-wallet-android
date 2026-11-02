@@ -1,6 +1,7 @@
 package com.example.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -125,13 +126,12 @@ fun DashboardScreen(
                 onNavigateToSms = onNavigateToSms,
                 onNavigateToBudget = onNavigateToBudget,
                 onNavigateToPortfolio = onNavigateToPortfolio,
-                onNavigateToMarket = onNavigateToMarket,
                 onNavigateToDebts = onNavigateToDebts
             )
         }
 
         item {
-            MarketOverviewSection()
+            MarketOverviewSection(onClick = onNavigateToMarket)
         }
 
         item {
@@ -280,7 +280,6 @@ private fun QuickActionsSection(
     onNavigateToSms: () -> Unit,
     onNavigateToBudget: () -> Unit,
     onNavigateToPortfolio: () -> Unit,
-    onNavigateToMarket: () -> Unit,
     onNavigateToDebts: () -> Unit
 ) {
     Row(
@@ -288,14 +287,15 @@ private fun QuickActionsSection(
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         listOf(
-            "پیامک بانکی" to Icons.Default.Message,
-            "بودجه" to Icons.Default.Savings,
-            "دارایی" to Icons.Default.AccountBalanceWallet,
-            "سررسید" to Icons.Default.CalendarMonth
-        ).forEach { (label, icon) ->
+            Triple("پیامک بانکی", Icons.Default.Message, onNavigateToSms),
+            Triple("بودجه", Icons.Default.Savings, onNavigateToBudget),
+            Triple("دارایی", Icons.Default.AccountBalanceWallet, onNavigateToPortfolio),
+            Triple("سررسید", Icons.Default.CalendarMonth, onNavigateToDebts)
+        ).forEach { (label, icon, onClick) ->
             Card(
                 modifier = Modifier
-                    .weight(1f),
+                    .weight(1f)
+                    .clickable(onClick = onClick),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surfaceVariant
@@ -324,9 +324,11 @@ private fun QuickActionsSection(
 }
 
 @Composable
-private fun MarketOverviewSection() {
+private fun MarketOverviewSection(onClick: () -> Unit) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface

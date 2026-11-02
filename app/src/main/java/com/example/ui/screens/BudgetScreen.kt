@@ -6,6 +6,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -247,12 +248,15 @@ private fun CategoryRowCard(
 }
 
 private fun formatMoney(value: Long): String {
-    return if (value < 1000) {
-        value.toString()
-    } else {
-        val formatted = value.toString().reversed()
-        val formattedValue = formattedValue.reversed().chunked(3)
-        val formattedValueArray = formattedValue.joinToString(",")
-        return formattedValueArray
-    }
+    val rawValue = value.toString()
+    val sign = if (rawValue.startsWith("-")) "-" else ""
+    val digits = rawValue.removePrefix("-")
+
+    val groupedDigits = digits
+        .reversed()
+        .chunked(3)
+        .joinToString(",")
+        .reversed()
+
+    return sign + groupedDigits
 }
