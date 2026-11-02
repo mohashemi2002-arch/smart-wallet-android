@@ -11,6 +11,7 @@ val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "se
 
 enum class AutoLockTimeout { IMMEDIATE, MIN_1, MIN_5 }
 enum class CurrencyMode { TOMAN, RIAL }
+enum class AppTheme { LIGHT, DARK, SYSTEM }
 
 data class UserPreferences(
     val currencyMode: CurrencyMode = CurrencyMode.TOMAN,
@@ -19,7 +20,8 @@ data class UserPreferences(
     val privacyModeEnabled: Boolean = false,
     val userFirstName: String = "",
     val userLastName: String = "",
-    val userPhoneNumber: String = ""
+    val userPhoneNumber: String = "",
+    val appTheme: AppTheme = AppTheme.SYSTEM
 )
 
 class UserPreferencesRepository(private val context: Context) {
@@ -39,6 +41,9 @@ class UserPreferencesRepository(private val context: Context) {
             val firstName = preferences[PreferencesKeys.USER_FIRST_NAME] ?: ""
             val lastName = preferences[PreferencesKeys.USER_LAST_NAME] ?: ""
             val phone = preferences[PreferencesKeys.USER_PHONE] ?: ""
+            val appTheme = runCatching {
+                AppTheme.valueOf(preferences[PreferencesKeys.APP_THEME] ?: AppTheme.SYSTEM.name)
+            }.getOrDefault(AppTheme.SYSTEM)
 
             UserPreferences(
                 currencyMode = currencyMode,
@@ -47,7 +52,8 @@ class UserPreferencesRepository(private val context: Context) {
                 privacyModeEnabled = privacyModeEnabled,
                 userFirstName = firstName,
                 userLastName = lastName,
-                userPhoneNumber = phone
+                userPhoneNumber = phone,
+                appTheme = appTheme
             )
         }
 
@@ -83,6 +89,12 @@ class UserPreferencesRepository(private val context: Context) {
         }
     }
 
+    suspend fun updateAppTheme(theme: AppTheme) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.APP_THEME] = theme.name
+        }
+    }
+
     private object PreferencesKeys {
         val CURRENCY_MODE = stringPreferencesKey("currency_mode")
         val BIOMETRIC_ENABLED = booleanPreferencesKey("biometric_enabled")
@@ -91,5 +103,6 @@ class UserPreferencesRepository(private val context: Context) {
         val USER_FIRST_NAME = stringPreferencesKey("user_first_name")
         val USER_LAST_NAME = stringPreferencesKey("user_last_name")
         val USER_PHONE = stringPreferencesKey("user_phone")
+        val APP_THEME = stringPreferencesKey("app_theme")
     }
 }
