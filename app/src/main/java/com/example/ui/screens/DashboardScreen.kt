@@ -19,6 +19,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.data.model.BankAccount
+import com.example.data.model.MarketRate
 import com.example.data.model.Transaction
 import com.example.data.model.TransactionType
 import com.example.ui.components.AddBankAccountDialog
@@ -46,6 +47,7 @@ fun DashboardScreen(
     val monthlyIncome by viewModel.totalIncomeToman.collectAsState()
     val monthlyExpense by viewModel.totalExpenseToman.collectAsState()
     val currencyUnit by viewModel.currencyUnit.collectAsState()
+    val marketRates by viewModel.marketRates.collectAsState()
 
     var accountToEdit by remember { mutableStateOf<BankAccount?>(null) }
     var showAddAccountDialog by remember { mutableStateOf(false) }
@@ -188,7 +190,11 @@ fun DashboardScreen(
         }
 
         item {
-            MarketOverviewSection(onClick = onNavigateToMarket)
+            MarketOverviewSection(
+                rates = marketRates,
+                currencyUnit = currencyUnit,
+                onClick = onNavigateToMarket
+            )
         }
 
         item {
@@ -414,26 +420,22 @@ private fun BankAccountsSection(
                                         )
                                     }
 
-                                    val cardDigits = account.cardNumber.filter { it.isDigit() }
-                                    val displayCardNum = if (cardDigits.length >= 4) {
-                                        "**** ${cardDigits.takeLast(4)}"
-                                    } else if (account.cardNumber.isNotBlank()) {
-                                        account.cardNumber
+                                    val accNum = account.accountNumber?.trim()
+                                    val displayAccText = if (!accNum.isNullOrBlank()) {
+                                        "شماره حساب: ${PersianCurrencyFormatter.toPersianDigits(accNum)}"
                                     } else {
-                                        account.accountNumber?.let { "حساب: $it" } ?: ""
+                                        "شماره حساب: ثبت نشده"
                                     }
-                                    if (displayCardNum.isNotBlank()) {
-                                        Text(
-                                            text = PersianCurrencyFormatter.toPersianDigits(displayCardNum),
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
+                                    Text(
+                                        text = displayAccText,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
 
                                     Spacer(modifier = Modifier.height(4.dp))
 
                                     Text(
-                                        text = "مانده کارت:",
+                                        text = "مانده حساب:",
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -513,7 +515,11 @@ private fun QuickActionsSection(
 }
 
 @Composable
-private fun MarketOverviewSection(onClick: () -> Unit) {
+private fun MarketOverviewSection(
+    rates: List<MarketRate>,
+    currencyUnit: CurrencyUnit,
+    onClick: () -> Unit
+) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -533,44 +539,112 @@ private fun MarketOverviewSection(onClick: () -> Unit) {
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(
-                text = "نرخ‌های بازار",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
-
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                listOf(
-                    "دلار" to "۱۸,۲۰۰",
-                    "طلا" to "۱۱,۸۰۰",
-                    "سکه" to "۳,۵۰۰"
-                ).forEach { (title, value) ->
-                    Card(
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant
-                        )
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        text = "نرخ‌های بازار",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "(قیمت لحظه‌ای)",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color(0xFF4CAF50),
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    Text(
+                        text = "مشاهده بازار آنلاین",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Icon(
+                        imageVector = Icons.Default.ChevronLeft,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+
+            val displayRates = if (rates.isNotEmpty()) {
+                // Prioritize key items: US Dollar, Gold 18k, Coin, or first 3
+                val usd = rates.firstOrNull { it.symbol.contains("USD", ignoreCase = true) || it.titleFa.contains("دلار") }
+                val gold = rates.firstOrNull { it.id.contains("gold", ignoreCase = true) || it.titleFa.contains("طلا") }
+                val coin = rates.firstOrNull { it.id.contains("coin", ignoreCase = true) || it.titleFa.contains("سکه") }
+                val selected = listOfNotNull(usd, gold, coin).distinct()
+                if (selected.size >= 3) selected.take(3) else rates.take(3)
+            } else emptyList()
+
+            if (displayRates.isNotEmpty()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    displayRates.forEach { rate ->
+                        Card(
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant
+                            )
                         ) {
-                            Text(
-                                text = title,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                text = value,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(10.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    text = rate.titleFa,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = formatWithUnit(rate.priceToman, currencyUnit),
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                val isPositive = rate.changePercent >= 0
+                                val changeText = "${if (isPositive) "+" else ""}${rate.changePercent}%"
+                                Text(
+                                    text = PersianCurrencyFormatter.toPersianDigits(changeText),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (isPositive) Color(0xFF4CAF50) else Color(0xFFE53935),
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
                         }
                     }
+                }
+            } else {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 12.dp),
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Text(
+                        text = "در حال بارگذاری نرخ‌های آنلاین...",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         }

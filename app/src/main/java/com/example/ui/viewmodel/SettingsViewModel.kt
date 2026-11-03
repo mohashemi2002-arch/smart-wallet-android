@@ -32,4 +32,11 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         // Keep the authentication layer's SharedPreferences and DataStore in sync.
         AuthManager(getApplication()).isBiometricEnabled = enabled
     }
+
+    fun updateUserProfile(firstName: String, lastName: String, phoneNumber: String) {
+        viewModelScope.launch {
+            repository.updateUserProfile(firstName, lastName, phoneNumber)
+            AuthManager(getApplication()).updateProfile(firstName, lastName, phoneNumber)
+        }
+    }
 }

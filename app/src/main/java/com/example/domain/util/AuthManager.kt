@@ -169,6 +169,42 @@ class AuthManager(private val context: Context) {
     }
 
     /**
+     * Updates user personal profile (First Name, Last Name, Phone Number) locally and syncs to cloud.
+     */
+    fun updateProfile(firstName: String, lastName: String, phoneNumber: String): Result<Unit> {
+        val fName = firstName.trim()
+        val lName = lastName.trim()
+        val phone = phoneNumber.trim()
+
+        prefs.edit()
+            .putString(KEY_FIRST_NAME, fName)
+            .putString(KEY_LAST_NAME, lName)
+            .putString(KEY_PHONE_NUMBER, phone)
+            .apply()
+
+        scope.launch {
+            userPrefsRepo.updateUserProfile(
+                firstName = fName,
+                lastName = lName,
+                phoneNumber = phone
+            )
+            triggerBackgroundSync()
+        }
+        return Result.success(Unit)
+    }
+
+    /**
+     * Checks if biometric hardware and enrollment are available on this device.
+     */
+    fun canUseBiometric(): Boolean {
+        val biometricManager = BiometricManager.from(context)
+        val res = biometricManager.canAuthenticate(
+            BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.BIOMETRIC_WEAK
+        )
+        return res == BiometricManager.BIOMETRIC_SUCCESS
+    }
+
+    /**
      * Triggers background cloud sync with up-to-date credentials.
      */
     fun triggerBackgroundSync() {
@@ -242,15 +278,48 @@ class AuthManager(private val context: Context) {
         onError: (String) -> Unit = {}
     ) {
         if (!isBiometricEnabled) {
-            onError("ورود با اثر انگشت غیرفعال است")
+            onError("ورود با اثر انگشت در تنظیمات غیرفعال است")
             return
         }
 
         val biometricManager = BiometricManager.from(context)
-        val authenticators = BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL
-        if (biometricManager.canAuthenticate(authenticators) != BiometricManager.BIOMETRIC_SUCCESS) {
-            onError("سنسور بیومتریک در دسترس نیست")
-            return
+        val canWeakOrStrong = biometricManager.canAuthenticate(
+            BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.BIOMETRIC_WEAK
+        )
+        val canDevice = biometricManager.canAuthenticate(BiometricManager.Authenticators.DEVICE_CREDENTIAL)
+
+        val promptInfoBuilder = BiometricPrompt.PromptInfo.Builder()
+            .setTitle("ورود به کیف پول هوشمند")
+            .setSubtitle("لطفاً اثر انگشت خود را تأیید کنید")
+
+        if (canWeakOrStrong == BiometricManager.BIOMETRIC_SUCCESS) {
+            promptInfoBuilder.setAllowedAuthenticators(
+                BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.BIOMETRIC_WEAK
+            )
+            promptInfoBuilder.setNegativeButtonText("ورود با پین کد / رمز عبور")
+        } else if (canDevice == BiometricManager.BIOMETRIC_SUCCESS) {
+            promptInfoBuilder.setAllowedAuthenticators(BiometricManager.Authenticators.DEVICE_CREDENTIAL)
+        } else {
+            when (canWeakOrStrong) {
+                BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED -> {
+                    onError("هیچ اثر انگشتی در تنظیمات امنیتی گوشی شما ثبت نشده است")
+                    return
+                }
+                BiometricManager.BIOMETRIC_ERROR_NO_HARDWARE -> {
+                    onError("این دستگاه فاقد حسگر اثر انگشت است")
+                    return
+                }
+                BiometricManager.BIOMETRIC_ERROR_HW_UNAVAILABLE -> {
+                    onError("حسگر اثر انگشت در حال حاضر در دسترس نیست")
+                    return
+                }
+                else -> {
+                    promptInfoBuilder.setAllowedAuthenticators(
+                        BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.BIOMETRIC_WEAK
+                    )
+                    promptInfoBuilder.setNegativeButtonText("ورود با پین کد / رمز عبور")
+                }
+            }
         }
 
         val executor = ContextCompat.getMainExecutor(context)
@@ -263,22 +332,23 @@ class AuthManager(private val context: Context) {
 
             override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
                 super.onAuthenticationError(errorCode, errString)
-                onError(errString.toString())
+                if (errorCode != BiometricPrompt.ERROR_USER_CANCELED && errorCode != BiometricPrompt.ERROR_NEGATIVE_BUTTON) {
+                    onError(errString.toString())
+                }
             }
 
             override fun onAuthenticationFailed() {
                 super.onAuthenticationFailed()
-                onError("اثر انگشت شناسایی نشد")
+                onError("اثر انگشت شناسایی نشد، دوباره تلاش کنید")
             }
         })
 
-        val promptInfo = BiometricPrompt.PromptInfo.Builder()
-            .setTitle("ورود به کیف پول هوشمند")
-            .setSubtitle("لطفاً اثر انگشت خود را تأیید کنید")
-            .setAllowedAuthenticators(authenticators)
-            .build()
-
-        prompt.authenticate(promptInfo)
+        try {
+            prompt.authenticate(promptInfoBuilder.build())
+        } catch (e: Exception) {
+            android.util.Log.e("AuthManager", "Error launching biometric prompt", e)
+            onError(e.message ?: "خطا در اجرای اثر انگشت")
+        }
     }
 
     /**
