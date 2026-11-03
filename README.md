@@ -1,285 +1,90 @@
 <div dir="rtl" align="right">
 
-#  💳 smart-wallet-android
- 
+# 💳 Smart Wallet — کیف پول هوشمند
 
-> یک کیف پول هوشمند برای مدیریت امور مالی شخصی در اندروید، طراحی‌شده برای کاربران ایرانی با قابلیت پردازش خودکار پیامک‌های بانکی، ثبت و مدیریت تراکنش‌ها، بودجه‌بندی، مدیریت دارایی‌ها و مدیریت بدهی، وام و چک.
+**مدیریت ساده‌تر امور مالی شخصی، با کمک هوش مصنوعی**
 
-</div>
-
-<div dir="ltr" align="center">
-
-[![Platform](https://img.shields.io/badge/platform-Android-brightgreen)](#)
-[![Kotlin](https://img.shields.io/badge/Kotlin-2.x-7F52FF?logo=kotlin\&logoColor=white)](#)
-[![Jetpack Compose](https://img.shields.io/badge/UI-Jetpack%20Compose-4285F4?logo=jetpackcompose\&logoColor=white)](#)
-[![Min SDK](https://img.shields.io/badge/minSdk-24-informational)](#)
-[![Target SDK](https://img.shields.io/badge/targetSdk-36-informational)](#)
+Smart Wallet یک اپلیکیشن اندرویدی برای ثبت و مدیریت تراکنش‌ها، حساب‌های بانکی، بودجه، دارایی‌ها و تعهدات مالی است. هدف پروژه کاهش ورود دستی اطلاعات و فراهم‌کردن یک نمای یکپارچه از وضعیت مالی کاربر است.
 
 </div>
 
-<div dir="rtl" align="right">
+<div align="center">
 
-## ✨ معرفی
-
-**smart-wallet-android** یک کیف پول هوشمند اندرویدی است که با هدف کاهش میزان ورود دستی اطلاعات و ساده‌تر کردن مدیریت امور مالی شخصی طراحی شده است.
-
-به‌جای اینکه کاربر مجبور باشد هر تراکنش بانکی را به‌صورت دستی وارد کند، برنامه می‌تواند پیامک‌های بانکی را دریافت کرده و با استفاده از **Gemini AI** اطلاعات مالی موجود در پیامک را استخراج و به داده‌های ساختاریافته تبدیل کند. سپس تراکنش‌ها به‌صورت محلی ذخیره شده و امکان دسته‌بندی و مدیریت آن‌ها در قالب سوابق مالی وجود دارد.
-
-این پروژه همچنین دارای مدل‌های داده و Repositoryهای اختصاصی برای مدیریت حساب‌های بانکی، تراکنش‌ها، دسته‌بندی‌ها، دارایی‌های غیرنقدی، بدهی‌ها و وام‌ها و فرستندگان پیامک‌های بانکی است.
-
-## 🚀 قابلیت‌ها
-
-- 🤖 **پردازش هوشمند پیامک‌های بانکی با هوش مصنوعی** با استفاده از Google Gemini
-- 📩 **تشخیص خودکار تراکنش‌های بانکی** از طریق SMS Receiver اندروید
-- 💰 **ثبت و مدیریت درآمد و هزینه‌ها**
-- 🏦 **مدیریت حساب‌های بانکی**
-- 🏷️ **دسته‌بندی تراکنش‌ها**
-- 📊 **نمای کلی وضعیت مالی و پشتیبانی از بودجه‌بندی**
-- 💎 **مدیریت دارایی‌های غیرنقدی**
-- 🤝 **مدیریت بدهی‌ها و وام‌ها**
-- 🧾 **مدیریت چک‌ها و تعهدات مالی**
-- 📤 **خروجی گرفتن از اطلاعات مالی**
-- 💾 **ذخیره‌سازی اطلاعات به‌صورت محلی با Room**
-- 🌐 **ارتباط با API و سرویس‌های شبکه با Retrofit و OkHttp**
-- 🔐 **مدیریت امن اطلاعات محرمانه و API Credentialها**
-- 🛡️ **یکپارچه‌سازی Firebase App Check / reCAPTCHA**
-- 🧪 **پشتیبانی از تست‌های Unit، Instrumentation، رابط کاربری Compose و تست‌های Screenshot**
-
-## 🧠 نحوه پردازش تراکنش‌ها با هوش مصنوعی
+[![Android](https://img.shields.io/badge/Platform-Android-3DDC84?logo=android&logoColor=white)](https://developer.android.com/)
+[![Kotlin](https://img.shields.io/badge/Kotlin-2.2.10-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org/)
+[![Jetpack Compose](https://img.shields.io/badge/UI-Jetpack%20Compose-4285F4?logo=jetpackcompose&logoColor=white)](https://developer.android.com/compose)
+[![Min SDK](https://img.shields.io/badge/Min%20SDK-24-informational)](https://developer.android.com/tools/releases/platforms)
+[![Compile SDK](https://img.shields.io/badge/Compile%20SDK-35-informational)](https://developer.android.com/tools/releases/platforms)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 </div>
 
-<div dir="ltr" align="center">
+---
+
+## ✨ امکانات اصلی
+
+- **پردازش هوشمند پیامک بانکی:** استخراج اطلاعات تراکنش از پیامک با استفاده از Google Gemini و Firebase AI.
+- **دریافت پیامک در اندروید:** استفاده از SMS Receiver برای دریافت پیامک‌های بانکی، با رعایت مجوزهای لازم.
+- **مدیریت تراکنش‌ها:** ثبت و پیگیری درآمدها و هزینه‌ها.
+- **مدیریت حساب‌ها:** نگهداری اطلاعات حساب‌های بانکی.
+- **دسته‌بندی و بودجه‌بندی:** سازمان‌دهی تراکنش‌ها و بررسی وضعیت هزینه‌ها.
+- **مدیریت دارایی و بدهی:** ثبت دارایی‌های غیرنقدی، بدهی‌ها و وام‌ها.
+- **مدیریت چک‌ها:** پیگیری چک‌ها و تعهدات مالی.
+- **گزارش و خروجی:** امکان خروجی گرفتن از داده‌های مالی.
+- **ذخیره‌سازی محلی:** استفاده از Room برای نگهداری داده‌ها روی دستگاه.
+
+## 🧠 جریان پردازش پیامک
+
+<div align="center">
 
 ```text
-پیامک بانکی دریافتی
-       │
-       ▼
-Android SMS Receiver
-       │
-       ▼
-پردازش و نرمال‌سازی پیامک
-       │
-       ▼
-Gemini AI
-       │
-       ▼
-اطلاعات ساختاریافته تراکنش
-       │
-       ▼
-Finance Repository
-       │
-       ▼
-Room Database
-       │
-       ▼
-رابط کاربری کیف پول / گزارش‌ها / بودجه‌بندی
+       پیامک بانکی دریافتی
+                │
+                ▼
+       Android SMS Receiver
+                │
+                ▼
+      پردازش و آماده‌سازی متن
+                │
+                ▼
+          Gemini / Firebase AI
+                │
+                ▼
+       داده ساختاریافته تراکنش
+                │
+                ▼
+        Finance Repository
+                │
+                ▼
+           Room Database
+                │
+                ▼
+       نمایش در بخش‌های مالی اپ
 ```
 
 </div>
 
-<div dir="rtl" align="right">
+> پردازش هوشمند پیامک به تنظیم صحیح سرویس AI و دسترسی‌های موردنیاز وابسته است. رفتار برنامه را پیش از استفاده با اطلاعات واقعی بانکی آزمایش کنید.
 
-برنامه شامل یک کامپوننت اختصاصی با نام `SmsAiParser` و همچنین `SmsReceiver` است که مسئول دریافت و پردازش پیامک‌های بانکی است.
+## 🛠️ فناوری‌ها
 
-> **نکته حریم خصوصی:** دسترسی به پیامک‌ها یک دسترسی بسیار حساس است. کاربران باید قبل از اعطای این مجوز، به‌طور کامل بدانند برنامه چه اطلاعاتی را می‌خواند و این اطلاعات چگونه پردازش می‌شوند. هرگز کلیدهای واقعی API، اطلاعات بانکی یا داده‌های مالی شخصی را داخل Repository قرار ندهید.
-
-## 🏗️ معماری
-
-ساختار کد پروژه بر اساس جداسازی نسبتاً سبک بین رابط کاربری، لایه داده، ابزارهای Domain و سیستم ذخیره‌سازی طراحی شده است.
-
-</div>
-
-<div dir="ltr" align="left">
-
-```text
-app/
-└── src/
-    └── main/
-        └── java/com/example/
-            ├── MainActivity.kt
-            ├── data/
-            │   ├── FinanceRepository.kt
-            │   ├── SmsAiParser.kt
-            │   ├── SmsReceiver.kt
-            │   ├── Exporter.kt
-            │   ├── dao/
-            │   ├── database/
-            │   └── model/
-            └── domain/
-                └── util/
-```
-
-</div>
-
-<div dir="rtl" align="right">
-
-### لایه‌های اصلی
-
-| لایه | مسئولیت |
+| بخش | فناوری |
 |---|---|
-| `MainActivity` / Compose UI | صفحات برنامه و تعامل با کاربر |
-| `data/model` | مدل‌های داده مربوط به حوزه مالی |
-| `data/dao` | Data Access Objectهای دیتابیس Room |
-| `AppDatabase` | پیکربندی دیتابیس محلی |
-| `FinanceRepository` | مدیریت عملیات اصلی داده و Repository |
-| `SmsReceiver` | دریافت رویدادهای مربوط به پیامک‌های بانکی اندروید |
-| `SmsAiParser` | تبدیل محتوای پیامک بانکی به اطلاعات ساختاریافته با استفاده از هوش مصنوعی |
-| `Exporter` | خروجی گرفتن از اطلاعات مالی |
-| `domain/util` | ابزارها و توابع کمکی مربوط به منطق کسب‌وکار و Domain |
+| زبان برنامه‌نویسی | Kotlin 2.2.10 |
+| رابط کاربری | Jetpack Compose، Material 3 |
+| معماری داده | Repository pattern |
+| پایگاه داده محلی | Room |
+| تولید کد | KSP |
+| پردازش ناهمگام | Kotlin Coroutines |
+| هوش مصنوعی | Firebase AI / Google Gemini |
+| ارتباط شبکه | Retrofit، OkHttp |
+| JSON | Moshi |
+| محافظت از سرویس‌ها | Firebase App Check / reCAPTCHA |
+| تست | JUnit، Robolectric، Espresso، Roborazzi |
 
-## 🛠️ تکنولوژی‌های استفاده‌شده
+## 🧱 ساختار کلی پروژه
 
-- **Kotlin**
-- **Jetpack Compose + Material 3**
-- **Android SDK 36**
-- **Min SDK 24 (Android 7.0)**
-- **Room** برای ذخیره‌سازی محلی
-- **KSP** برای تولید کد
-- **Retrofit** برای ارتباط با APIهای HTTP
-- **OkHttp** برای ارتباطات شبکه
-- **Moshi** برای Serialization و Deserialization داده‌های JSON
-- **Kotlin Coroutines** برای اجرای عملیات غیرهمزمان
-- **Coil** برای بارگذاری تصاویر
-- **Google Gemini / Firebase AI** برای تفسیر هوشمند پیامک‌های بانکی
-- **Firebase App Check / reCAPTCHA**
-- **Robolectric / JUnit / Espresso / Roborazzi** برای تست
-
-## 📋 پیش‌نیازها
-
-قبل از Build کردن پروژه، موارد زیر را آماده کنید:
-
-- Android Studio با یک Android SDK جدید
-- JDK 11 یا محیط سازگار با Gradle/JVM
-- Android SDK Platform 36
-- یک Gemini API Key معتبر برای قابلیت‌های هوش مصنوعی
-
-پیکربندی فعلی Gradle پروژه از **SDK 36** استفاده می‌کند، سازگاری Java 11 را در نظر گرفته و حداقل نسخه پشتیبانی‌شده اندروید را **Android 7.0 / API 24** تعیین کرده است.
-
-## ⚙️ پیکربندی
-
-پروژه از **Secrets Gradle Plugin** استفاده می‌کند و یک فایل نمونه با نام `.env.example` در اختیار قرار داده شده است.
-
-### 1. ساخت فایل `.env`
-
-در محیط توسعه محلی، فایل `.env.example` را به `.env` کپی کنید.
-
-### 2. وارد کردن Gemini API Key
-
-کلید Gemini خود را در فایل قرار دهید:
-
-</div>
-
-<div dir="ltr" align="left">
-
-```env
-GEMINI_API_KEY=YOUR_GEMINI_API_KEY
-```
-
-</div>
-
-<div dir="rtl" align="right">
-
-### 3. محافظت از اطلاعات محرمانه
-
-فایل `.env` و تمام Credentialهای واقعی را از Version Control خارج نگه دارید.
-
-پیکربندی نمونه Repository، متغیر `GEMINI_API_KEY` را به‌عنوان Credential موردنیاز برای فراخوانی Gemini AI تعریف کرده است.
-
-## ▶️ Build و اجرای پروژه
-
-ابتدا Repository را Clone کنید:
-
-</div>
-
-<div dir="ltr" align="left">
-
-```bash
-git clone https://github.com/mohashemi2002-arch/smart-wallet-android.git
-cd smart-wallet-android
-```
-
-</div>
-
-<div dir="rtl" align="right">
-
-سپس پروژه را در Android Studio باز کرده و اجازه دهید Gradle Sync انجام شود.
-
-بعد از تنظیم Secretهای موردنیاز، Configuration مربوط به `app` را روی یک دستگاه اندرویدی یا Emulator اجرا کنید.
-
-### Build از طریق Command Line
-
-</div>
-
-<div dir="ltr" align="left">
-
-```bash
-./gradlew assembleDebug
-```
-
-</div>
-
-<div dir="rtl" align="right">
-
-### در Windows PowerShell
-
-</div>
-
-<div dir="ltr" align="left">
-
-```powershell
-.\gradlew.bat assembleDebug
-```
-
-</div>
-
-<div dir="rtl" align="right">
-
-## 🔐 مجوزهای اندروید
-
-برنامه مجوزهای زیر را در Android Manifest تعریف کرده است:
-
-- دسترسی به اینترنت
-- دریافت پیامک
-- خواندن پیامک
-- ارسال Notification
-- زمان‌بندی Alarmهای دقیق
-
-برخی از این Permissionها حساس هستند و ممکن است تحت قوانین و محدودیت‌های Android و Google Play قرار داشته باشند.
-
-اگر قصد انتشار **smart-wallet-android** در Google Play را دارید، حتماً آخرین قوانین مربوط به Permissionها و دسترسی به SMS را بررسی کنید و مطمئن شوید کاربرد برنامه با سیاست‌های Google Play مطابقت دارد.
-
-## 🧪 تست
-
-پروژه زیرساخت لازم برای چندین سطح تست را در اختیار دارد:
-
-- تست‌های Unit با JUnit
-- تست‌های Coroutine
-- تست‌های Robolectric
-- تست‌های رابط کاربری Compose
-- تست‌های Instrumentation اندروید
-- تست‌های Screenshot با Roborazzi
-
-### نمونه دستورات
-
-</div>
-
-<div dir="ltr" align="left">
-
-```bash
-./gradlew test
-./gradlew connectedAndroidTest
-```
-
-</div>
-
-<div dir="rtl" align="right">
-
-## 📦 ساختار پروژه
-
-</div>
-
-<div dir="ltr" align="left">
+ساختار زیر نمایی خلاصه از بخش‌های اصلی کد است؛ ممکن است با توسعه پروژه تغییر کند.
 
 ```text
 smart-wallet-android/
@@ -290,112 +95,171 @@ smart-wallet-android/
 │   │   │   └── java/com/example/
 │   │   │       ├── MainActivity.kt
 │   │   │       ├── data/
+│   │   │       │   ├── FinanceRepository.kt
+│   │   │       │   ├── SmsAiParser.kt
+│   │   │       │   ├── SmsReceiver.kt
+│   │   │       │   ├── Exporter.kt
 │   │   │       │   ├── dao/
 │   │   │       │   ├── database/
 │   │   │       │   └── model/
 │   │   │       └── domain/
+│   │   │           └── util/
 │   │   └── androidTest/
-│   ├── build.gradle.kts
-│   └── proguard-rules.pro
-├── assets/
+│   └── build.gradle.kts
 ├── gradle/
+│   └── libs.versions.toml
 ├── .env.example
 ├── build.gradle.kts
-├── gradle.properties
-├── metadata.json
 └── settings.gradle.kts
 ```
 
-</div>
+### اجزای مهم
 
-<div dir="rtl" align="right">
+- `SmsReceiver`: دریافت رویداد پیامک ورودی اندروید.
+- `SmsAiParser`: آماده‌سازی و تحلیل پیامک برای استخراج اطلاعات تراکنش.
+- `FinanceRepository`: نقطه دسترسی لایه داده برای عملیات مالی.
+- `dao/` و `database/`: اجزای ذخیره‌سازی و دسترسی به داده با Room.
+- `Exporter`: ابزارهای خروجی گرفتن از اطلاعات.
 
-## 🔒 امنیت
+## 📋 پیش‌نیازهای توسعه
 
-از آنجا که این برنامه با اطلاعات مالی و پیامک‌های بانکی سروکار دارد:
+تنظیمات فعلی پروژه:
 
-- هرگز API Key یا Service Credentialهای واقعی را Commit نکنید.
-- هرگز پیامک‌های واقعی بانکی یا اطلاعات مالی شخصی را داخل Repository قرار ندهید.
-- فایل‌های Export شده مالی را به‌عنوان اطلاعات حساس در نظر بگیرید.
-- میزان محتوای پیامکی که به سرویس‌های خارجی ارسال می‌شود را تا حد امکان کاهش دهید.
-- قبل از استفاده از برنامه با اطلاعات مالی واقعی، نحوه پردازش داده‌ها توسط AI و API را بررسی کنید.
-- Credentialهای مربوط به امضای نسخه Release را فقط از طریق Environment Variableهای امن یا یک سیستم مدیریت Secret مناسب استفاده کنید.
+| مورد | مقدار |
+|---|---|
+| Android Gradle Plugin | 9.1.1 |
+| Gradle Wrapper | 9.3.1 |
+| Kotlin | 2.2.10 |
+| compileSdk | 35 |
+| targetSdk | 35 |
+| minSdk | 24 (Android 7.0) |
+| Java source / target | 11 |
+| Kotlin JVM target | 11 |
 
-## 🗺️ نقشه راه
+برای توسعه، Android Studio سازگار با نسخه‌های Gradle و Android Gradle Plugin پروژه و Android SDK Platform 35 را نصب کنید.
 
-برخی قابلیت‌های احتمالی برای نسخه‌های آینده:
+## 🚀 دریافت و اجرای پروژه
 
-- [ ] پشتیبانی از فرمت‌های بیشتر پیامک بانکی بانک‌های ایرانی
-- [ ] بهبود پردازش AI به‌صورت Offline-First و ایجاد روش‌های جایگزین در صورت عدم دسترسی به AI
-- [ ] تحلیل‌های پیشرفته هزینه‌ها و نمودارهای مالی
-- [ ] تشخیص خودکار درآمدها و هزینه‌های دوره‌ای
-- [ ] پیشنهادهای هوشمندتر برای بودجه‌بندی
-- [ ] پشتیبان‌گیری و بازیابی رمزنگاری‌شده
-- [ ] همگام‌سازی اطلاعات بین چند دستگاه
-- [ ] رمزنگاری قوی‌تر اطلاعات محلی
-- [ ] افزایش پوشش تست‌های خودکار و Screenshot
-- [ ] ایجاد Pipeline کامل و آماده برای انتشار نسخه Production
+ابتدا مخزن را دریافت کنید:
 
-## 🤝 مشارکت در پروژه
+```bash
+git clone https://github.com/mohashemi2002-arch/smart-wallet-android.git
+cd smart-wallet-android
+```
 
-مشارکت در توسعه پروژه، گزارش Bug و پیشنهاد قابلیت‌های جدید کاملاً استقبال می‌شود.
+سپس پروژه را در Android Studio باز کنید و منتظر بمانید Gradle Sync کامل شود.
 
-### مراحل مشارکت
+### تنظیم کلید Gemini
 
-**1.** Repository را Fork کنید.
+پروژه از Secrets Gradle Plugin استفاده می‌کند و فایل نمونه `.env.example` را در ریشه مخزن دارد.
 
-**2.** یک Branch جدید برای قابلیت موردنظر ایجاد کنید:
+1. از فایل `.env.example` یک کپی با نام `.env` در ریشه پروژه بسازید.
+2. مقدار نمونه را با کلید معتبر Gemini جایگزین کنید:
 
-</div>
+```env
+GEMINI_API_KEY=YOUR_GEMINI_API_KEY
+```
 
-<div dir="ltr" align="left">
+3. فایل `.env` و کلید واقعی را در Git Commit نکنید.
+
+> فایل `.env.example` فقط برای نمایش نام متغیر و قالب تنظیمات است؛ مقدار نمونه داخل آن یک کلید معتبر نیست.
+
+### Build نسخه Debug
+
+در Linux یا macOS:
+
+```bash
+./gradlew assembleDebug
+```
+
+در Windows PowerShell:
+
+```powershell
+.\gradlew.bat assembleDebug
+```
+
+فایل APK نسخه Debug پس از Build موفق، معمولاً در مسیر زیر قرار می‌گیرد:
+
+```text
+app/build/outputs/apk/debug/
+```
+
+## 🧪 اجرای تست‌ها
+
+برای اجرای تست‌های Unit:
+
+```bash
+./gradlew test
+```
+
+برای اجرای تست‌های Instrumentation روی دستگاه یا Emulator متصل:
+
+```bash
+./gradlew connectedAndroidTest
+```
+
+در Windows از `gradlew.bat` استفاده کنید.
+
+## 🔐 حریم خصوصی و امنیت
+
+این برنامه ممکن است با پیامک‌ها و اطلاعات مالی کاربر سروکار داشته باشد. هنگام توسعه، آزمایش و انتشار به نکات زیر توجه کنید:
+
+- دسترسی به SMS حساس است؛ فقط در صورت نیاز واقعی و با اطلاع و رضایت کاربر درخواست شود.
+- از داده‌های بانکی واقعی در Logها، Issueها، Screenshotها و مخزن عمومی استفاده نکنید.
+- کلید Gemini، فایل‌های محرمانه Firebase و سایر Credentialها را در Git قرار ندهید.
+- پیش از ارسال متن پیامک به سرویس AI، ضرورت ارسال و میزان داده موردنیاز را بررسی کنید.
+- فایل‌های خروجی مالی را داده حساس تلقی کنید و در نگهداری یا اشتراک‌گذاری آن‌ها احتیاط کنید.
+- **پیش از انتشار نسخه Release، تنظیمات امضای برنامه را بازبینی کنید.** رمزها و اطلاعات Keystore باید فقط از طریق متغیرهای محیطی امن یا Secretهای CI تأمین شوند؛ از نگهداری Credential ثابت در کد یا فایل‌های قابل Commit خودداری کنید.
+- مجوزهای SMS و سایر دسترسی‌ها ممکن است تابع محدودیت‌های نسخه اندروید و سیاست‌های Google Play باشند. پیش از انتشار، الزامات روز را بررسی کنید.
+
+## 🗺️ ایده‌های توسعه آینده
+
+موارد زیر پیشنهادهایی برای توسعه‌های بعدی هستند و لزوماً به معنی پیاده‌سازی‌شدن آن‌ها در نسخه فعلی نیستند:
+
+- افزایش پوشش بانک‌ها و قالب‌های پیامکی
+- بهبود تشخیص و دسته‌بندی تراکنش‌ها
+- گزارش‌ها و تحلیل‌های مالی پیشرفته‌تر
+- پشتیبان‌گیری و بازیابی امن اطلاعات
+- بهبود قابلیت استفاده در حالت آفلاین
+- افزایش پوشش تست‌های خودکار
+
+## 🤝 مشارکت
+
+از گزارش خطا، پیشنهاد قابلیت و مشارکت در توسعه استقبال می‌شود.
+
+1. مخزن را Fork کنید.
+2. یک Branch برای تغییر خود بسازید:
 
 ```bash
 git checkout -b feature/your-feature
 ```
 
-</div>
-
-<div dir="rtl" align="right">
-
-**3.** تغییرات خود را اعمال کرده و در صورت امکان تست‌های مربوطه را نیز اضافه کنید.
-
-**4.** تغییرات را Commit کنید:
-
-</div>
-
-<div dir="ltr" align="left">
+3. تغییرات را پیاده‌سازی و تست‌های مرتبط را اجرا کنید.
+4. یک Commit واضح ایجاد کنید:
 
 ```bash
-git commit -m "feat: add your feature"
+git commit -m "feat: describe your change"
 ```
 
-</div>
+5. Branch را Push کرده و Pull Request ارسال کنید.
 
-<div dir="rtl" align="right">
+برای گزارش مشکلات امنیتی، لطفاً جزئیات آسیب‌پذیری یا اطلاعات قابل سوءاستفاده را در فضای عمومی منتشر نکنید.
 
-**5.** Branch را Push کرده و یک Pull Request ایجاد کنید.
+## 📄 مجوز
 
-برای مشکلات امنیتی حساس، از انتشار جزئیات آسیب‌پذیری یا روش Exploit به‌صورت عمومی خودداری کرده و از یک روش خصوصی برای گزارش مشکل امنیتی استفاده کنید.
+این پروژه تحت مجوز **MIT** منتشر شده است. برای جزئیات، فایل [LICENSE](LICENSE) را ببینید.
 
-## 📄 مجوز استفاده (License)
-
-در حال حاضر فایل License مشخصی در Repository تعریف نشده است.
-
-تا زمانی که یک License رسمی به پروژه اضافه نشده باشد، فرض کنید کد پروژه **به‌صورت خودکار مجوز استفاده یا بازنشر نامحدود ندارد**.
-
-## 👤 توسعه‌دهنده
+## 👨‍💻 توسعه‌دهنده
 
 **Mohammad Hashemi**
 
-GitHub: [@mohashemi2002-arch](https://github.com/mohashemi2002-arch)
-
-</div>
-
-<div dir="ltr" align="center">
+- GitHub: [@mohashemi2002-arch](https://github.com/mohashemi2002-arch)
+- Repository: [smart-wallet-android](https://github.com/mohashemi2002-arch/smart-wallet-android)
 
 ---
 
-**Built with Kotlin, Jetpack Compose, Room & Gemini AI** ❤️
+<div align="center">
+
+**ساخته‌شده با Kotlin، Jetpack Compose و Gemini AI** ❤️
 
 </div>
