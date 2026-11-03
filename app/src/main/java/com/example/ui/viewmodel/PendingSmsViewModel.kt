@@ -70,4 +70,15 @@ class PendingSmsViewModel(application: Application) : AndroidViewModel(applicati
             }
         }
     }
+
+    fun addBankSmsSender(bankName: String, senderNumber: String) {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            val sender = com.example.data.model.BankSmsSender(
+                bankName = bankName,
+                senderNumber = senderNumber,
+                isActive = true
+            )
+            repository.addBankSmsSender(sender)
+        }
+    }
 }

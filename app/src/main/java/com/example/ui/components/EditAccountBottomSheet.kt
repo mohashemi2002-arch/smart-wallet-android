@@ -13,9 +13,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Inbox
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.material.icons.filled.Email
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.example.util.BankBinHelper
@@ -122,11 +123,12 @@ fun EditAccountBottomSheet(
             Button(
                 onClick = { showSmsPicker = true },
                 modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF5C82E6))
             ) {
-                Icon(Icons.Default.Email, contentDescription = null)
+                Icon(Icons.Default.Inbox, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("📩 انتخاب سرشماره از بین پیامک‌های گوشی")
+                Text("📩 انتخاب سرشماره از صندوق پیامک‌ها (کشویی)", fontWeight = FontWeight.Bold, fontSize = 13.sp)
             }
 
             }
@@ -178,6 +180,13 @@ fun EditAccountBottomSheet(
             onDismiss = { showSmsPicker = false },
             onSenderSelected = { selectedAddress ->
                 smsShortcode = selectedAddress
+                showSmsPicker = false
+            },
+            onSenderAndBankSelected = { selectedAddress, detectedBank ->
+                smsShortcode = selectedAddress
+                if (bankName.isBlank() && detectedBank.isNotBlank() && detectedBank != "بانک مربوطه") {
+                    bankName = detectedBank
+                }
                 showSmsPicker = false
             }
         )

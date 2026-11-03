@@ -143,9 +143,16 @@ fun SmsSenderSettingsScreen(
     }
 
     if (showPickerBottomSheet) {
-        SmsSenderPickerBottomSheet(
-            onDismissRequest = { showPickerBottomSheet = false },
-            onSenderSelected = { address, bankName ->
+        com.example.ui.components.SmsSenderPickerSheet(
+            onDismiss = { showPickerBottomSheet = false },
+            onSenderSelected = { address ->
+                coroutineScope.launch {
+                    val newSender = BankSmsSender(bankName = "بانک مربوطه", senderNumber = address, isActive = true)
+                    repository.bankSmsSenderDao.insert(newSender)
+                    showPickerBottomSheet = false
+                }
+            },
+            onSenderAndBankSelected = { address, bankName ->
                 coroutineScope.launch {
                     val newSender = BankSmsSender(bankName = bankName, senderNumber = address, isActive = true)
                     repository.bankSmsSenderDao.insert(newSender)

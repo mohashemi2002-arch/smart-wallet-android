@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.sp
 import com.example.data.model.Transaction
 import com.example.data.model.TransactionType
 import com.example.ui.components.PersianFormatters
+import com.example.ui.components.SmsSenderPickerSheet
 import com.example.ui.viewmodel.PendingSmsViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -39,6 +40,21 @@ fun PendingSmsInboxScreen(
     val pendingTransactions by viewModel.pendingTransactions.collectAsState()
     val bankAccounts by viewModel.bankAccounts.collectAsState()
     val categories by viewModel.categories.collectAsState()
+
+    var showSmsPickerBottomSheet by remember { mutableStateOf(false) }
+
+    if (showSmsPickerBottomSheet) {
+        SmsSenderPickerSheet(
+            onDismiss = { showSmsPickerBottomSheet = false },
+            onSenderSelected = { address ->
+                // Handled in onSenderAndBankSelected
+            },
+            onSenderAndBankSelected = { address, detectedBank ->
+                viewModel.addBankSmsSender(detectedBank, address)
+                showSmsPickerBottomSheet = false
+            }
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -84,8 +100,18 @@ fun PendingSmsInboxScreen(
                     Icon(Icons.Default.Inbox, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(64.dp))
                     Text("همه پیامک‌ها بررسی شدند.\nصندوق خالی است.", textAlign = TextAlign.Center, color = Color.LightGray)
                     
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
                     
+                    Button(
+                        onClick = { showSmsPickerBottomSheet = true },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF5C82E6)),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Default.Inbox, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("📩 انتخاب سرشماره از صندوق پیامک‌ها (کشویی)")
+                    }
+
                     OutlinedButton(
                         onClick = onNavigateToHistory,
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF5C82E6))

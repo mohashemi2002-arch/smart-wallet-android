@@ -317,11 +317,12 @@ fun AddBankAccountDialog(
                         Button(
                             onClick = { showSmsPickerModal = true },
                             modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF5C82E6))
                         ) {
-                            Icon(Icons.Default.Email, contentDescription = null)
+                            Icon(Icons.Default.Inbox, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("📩 انتخاب سرشماره از بین پیامک‌های گوشی")
+                            Text("📩 انتخاب سرشماره از صندوق پیامک‌ها (کشویی)", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                         }
                     }
 
@@ -434,6 +435,15 @@ fun AddBankAccountDialog(
             onDismiss = { showSmsPickerModal = false },
             onSenderSelected = { selectedAddress ->
                 smsShortcode = selectedAddress
+                showSmsPickerModal = false
+            },
+            onSenderAndBankSelected = { selectedAddress, detectedBank ->
+                smsShortcode = selectedAddress
+                if (bankName.isBlank() && detectedBank.isNotBlank() && detectedBank != "بانک مربوطه") {
+                    if (accountName.isBlank()) {
+                        accountName = "حساب $detectedBank"
+                    }
+                }
                 showSmsPickerModal = false
             }
         )

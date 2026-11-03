@@ -34,6 +34,7 @@ import com.example.ui.components.BankCardItem
 import com.example.ui.components.CurrencyUnit
 import com.example.ui.components.PersianFormatters
 import com.example.ui.components.SmartWalletPlusBadge
+import com.example.ui.components.SmsSenderPickerSheet
 import com.example.ui.viewmodel.FinanceViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -55,6 +56,7 @@ fun SmsReaderScreen(
 
     var showAddAccountDialog by remember { mutableStateOf(false) }
     var showAddSenderDialog by remember { mutableStateOf(false) }
+    var showSmsPickerBottomSheet by remember { mutableStateOf(false) }
 
     val context = androidx.compose.ui.platform.LocalContext.current
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -364,6 +366,23 @@ fun SmsReaderScreen(
                             }
                         }
 
+                        // Prominent drawer button: Pick from SMS inbox
+                        Button(
+                            onClick = { showSmsPickerBottomSheet = true },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("pick_sms_sender_drawer_button"),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF5C82E6),
+                                contentColor = Color.White
+                            )
+                        ) {
+                            Icon(Icons.Default.Inbox, contentDescription = null, modifier = Modifier.size(20.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("📩 باز کردن صندوق پیامک‌ها و انتخاب سرشماره (کشویی)", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        }
+
                         Text(
                             text = "پیامک‌های دریافتی فقط از این سرشماره‌ها آنالیز و استخراج می‌شوند:",
                             style = MaterialTheme.typography.bodySmall,
@@ -603,10 +622,28 @@ fun SmsReaderScreen(
         )
     }
 
+    // Drawer: Select Bank Sender from Device SMS Inbox
+    if (showSmsPickerBottomSheet) {
+        SmsSenderPickerSheet(
+            onDismiss = { showSmsPickerBottomSheet = false },
+            onSenderSelected = { address ->
+                // Handled in onSenderAndBankSelected
+            },
+            onSenderAndBankSelected = { address, detectedBank ->
+                viewModel.addBankSmsSender(detectedBank, address)
+                showSmsPickerBottomSheet = false
+            }
+        )
+    }
+
     // Dialog: Add New SMS Sender Number
     if (showAddSenderDialog) {
         AddSmsSenderDialog(
             onDismiss = { showAddSenderDialog = false },
+            onOpenPicker = {
+                showAddSenderDialog = false
+                showSmsPickerBottomSheet = true
+            },
             onConfirm = { bankName, senderNumber ->
                 viewModel.addBankSmsSender(bankName, senderNumber)
                 showAddSenderDialog = false
@@ -667,11 +704,10 @@ fun BankSmsSenderRow(
     }
 }
 
-
-
 @Composable
 fun AddSmsSenderDialog(
     onDismiss: () -> Unit,
+    onOpenPicker: () -> Unit = {},
     onConfirm: (bankName: String, senderNumber: String) -> Unit
 ) {
     var bankName by remember { mutableStateOf("") }
@@ -683,9 +719,32 @@ fun AddSmsSenderDialog(
         containerColor = Color(0xFF2B2930),
         text = {
             Column(
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
+                Button(
+                    onClick = onOpenPicker,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF5C82E6),
+                        contentColor = Color.White
+                    )
+                ) {
+                    Icon(Icons.Default.Inbox, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("📩 انتخاب از صندوق پیامک‌ها (کشویی)", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    HorizontalDivider(modifier = Modifier.weight(1f), color = Color(0xFF49454F))
+                    Text(" یا وارد کردن دستی ", color = Color(0xFFCAC4D0), fontSize = 11.sp)
+                    HorizontalDivider(modifier = Modifier.weight(1f), color = Color(0xFF49454F))
+                }
+
                 OutlinedTextField(
                     value = bankName,
                     onValueChange = { bankName = it },
