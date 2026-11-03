@@ -218,9 +218,50 @@ val downloadBankLogos = tasks.register("downloadAndSetupBankLogos") {
             "tt" to "tt", "bim" to "bim", "edbi" to "edbi", "melal" to "melal"
         )
         
+        val allExist = slugMapping.values.all { slug ->
+            File(drawableDir, "ic_bank_$slug.png").exists()
+        }
+        if (allExist) {
+            return@doLast
+        }
+
+        // Try extracting from local logos.zip first
+        val localZip = rootProject.file("logos.zip")
+        if (localZip.exists()) {
+            try {
+                localZip.inputStream().use { input ->
+                    ZipInputStream(input).use { zis ->
+                        var entry = zis.nextEntry
+                        while (entry != null) {
+                            val name = entry.name
+                            if (name.startsWith("IranianBankLogos-master/resources/images/") && name.endsWith("-300-wc.png")) {
+                                val baseName = name.substringAfterLast("/").removeSuffix("-300-wc.png")
+                                val slug = slugMapping[baseName]
+                                if (slug != null) {
+                                    val targetFile = File(drawableDir, "ic_bank_$slug.png")
+                                    if (!targetFile.exists()) {
+                                        FileOutputStream(targetFile).use { output ->
+                                            zis.copyTo(output)
+                                        }
+                                    }
+                                }
+                            }
+                            entry = zis.nextEntry
+                        }
+                    }
+                }
+                return@doLast
+            } catch (e: Exception) {
+                println("Local logo extraction failed: ${e.message}")
+            }
+        }
+        
         try {
             val url = URI("https://github.com/amastaneh/IranianBankLogos/archive/refs/heads/master.zip").toURL()
-            url.openStream().use { input ->
+            val conn = url.openConnection()
+            conn.connectTimeout = 3000
+            conn.readTimeout = 5000
+            conn.getInputStream().use { input ->
                 ZipInputStream(input).use { zis ->
                     var entry = zis.nextEntry
                     while (entry != null) {

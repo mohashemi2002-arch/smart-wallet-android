@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -14,11 +15,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.data.model.BankAccount
 import com.example.data.model.Transaction
+import com.example.data.model.TransactionType
+import com.example.ui.components.AddBankAccountDialog
+import com.example.ui.components.BankLogoImage
+import com.example.ui.components.CurrencyUnit
+import com.example.ui.components.EditAccountBottomSheet
+import com.example.ui.components.PersianCurrencyFormatter
 import com.example.ui.viewmodel.FinanceViewModel
+import com.example.util.BankLogoHelper
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -36,6 +45,46 @@ fun DashboardScreen(
     val totalBalance by viewModel.totalNetWorthToman.collectAsState()
     val monthlyIncome by viewModel.totalIncomeToman.collectAsState()
     val monthlyExpense by viewModel.totalExpenseToman.collectAsState()
+    val currencyUnit by viewModel.currencyUnit.collectAsState()
+
+    var accountToEdit by remember { mutableStateOf<BankAccount?>(null) }
+    var showAddAccountDialog by remember { mutableStateOf(false) }
+
+    if (accountToEdit != null) {
+        EditAccountBottomSheet(
+            account = accountToEdit!!,
+            onDismiss = { accountToEdit = null },
+            onUpdate = { updatedAcc ->
+                viewModel.updateBankAccount(updatedAcc)
+                accountToEdit = null
+            },
+            onDelete = { accToDelete ->
+                viewModel.deleteBankAccount(accToDelete)
+                accountToEdit = null
+            }
+        )
+    }
+
+    if (showAddAccountDialog) {
+        AddBankAccountDialog(
+            onDismiss = { showAddAccountDialog = false },
+            onConfirm = { bankName, accountName, cardNumber, accountNumber, balanceToman, colorHex, smsShortcode, accountType, readSmsEnabled, initialBalanceEnabled ->
+                viewModel.addBankAccount(
+                    bankName = bankName,
+                    accountName = accountName,
+                    cardNumber = cardNumber,
+                    accountNumber = accountNumber,
+                    balanceToman = balanceToman,
+                    cardColorHex = colorHex,
+                    smsShortcode = smsShortcode,
+                    accountType = accountType,
+                    readSmsEnabled = readSmsEnabled,
+                    initialBalanceEnabled = initialBalanceEnabled
+                )
+                showAddAccountDialog = false
+            }
+        )
+    }
 
     LazyColumn(
         modifier = Modifier
@@ -46,7 +95,10 @@ fun DashboardScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         item {
-            TopBarDashboard()
+            TopBarDashboard(
+                currencyUnit = currencyUnit,
+                onCurrencyChange = { viewModel.setCurrencyUnit(it) }
+            )
         }
 
         item {
@@ -61,16 +113,16 @@ fun DashboardScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(24.dp),
-                    verticalArrangement = Arrangement.spacedBy(20.dp)
+                    verticalArrangement = Arrangement.spacedBy(18.dp)
                 ) {
                     Text(
-                        text = "موجودی کل",
+                        text = "موجودی کل دارایی",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = Color.White.copy(alpha = 0.8f)
+                        color = Color.White.copy(alpha = 0.85f)
                     )
 
                     Text(
-                        text = "${formatMoney(totalBalance.valueOrZero())} تومان",
+                        text = formatWithUnit(totalBalance.valueOrZero(), currencyUnit),
                         style = MaterialTheme.typography.displayMedium,
                         fontWeight = FontWeight.Bold,
                         color = Color.White
@@ -78,17 +130,17 @@ fun DashboardScreen(
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         Text(
-                            text = "درآمد ماهانه: ${formatMoney(monthlyIncome.valueOrZero())}",
+                            text = "درآمد ماهانه: ${formatWithUnit(monthlyIncome.valueOrZero(), currencyUnit)}",
                             style = MaterialTheme.typography.bodySmall,
-                            color = Color.White.copy(alpha = 0.8f)
+                            color = Color.White.copy(alpha = 0.9f)
                         )
                         Text(
-                            text = "هزینه ماهانه: ${formatMoney(monthlyExpense.valueOrZero())}",
+                            text = "هزینه ماهانه: ${formatWithUnit(monthlyExpense.valueOrZero(), currencyUnit)}",
                             style = MaterialTheme.typography.bodySmall,
-                            color = Color.White.copy(alpha = 0.8f)
+                            color = Color.White.copy(alpha = 0.9f)
                         )
                     }
                 }
@@ -102,14 +154,14 @@ fun DashboardScreen(
             ) {
                 SummaryCard(
                     title = "درآمد",
-                    value = formatMoney(monthlyIncome.valueOrZero()),
+                    value = formatWithUnit(monthlyIncome.valueOrZero(), currencyUnit),
                     subtitle = "+۱۲٪",
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.weight(1f)
                 )
                 SummaryCard(
                     title = "هزینه",
-                    value = formatMoney(monthlyExpense.valueOrZero()),
+                    value = formatWithUnit(monthlyExpense.valueOrZero(), currencyUnit),
                     subtitle = "-۵٪",
                     tint = MaterialTheme.colorScheme.error,
                     modifier = Modifier.weight(1f)
@@ -118,7 +170,12 @@ fun DashboardScreen(
         }
 
         item {
-            BankAccountsSection(accounts = accounts)
+            BankAccountsSection(
+                accounts = accounts,
+                currencyUnit = currencyUnit,
+                onAccountClick = { accountToEdit = it },
+                onAddAccount = { showAddAccountDialog = true }
+            )
         }
 
         item {
@@ -135,7 +192,10 @@ fun DashboardScreen(
         }
 
         item {
-            RecentTransactionsSection(transactions = transactions)
+            RecentTransactionsSection(
+                transactions = transactions,
+                currencyUnit = currencyUnit
+            )
         }
 
         item {
@@ -145,7 +205,10 @@ fun DashboardScreen(
 }
 
 @Composable
-private fun TopBarDashboard() {
+private fun TopBarDashboard(
+    currencyUnit: CurrencyUnit,
+    onCurrencyChange: (CurrencyUnit) -> Unit
+) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -153,7 +216,7 @@ private fun TopBarDashboard() {
     ) {
         Column {
             Text(
-                text = "سلام، کاربر",
+                text = "سلام، کاربر گرامی",
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -165,8 +228,22 @@ private fun TopBarDashboard() {
             )
         }
 
-        IconButton(onClick = {}) {
-            Icon(Icons.Default.Notifications, contentDescription = "اعلان ها")
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            FilterChip(
+                selected = currencyUnit == CurrencyUnit.TOMAN,
+                onClick = { onCurrencyChange(CurrencyUnit.TOMAN) },
+                label = { Text("تومان", style = MaterialTheme.typography.labelSmall) },
+                shape = RoundedCornerShape(12.dp)
+            )
+            FilterChip(
+                selected = currencyUnit == CurrencyUnit.RIAL,
+                onClick = { onCurrencyChange(CurrencyUnit.RIAL) },
+                label = { Text("ریال", style = MaterialTheme.typography.labelSmall) },
+                shape = RoundedCornerShape(12.dp)
+            )
         }
     }
 }
@@ -217,7 +294,12 @@ private fun SummaryCard(
 }
 
 @Composable
-private fun BankAccountsSection(accounts: List<BankAccount>) {
+private fun BankAccountsSection(
+    accounts: List<BankAccount>,
+    currencyUnit: CurrencyUnit,
+    onAccountClick: (BankAccount) -> Unit,
+    onAddAccount: () -> Unit
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
@@ -233,40 +315,147 @@ private fun BankAccountsSection(accounts: List<BankAccount>) {
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Text(
-                text = "حساب‌های بانکی",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
-
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                accounts.take(3).forEach { account ->
-                    Card(
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer
-                        )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CreditCard,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = "حساب‌ها و کارت‌های بانکی",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                TextButton(
+                    onClick = onAddAccount,
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("افزودن کارت", style = MaterialTheme.typography.labelMedium)
+                }
+            }
+
+            if (accounts.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 12.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    OutlinedButton(
+                        onClick = onAddAccount,
+                        shape = RoundedCornerShape(12.dp)
                     ) {
-                        Column(
-                            modifier = Modifier.padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        Text("هنوز کارتی ثبت نشده، برای افزودن کلیک کنید +")
+                    }
+                }
+            } else {
+                LazyRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(horizontal = 2.dp)
+                ) {
+                    items(accounts) { account ->
+                        val brandColor = BankLogoHelper.getBrandColor(account.bankName, account.cardNumber)
+                        Card(
+                            modifier = Modifier
+                                .width(270.dp)
+                                .clickable { onAccountClick(account) },
+                            shape = RoundedCornerShape(18.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                            ),
+                            border = androidx.compose.foundation.BorderStroke(
+                                1.5.dp,
+                                brandColor.copy(alpha = 0.6f)
+                            )
                         ) {
-                            Text(
-                                text = account.accountName,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = formatMoney(account.balanceToman),
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.primary
-                            )
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                // Right Side (in RTL start): Account details & balance
+                                Column(
+                                    modifier = Modifier.weight(1f),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Text(
+                                        text = account.bankName.ifBlank { account.accountName },
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+
+                                    if (account.accountName.isNotBlank() && account.accountName != account.bankName) {
+                                        Text(
+                                            text = account.accountName,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+
+                                    val cardDigits = account.cardNumber.filter { it.isDigit() }
+                                    val displayCardNum = if (cardDigits.length >= 4) {
+                                        "**** ${cardDigits.takeLast(4)}"
+                                    } else if (account.cardNumber.isNotBlank()) {
+                                        account.cardNumber
+                                    } else {
+                                        account.accountNumber?.let { "حساب: $it" } ?: ""
+                                    }
+                                    if (displayCardNum.isNotBlank()) {
+                                        Text(
+                                            text = PersianCurrencyFormatter.toPersianDigits(displayCardNum),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.height(4.dp))
+
+                                    Text(
+                                        text = "مانده کارت:",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        text = formatWithUnit(account.balanceToman, currencyUnit),
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.width(10.dp))
+
+                                // Left Side (in RTL end): Bank Logo
+                                BankLogoImage(
+                                    bankName = account.bankName,
+                                    cardNumber = account.cardNumber,
+                                    containerSize = 52.dp,
+                                    logoSize = 42.dp,
+                                    containerColor = Color.White
+                                )
+                            }
                         }
                     }
                 }
@@ -389,7 +578,10 @@ private fun MarketOverviewSection(onClick: () -> Unit) {
 }
 
 @Composable
-private fun RecentTransactionsSection(transactions: List<Transaction>) {
+private fun RecentTransactionsSection(
+    transactions: List<Transaction>,
+    currencyUnit: CurrencyUnit
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
@@ -413,22 +605,33 @@ private fun RecentTransactionsSection(transactions: List<Transaction>) {
                 fontWeight = FontWeight.Bold
             )
 
-            transactions.take(5).forEach { transaction ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = transaction.merchantName.ifBlank { transaction.categoryName },
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    Text(
-                        text = formatMoney(transaction.amountToman),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+            if (transactions.isEmpty()) {
+                Text(
+                    text = "تراکنشی برای این دوره ثبت نشده است.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                transactions.take(5).forEach { transaction ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = transaction.merchantName.ifBlank { transaction.categoryName },
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            text = formatWithUnit(transaction.amountToman, currencyUnit),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = if (transaction.type == TransactionType.INCOME) Color(0xFF4CAF50) else MaterialTheme.colorScheme.error
+                        )
+                    }
                 }
             }
         }
@@ -466,7 +669,7 @@ private fun PendingSmsSection(onNavigateToSms: () -> Unit) {
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
-                    text = "۳ پیامک بانکی در انتظار بررسی",
+                    text = "پیامک‌های بانکی دریافتی را بررسی کنید",
                     style = MaterialTheme.typography.bodyMedium
                 )
                 Button(
@@ -480,16 +683,17 @@ private fun PendingSmsSection(onNavigateToSms: () -> Unit) {
     }
 }
 
-private fun formatMoney(value: Long): String {
-    return if (value < 1000) {
-        value.toString()
-    } else {
-        val formatted = value.toString()
-        val formattedValue = value.toString().reversed()
-        val formattedValueArray = formattedValue.reversed().chunked(3)
-        val formattedValueArrayJoined = formattedValueArray.joinToString(",")
-        return formattedValueArrayJoined
-    }
+private fun formatMoney(value: Long, usePersianDigits: Boolean = true): String {
+    val formatter = java.text.DecimalFormat("#,###")
+    val formatted = formatter.format(value).replace(",", "،")
+    return if (usePersianDigits) PersianCurrencyFormatter.toPersianDigits(formatted) else formatted
+}
+
+private fun formatWithUnit(amountToman: Long, unit: CurrencyUnit): String {
+    val amount = if (unit == CurrencyUnit.RIAL) amountToman * 10L else amountToman
+    val suffix = if (unit == CurrencyUnit.RIAL) "ریال" else "تومان"
+    return "${formatMoney(amount)} $suffix"
 }
 
 private fun Long.valueOrZero(): Long = this
+
