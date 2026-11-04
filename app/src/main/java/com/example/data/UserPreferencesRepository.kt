@@ -15,8 +15,14 @@ enum class AppTheme {
     SYSTEM
 }
 
+enum class AppLanguage {
+    FA,
+    EN
+}
+
 data class UserPreferences(
     val appTheme: AppTheme = AppTheme.SYSTEM,
+    val appLanguage: AppLanguage = AppLanguage.FA,
     val biometricEnabled: Boolean = true,
     val userFirstName: String = "",
     val userLastName: String = "",
@@ -32,8 +38,13 @@ class UserPreferencesRepository(private val context: Context) {
                 AppTheme.valueOf(prefs[PreferencesKeys.APP_THEME] ?: AppTheme.SYSTEM.name)
             }.getOrDefault(AppTheme.SYSTEM)
 
+            val language = runCatching {
+                AppLanguage.valueOf(prefs[PreferencesKeys.APP_LANGUAGE] ?: AppLanguage.FA.name)
+            }.getOrDefault(AppLanguage.FA)
+
             UserPreferences(
                 appTheme = theme,
+                appLanguage = language,
                 biometricEnabled = prefs[PreferencesKeys.BIOMETRIC_ENABLED] ?: true,
                 userFirstName = prefs[PreferencesKeys.USER_FIRST_NAME] ?: "",
                 userLastName = prefs[PreferencesKeys.USER_LAST_NAME] ?: "",
@@ -44,6 +55,12 @@ class UserPreferencesRepository(private val context: Context) {
     suspend fun updateAppTheme(theme: AppTheme) {
         dataStore.edit { pref ->
             pref[PreferencesKeys.APP_THEME] = theme.name
+        }
+    }
+
+    suspend fun updateAppLanguage(language: AppLanguage) {
+        dataStore.edit { pref ->
+            pref[PreferencesKeys.APP_LANGUAGE] = language.name
         }
     }
 
@@ -67,6 +84,7 @@ class UserPreferencesRepository(private val context: Context) {
 
     private object PreferencesKeys {
         val APP_THEME = stringPreferencesKey("app_theme")
+        val APP_LANGUAGE = stringPreferencesKey("app_language")
         val BIOMETRIC_ENABLED = booleanPreferencesKey("biometric_enabled")
         val USER_FIRST_NAME = stringPreferencesKey("user_first_name")
         val USER_LAST_NAME = stringPreferencesKey("user_last_name")

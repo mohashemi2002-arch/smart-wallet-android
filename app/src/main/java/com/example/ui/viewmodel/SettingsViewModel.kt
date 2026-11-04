@@ -28,6 +28,12 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    fun updateAppLanguage(language: com.example.data.AppLanguage) {
+        viewModelScope.launch {
+            repository.updateAppLanguage(language)
+        }
+    }
+
     fun updateBiometricEnabled(enabled: Boolean) {
         // Keep the authentication layer's SharedPreferences and DataStore in sync.
         AuthManager(getApplication()).isBiometricEnabled = enabled

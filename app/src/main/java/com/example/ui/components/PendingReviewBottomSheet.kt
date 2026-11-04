@@ -58,12 +58,52 @@ fun PendingReviewBottomSheet(
                 modifier = Modifier.fillMaxWidth()
             )
 
-            OutlinedTextField(
-                value = categoryText,
-                onValueChange = { categoryText = it },
-                label = { Text("دسته‌بندی") },
+            val context = androidx.compose.ui.platform.LocalContext.current
+            val repository = remember { com.example.data.FinanceRepository.getInstance(context) }
+            val dbCategories by repository.allCategories.collectAsState(initial = emptyList())
+            val categoryNames = remember(dbCategories) {
+                val names = dbCategories.map { it.name }.filter { it.isNotBlank() }
+                if (names.isNotEmpty()) names else listOf(
+                    "خوراکی و سوپرمارکت",
+                    "حمل و نقل",
+                    "خرید و پوشاک",
+                    "پزشکی و سلامت",
+                    "قبوض و ساختمان",
+                    "تفریح و سرگرمی",
+                    "درآمد و حقوق",
+                    "متفرقه"
+                )
+            }
+            var expandedCategory by remember { mutableStateOf(false) }
+
+            ExposedDropdownMenuBox(
+                expanded = expandedCategory,
+                onExpandedChange = { expandedCategory = it },
                 modifier = Modifier.fillMaxWidth()
-            )
+            ) {
+                OutlinedTextField(
+                    value = categoryText.ifBlank { "متفرقه" },
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("دسته‌بندی (منوی کشویی)") },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedCategory) },
+                    modifier = Modifier.menuAnchor().fillMaxWidth()
+                )
+                ExposedDropdownMenu(
+                    expanded = expandedCategory,
+                    onDismissRequest = { expandedCategory = false }
+                ) {
+                    categoryNames.forEach { catName ->
+                        DropdownMenuItem(
+                            text = { Text(catName) },
+                            onClick = {
+                                categoryText = catName
+                                expandedCategory = false
+                            }
+                        )
+                    }
+                }
+            }
 
             ExposedDropdownMenuBox(
                 expanded = expandedAccount,

@@ -132,4 +132,82 @@ object DeviceSmsReader {
 
         return@withContext sendersMap.values.sortedByDescending { it.timestamp }.toList()
     }
+
+    suspend fun getMessagesForSender(
+        context: Context,
+        senderNumber: String,
+        limit: Int = 100
+    ): List<DeviceSenderSmsMessage> = withContext(Dispatchers.IO) {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED) {
+            return@withContext emptyList()
+        }
+
+        val messages = mutableListOf<DeviceSenderSmsMessage>()
+        val uri: Uri = Uri.parse("content://sms/inbox")
+        val projection = arrayOf(
+            Telephony.Sms._ID,
+            Telephony.Sms.ADDRESS,
+            Telephony.Sms.BODY,
+            Telephony.Sms.DATE
+        )
+
+        fun clean(num: String) = num.replace("+98", "").replace("098", "").replace(" ", "").replace("-", "").trim()
+        val targetClean = clean(senderNumber)
+
+        var cursor: Cursor? = null
+        try {
+            cursor = context.contentResolver.query(
+                uri,
+                projection,
+                null,
+                null,
+                Telephony.Sms.DATE + " DESC LIMIT 1000"
+            )
+
+            cursor?.let {
+                val idIndex = it.getColumnIndexOrThrow(Telephony.Sms._ID)
+                val addressIndex = it.getColumnIndexOrThrow(Telephony.Sms.ADDRESS)
+                val bodyIndex = it.getColumnIndexOrThrow(Telephony.Sms.BODY)
+                val dateIndex = it.getColumnIndexOrThrow(Telephony.Sms.DATE)
+
+                while (it.moveToNext() && messages.size < limit) {
+                    val address = it.getString(addressIndex) ?: continue
+                    val body = it.getString(bodyIndex) ?: ""
+                    val date = it.getLong(dateIndex)
+                    val id = it.getLong(idIndex)
+
+                    val addrClean = clean(address)
+                    val isMatch = targetClean.isNotBlank() && (
+                        addrClean.endsWith(targetClean) ||
+                        targetClean.endsWith(addrClean) ||
+                        (targetClean.length >= 4 && addrClean.contains(targetClean))
+                    )
+
+                    if (isMatch) {
+                        messages.add(
+                            DeviceSenderSmsMessage(
+                                id = id,
+                                address = address,
+                                body = body,
+                                timestamp = date
+                            )
+                        )
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("DeviceSmsReader", "Error reading messages for sender $senderNumber: ${e.message}")
+        } finally {
+            cursor?.close()
+        }
+
+        return@withContext messages
+    }
 }
+
+data class DeviceSenderSmsMessage(
+    val id: Long,
+    val address: String,
+    val body: String,
+    val timestamp: Long
+)

@@ -57,6 +57,7 @@ fun SmsReaderScreen(
     var showAddAccountDialog by remember { mutableStateOf(false) }
     var showAddSenderDialog by remember { mutableStateOf(false) }
     var showSmsPickerBottomSheet by remember { mutableStateOf(false) }
+    var selectedSenderForSmsView by remember { mutableStateOf<BankSmsSender?>(null) }
 
     val context = androidx.compose.ui.platform.LocalContext.current
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -393,7 +394,8 @@ fun SmsReaderScreen(
                             BankSmsSenderRow(
                                 sender = sender,
                                 onToggleActive = { viewModel.toggleBankSmsSenderActive(sender) },
-                                onDelete = { viewModel.deleteBankSmsSender(sender) }
+                                onDelete = { viewModel.deleteBankSmsSender(sender) },
+                                onViewSms = { selectedSenderForSmsView = sender }
                             )
                         }
                     }
@@ -650,16 +652,26 @@ fun SmsReaderScreen(
             }
         )
     }
+
+    selectedSenderForSmsView?.let { sender ->
+        com.example.ui.components.SenderSmsViewerSheet(
+            sender = sender,
+            onDismiss = { selectedSenderForSmsView = null }
+        )
+    }
 }
 
 @Composable
 fun BankSmsSenderRow(
     sender: BankSmsSender,
     onToggleActive: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onViewSms: () -> Unit = {}
 ) {
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onViewSms() },
         shape = RoundedCornerShape(16.dp),
         color = Color(0xFF36343B)
     ) {
@@ -691,6 +703,14 @@ fun BankSmsSenderRow(
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onViewSms) {
+                    Icon(
+                        Icons.Default.ReceiptLong,
+                        contentDescription = "مشاهده پیامک‌ها و ثبت",
+                        tint = Color(0xFF5C82E6),
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
                 Switch(
                     checked = sender.isActive,
                     onCheckedChange = { onToggleActive() },

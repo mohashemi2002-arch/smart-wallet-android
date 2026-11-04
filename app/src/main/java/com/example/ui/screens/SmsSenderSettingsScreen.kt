@@ -20,6 +20,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.filled.ReceiptLong
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.example.data.FinanceRepository
@@ -54,6 +57,8 @@ fun SmsSenderSettingsScreen(
             Toast.makeText(context, "دسترسی پیامک داده نشد", Toast.LENGTH_SHORT).show()
         }
     }
+
+    var selectedSenderForSmsView by remember { mutableStateOf<BankSmsSender?>(null) }
 
     Scaffold(
         topBar = {
@@ -102,44 +107,72 @@ fun SmsSenderSettingsScreen(
             ) {
                 items(senders) { sender ->
                     Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFF2B2930))
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { selectedSenderForSmsView = sender },
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF2B2930)),
+                        shape = RoundedCornerShape(16.dp)
                     ) {
-                        Row(
-                            modifier = Modifier.padding(16.dp).fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Column {
-                                Text(sender.bankName, style = MaterialTheme.typography.titleMedium, color = Color(0xFFE6E1E5))
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(sender.senderNumber, style = MaterialTheme.typography.bodyMedium, color = Color(0xFFCAC4D0))
-                            }
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Switch(
-                                    checked = sender.isActive,
-                                    onCheckedChange = { isActive ->
-                                        coroutineScope.launch {
-                                            repository.bankSmsSenderDao.update(sender.copy(isActive = isActive))
-                                        }
-                                    },
-                                    colors = SwitchDefaults.colors(
-                                        checkedThumbColor = Color(0xFF381E72),
-                                        checkedTrackColor = Color(0xFFD0BCFF)
-                                    )
-                                )
-                                Spacer(modifier = Modifier.width(16.dp))
-                                IconButton(onClick = {
-                                    coroutineScope.launch { repository.bankSmsSenderDao.delete(sender) }
-                                }) {
-                                    Icon(Icons.Filled.Delete, contentDescription = "حذف", tint = Color.Red)
+                        Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(sender.bankName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color(0xFFE6E1E5))
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text("سرشماره: ${sender.senderNumber}", style = MaterialTheme.typography.bodyMedium, color = Color(0xFFCAC4D0))
                                 }
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Switch(
+                                        checked = sender.isActive,
+                                        onCheckedChange = { isActive ->
+                                            coroutineScope.launch {
+                                                repository.bankSmsSenderDao.update(sender.copy(isActive = isActive))
+                                            }
+                                        },
+                                        colors = SwitchDefaults.colors(
+                                            checkedThumbColor = Color(0xFF381E72),
+                                            checkedTrackColor = Color(0xFFD0BCFF)
+                                        )
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    IconButton(onClick = {
+                                        coroutineScope.launch { repository.bankSmsSenderDao.delete(sender) }
+                                    }) {
+                                        Icon(Icons.Filled.Delete, contentDescription = "حذف", tint = Color(0xFFF2B8B5))
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            Button(
+                                onClick = { selectedSenderForSmsView = sender },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFF5C82E6),
+                                    contentColor = Color.White
+                                ),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Icon(Icons.Default.ReceiptLong, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text("مشاهده پیامک‌ها و ثبت تراکنش (منوی کشویی)", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                             }
                         }
                     }
                 }
             }
         }
+    }
+
+    selectedSenderForSmsView?.let { sender ->
+        com.example.ui.components.SenderSmsViewerSheet(
+            sender = sender,
+            onDismiss = { selectedSenderForSmsView = null }
+        )
     }
 
     if (showPickerBottomSheet) {

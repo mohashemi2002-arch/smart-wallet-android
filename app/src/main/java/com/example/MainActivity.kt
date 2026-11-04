@@ -29,9 +29,15 @@ class MainActivity : FragmentActivity() {
                 AppTheme.SYSTEM -> isSystemInDarkTheme()
             }
 
+            val layoutDirection = if (preferences.appLanguage == com.example.data.AppLanguage.EN) {
+                LayoutDirection.Ltr
+            } else {
+                LayoutDirection.Rtl
+            }
+
             SmartWalletTheme(darkTheme = darkTheme) {
                 androidx.compose.runtime.CompositionLocalProvider(
-                    LocalLayoutDirection provides LayoutDirection.Rtl
+                    LocalLayoutDirection provides layoutDirection
                 ) {
                     AuthGatekeeper(
                         authManager = com.example.domain.util.AuthManager(this),
