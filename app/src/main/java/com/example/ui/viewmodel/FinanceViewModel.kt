@@ -459,28 +459,54 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
     fun scanRecentSmsFromSenders() {
         viewModelScope.launch {
             _isParsingSms.value = true
-            val activeSendersList = bankSmsSenders.value.filter { it.isActive }
-            if (activeSendersList.isEmpty()) {
-                _statusMessage.value = "هیچ سرشماره اس‌ام‌اس فعال وجود ندارد."
+            val hasPermission = androidx.core.content.ContextCompat.checkSelfPermission(
+                getApplication(),
+                android.Manifest.permission.READ_SMS
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+            if (!hasPermission) {
+                _statusMessage.value = "مجوز خواندن پیامک اعطا نشده است. لطفاً ابتدا دسترسی را تایید کنید."
                 _isParsingSms.value = false
                 return@launch
             }
 
-            // Simulate/Fetch recent bank SMS received from active head numbers
-            val sampleBankSmsToProcess = listOf(
-                "برداشت مبلغ 1,850,000 ریال از حساب 6037****8910 - خرید هایپرمارکت میقات - بانک ملی",
-                "واریز 4,200,000 ریال به حساب 6104****4321 - کارت به کارت از محمد - بانک ملت",
-                "برداشت 750,000 ریال از حساب 6219****5544 بابت تاکسی آنلاین - بلوبانک"
-            )
+            val activeSendersList = bankSmsSenders.value.filter { it.isActive }
+            
+            // Query real SMS from device inbox
+            val deviceMessages = if (activeSendersList.isNotEmpty()) {
+                val collected = mutableListOf<com.example.util.DeviceSenderSmsMessage>()
+                for (sender in activeSendersList) {
+                    val msgs = com.example.util.DeviceSmsReader.getMessagesForSender(
+                        context = getApplication(),
+                        senderNumber = sender.senderNumber,
+                        bankName = sender.bankName,
+                        limit = 50
+                    )
+                    collected.addAll(msgs)
+                }
+                if (collected.isEmpty()) {
+                    com.example.util.DeviceSmsReader.getAllBankSms(getApplication(), limit = 100)
+                } else {
+                    collected
+                }
+            } else {
+                com.example.util.DeviceSmsReader.getAllBankSms(getApplication(), limit = 100)
+            }
+
+            if (deviceMessages.isEmpty()) {
+                _statusMessage.value = "هیچ پیامک بانکی در صندوق پیامک‌های دستگاه یافت نشد."
+                _isParsingSms.value = false
+                return@launch
+            }
 
             var processedCount = 0
-            for (smsText in sampleBankSmsToProcess) {
-                repository.processIncomingSms(smsText)
+            for (msg in deviceMessages) {
+                repository.processIncomingSms(smsText = msg.body, senderAddress = msg.address)
                 processedCount++
             }
 
             _isParsingSms.value = false
-            _statusMessage.value = "تعداد $processedCount پیامک جدید از سرشماره‌های فعال استخراج و ثبت شد!"
+            _statusMessage.value = "تعداد $processedCount پیامک تراکنش بانکی با موفقیت خوانده و به لیست اضافه شد."
         }
     }
 

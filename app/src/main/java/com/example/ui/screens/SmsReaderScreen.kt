@@ -31,11 +31,17 @@ import com.example.data.model.BankSmsSender
 import com.example.data.model.TransactionType
 import com.example.ui.components.AddBankAccountDialog
 import com.example.ui.components.BankCardItem
+import com.example.ui.components.BankLogoImage
 import com.example.ui.components.CurrencyUnit
 import com.example.ui.components.PersianFormatters
+import com.example.ui.components.SenderSmsItemCard
 import com.example.ui.components.SmartWalletPlusBadge
 import com.example.ui.components.SmsSenderPickerSheet
 import com.example.ui.viewmodel.FinanceViewModel
+import com.example.util.DeviceSenderSmsMessage
+import com.example.util.DeviceSmsReader
+import com.example.data.FinanceRepository
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -60,12 +66,55 @@ fun SmsReaderScreen(
     var selectedSenderForSmsView by remember { mutableStateOf<BankSmsSender?>(null) }
 
     val context = androidx.compose.ui.platform.LocalContext.current
+    val repository = remember { FinanceRepository.getInstance(context) }
+    val coroutineScope = rememberCoroutineScope()
+    val dbCategories by repository.allCategories.collectAsState(initial = emptyList())
+    val registeredTransactions by repository.allTransactions.collectAsState(initial = emptyList())
+
+    val categoryNames = remember(dbCategories) {
+        val names = dbCategories.map { it.name }.filter { it.isNotBlank() }
+        if (names.isNotEmpty()) names else listOf(
+            "خوراکی و سوپرمارکت", "حمل و نقل", "خرید و پوشاک", "پزشکی و سلامت",
+            "قبوض و ساختمان", "تفریح و سرگرمی", "درآمد و حقوق", "متفرقه"
+        )
+    }
+
+    var hasReadSmsPermission by remember {
+        mutableStateOf(
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                context,
+                android.Manifest.permission.READ_SMS
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        )
+    }
+
+    var deviceBankMessages by remember { mutableStateOf<List<DeviceSenderSmsMessage>>(emptyList()) }
+    var isLoadingDeviceSms by remember { mutableStateOf(false) }
+    var selectedBankFilter by remember { mutableStateOf("همه") }
+
+    LaunchedEffect(hasReadSmsPermission) {
+        if (hasReadSmsPermission) {
+            isLoadingDeviceSms = true
+            val msgs = DeviceSmsReader.getAllBankSms(context, limit = 100)
+            deviceBankMessages = msgs
+            isLoadingDeviceSms = false
+        }
+    }
+
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
+        val granted = permissions[android.Manifest.permission.READ_SMS] == true
+        hasReadSmsPermission = granted
         val allGranted = permissions.values.all { it }
-        if (allGranted) {
+        if (allGranted || granted) {
             viewModel.scanRecentSmsFromSenders()
+            coroutineScope.launch {
+                isLoadingDeviceSms = true
+                val msgs = DeviceSmsReader.getAllBankSms(context, limit = 100)
+                deviceBankMessages = msgs
+                isLoadingDeviceSms = false
+            }
         }
     }
 
@@ -191,6 +240,191 @@ fun SmsReaderScreen(
                                 Icon(Icons.Default.Sms, contentDescription = null, tint = Color(0xFF381E72))
                                 Spacer(Modifier.width(8.dp))
                                 Text("خوانش اس‌ام‌اس‌های جدید از سرشماره‌های فعال", fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 1.2 Device Bank Transaction SMS Inbox Section
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF232A38)),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF384357)),
+                    shape = RoundedCornerShape(28.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(18.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(Icons.Default.Inbox, contentDescription = null, tint = Color(0xFF60A5FA), modifier = Modifier.size(24.dp))
+                                Column {
+                                    Text(
+                                        text = "صندوق پیامک‌های بانکی گوشی",
+                                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                        color = Color.White
+                                    )
+                                    Text(
+                                        text = if (hasReadSmsPermission) "تعداد ${deviceBankMessages.size} پیامک تراکنش شناسایی شد" else "نیازمند اعطای دسترسی پیامک",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = Color(0xFF94A3B8)
+                                    )
+                                }
+                            }
+
+                            FilledTonalButton(
+                                onClick = {
+                                    if (hasReadSmsPermission) {
+                                        coroutineScope.launch {
+                                            isLoadingDeviceSms = true
+                                            val msgs = DeviceSmsReader.getAllBankSms(context, limit = 100)
+                                            deviceBankMessages = msgs
+                                            isLoadingDeviceSms = false
+                                        }
+                                    } else {
+                                        permissionLauncher.launch(
+                                            arrayOf(
+                                                android.Manifest.permission.READ_SMS,
+                                                android.Manifest.permission.RECEIVE_SMS
+                                            )
+                                        )
+                                    }
+                                },
+                                shape = RoundedCornerShape(50),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                            ) {
+                                Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("به‌روزرسانی", fontSize = 12.sp)
+                            }
+                        }
+
+                        if (!hasReadSmsPermission) {
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E2633)),
+                                shape = RoundedCornerShape(16.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Text(
+                                        "برای خواندن و استخراج پیامک‌های بانکی از گوشی، لطفاً دسترسی پیامک را تایید کنید:",
+                                        color = Color.LightGray,
+                                        fontSize = 13.sp,
+                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                    )
+                                    Button(
+                                        onClick = {
+                                            permissionLauncher.launch(
+                                                arrayOf(
+                                                    android.Manifest.permission.READ_SMS,
+                                                    android.Manifest.permission.RECEIVE_SMS
+                                                )
+                                            )
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6))
+                                    ) {
+                                        Text("اعطای دسترسی به پیامک‌ها", fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                        } else if (isLoadingDeviceSms) {
+                            Box(
+                                modifier = Modifier.fillMaxWidth().padding(24.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color(0xFF60A5FA), strokeWidth = 2.dp)
+                                    Text("در حال جستجو و خواندن پیامک‌های بانکی از گوشی...", color = Color.LightGray, fontSize = 12.sp)
+                                }
+                            }
+                        } else if (deviceBankMessages.isEmpty()) {
+                            Text(
+                                text = "هیچ پیامک بانکی در صندوق پیامک‌های گوشی یافت نشد. دکمه «به‌روزرسانی» یا «خوانش اس‌ام‌اس‌های جدید» را بزنید.",
+                                color = Color.Gray,
+                                fontSize = 13.sp,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)
+                            )
+                        } else {
+                            val availableBanks = remember(deviceBankMessages) {
+                                listOf("همه") + deviceBankMessages.mapNotNull { it.detectedBank }.distinct()
+                            }
+
+                            if (availableBanks.size > 2) {
+                                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    items(availableBanks) { bName ->
+                                        FilterChip(
+                                            selected = selectedBankFilter == bName,
+                                            onClick = { selectedBankFilter = bName },
+                                            label = { Text(bName, fontSize = 11.sp) },
+                                            colors = FilterChipDefaults.filterChipColors(
+                                                selectedContainerColor = Color(0xFF3B82F6),
+                                                selectedLabelColor = Color.White
+                                            )
+                                        )
+                                    }
+                                }
+                            }
+
+                            val filteredMessages = remember(deviceBankMessages, selectedBankFilter) {
+                                if (selectedBankFilter == "همه") deviceBankMessages
+                                else deviceBankMessages.filter { it.detectedBank == selectedBankFilter }
+                            }
+
+                            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                filteredMessages.take(25).forEach { msg ->
+                                    val detectedSender = BankSmsSender(
+                                        bankName = msg.detectedBank ?: "بانک",
+                                        senderNumber = msg.address,
+                                        isActive = true
+                                    )
+                                    SenderSmsItemCard(
+                                        message = msg,
+                                        sender = detectedSender,
+                                        categoryNames = categoryNames,
+                                        bankAccounts = bankAccounts,
+                                        isAlreadyRegistered = registeredTransactions.any { tx ->
+                                            tx.dateMillis == msg.timestamp ||
+                                            (!tx.rawSmsText.isNullOrBlank() && (tx.rawSmsText == msg.body || msg.body.contains(tx.rawSmsText!!)))
+                                        },
+                                        onRegister = { tx ->
+                                            coroutineScope.launch {
+                                                repository.transactionDao.insert(tx)
+                                                if (tx.balanceAfterToman != null && tx.balanceAfterToman > 0) {
+                                                    val matchedCard = bankAccounts.find {
+                                                        (tx.cardNumber != null && it.cardNumber.endsWith(tx.cardNumber)) ||
+                                                        it.bankName == detectedSender.bankName
+                                                    }
+                                                    if (matchedCard != null) {
+                                                        repository.bankAccountDao.update(
+                                                            matchedCard.copy(balanceToman = tx.balanceAfterToman)
+                                                        )
+                                                    }
+                                                }
+                                                android.widget.Toast.makeText(context, "تراکنش با موفقیت ثبت شد", android.widget.Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
@@ -675,50 +909,61 @@ fun BankSmsSenderRow(
         shape = RoundedCornerShape(16.dp),
         color = Color(0xFF36343B)
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+                .padding(12.dp)
         ) {
             Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Surface(
-                    shape = CircleShape,
-                    color = Color(0xFFD0BCFF).copy(alpha = 0.2f),
-                    modifier = Modifier.size(32.dp)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.Sms, contentDescription = null, tint = Color(0xFFD0BCFF), modifier = Modifier.size(16.dp))
+                    BankLogoImage(
+                        bankName = sender.bankName,
+                        cardNumber = null,
+                        containerSize = 36.dp,
+                        logoSize = 28.dp,
+                        containerColor = Color(0xFF2B2930)
+                    )
+
+                    Column {
+                        Text(sender.bankName, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold), color = Color(0xFFE6E1E5))
+                        Text("سرشماره: ${sender.senderNumber}", style = MaterialTheme.typography.bodySmall, color = Color(0xFFCAC4D0))
                     }
                 }
 
-                Column {
-                    Text(sender.bankName, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold), color = Color(0xFFE6E1E5))
-                    Text("سرشماره: ${sender.senderNumber}", style = MaterialTheme.typography.bodySmall, color = Color(0xFFCAC4D0))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Switch(
+                        checked = sender.isActive,
+                        onCheckedChange = { onToggleActive() },
+                        colors = SwitchDefaults.colors(checkedThumbColor = Color(0xFF381E72), checkedTrackColor = Color(0xFFD0BCFF))
+                    )
+                    IconButton(onClick = onDelete) {
+                        Icon(Icons.Default.Delete, contentDescription = "حذف", tint = Color(0xFFF2B8B5), modifier = Modifier.size(18.dp))
+                    }
                 }
             }
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onViewSms) {
-                    Icon(
-                        Icons.Default.ReceiptLong,
-                        contentDescription = "مشاهده پیامک‌ها و ثبت",
-                        tint = Color(0xFF5C82E6),
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-                Switch(
-                    checked = sender.isActive,
-                    onCheckedChange = { onToggleActive() },
-                    colors = SwitchDefaults.colors(checkedThumbColor = Color(0xFF381E72), checkedTrackColor = Color(0xFFD0BCFF))
-                )
-                IconButton(onClick = onDelete) {
-                    Icon(Icons.Default.Delete, contentDescription = "حذف", tint = Color(0xFFF2B8B5), modifier = Modifier.size(18.dp))
-                }
+            Spacer(Modifier.height(8.dp))
+
+            Button(
+                onClick = onViewSms,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF435574),
+                    contentColor = Color.White
+                ),
+                shape = RoundedCornerShape(10.dp),
+                contentPadding = PaddingValues(vertical = 4.dp, horizontal = 8.dp)
+            ) {
+                Icon(Icons.Default.ReceiptLong, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("مشاهده پیامک‌های ${sender.bankName} و ثبت با منوی کشویی", fontSize = 12.sp, fontWeight = FontWeight.Bold)
             }
         }
     }

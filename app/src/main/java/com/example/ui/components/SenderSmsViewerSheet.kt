@@ -1,6 +1,10 @@
 package com.example.ui.components
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -22,6 +26,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import com.example.data.FinanceRepository
 import com.example.data.SmsAiParser
 import com.example.data.model.*
@@ -47,8 +52,33 @@ fun SenderSmsViewerSheet(
     val repository = remember { FinanceRepository.getInstance(context) }
     val coroutineScope = rememberCoroutineScope()
 
+    var hasPermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) == PackageManager.PERMISSION_GRANTED
+        )
+    }
+
     var messages by remember { mutableStateOf<List<DeviceSenderSmsMessage>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
+    var showingAllBankSms by remember { mutableStateOf(false) }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        hasPermission = isGranted
+        if (isGranted) {
+            coroutineScope.launch {
+                isLoading = true
+                val result = DeviceSmsReader.getMessagesForSender(
+                    context = context,
+                    senderNumber = sender.senderNumber,
+                    bankName = sender.bankName
+                )
+                messages = result
+                isLoading = false
+            }
+        }
+    }
 
     val bankAccounts by repository.allBankAccounts.collectAsState(initial = emptyList())
     val dbCategories by repository.allCategories.collectAsState(initial = emptyList())
@@ -68,11 +98,19 @@ fun SenderSmsViewerSheet(
         )
     }
 
-    LaunchedEffect(sender.senderNumber) {
-        isLoading = true
-        val result = DeviceSmsReader.getMessagesForSender(context, sender.senderNumber)
-        messages = result
-        isLoading = false
+    LaunchedEffect(sender.senderNumber, hasPermission) {
+        if (hasPermission) {
+            isLoading = true
+            val result = DeviceSmsReader.getMessagesForSender(
+                context = context,
+                senderNumber = sender.senderNumber,
+                bankName = sender.bankName
+            )
+            messages = result
+            isLoading = false
+        } else {
+            isLoading = false
+        }
     }
 
     ModalBottomSheet(
@@ -106,13 +144,13 @@ fun SenderSmsViewerSheet(
                     )
                     Column {
                         Text(
-                            text = "پیامک‌های ${sender.bankName}",
+                            text = if (showingAllBankSms) "تمام پیامک‌های بانکی دستگاه" else "پیامک‌های ${sender.bankName}",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = Color.White
                         )
                         Text(
-                            text = "سرشماره: ${sender.senderNumber}",
+                            text = if (showingAllBankSms) "صندوق کلی پیامک‌های بانکی" else "سرشماره: ${sender.senderNumber}",
                             style = MaterialTheme.typography.bodySmall,
                             color = Color(0xFF9E9E9E)
                         )
@@ -126,7 +164,46 @@ fun SenderSmsViewerSheet(
 
             HorizontalDivider(color = Color(0xFF2E3446))
 
-            if (isLoading) {
+            if (!hasPermission) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(24.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF282E3E)),
+                        shape = RoundedCornerShape(18.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            Icon(Icons.Default.Sms, contentDescription = null, tint = Color(0xFF5C82E6), modifier = Modifier.size(48.dp))
+                            Text(
+                                text = "دسترسی خواندن پیامک‌ها نیاز است",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                            Text(
+                                text = "برای استخراج پیامک‌های بانکی از گوشی و نمایش آنها، لطفاً دسترسی پیامک را تایید کنید.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.LightGray,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                            )
+                            Button(
+                                onClick = { permissionLauncher.launch(Manifest.permission.READ_SMS) },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF5C82E6))
+                            ) {
+                                Text("اعطای دسترسی به پیامک‌ها", fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+            } else if (isLoading) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -148,24 +225,58 @@ fun SenderSmsViewerSheet(
                 ) {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Icon(Icons.Default.Inbox, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(48.dp))
                         Text(
-                            text = "هیچ پیامکی از سرشماره ${sender.senderNumber} در صندوق یافت نشد.",
+                            text = "هیچ پیامکی از سرشماره ${sender.senderNumber} یافت نشد.",
                             color = Color.Gray,
                             fontSize = 14.sp,
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center
                         )
+                        Button(
+                            onClick = {
+                                coroutineScope.launch {
+                                    isLoading = true
+                                    val all = DeviceSmsReader.getAllBankSms(context)
+                                    messages = all
+                                    showingAllBankSms = true
+                                    isLoading = false
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6))
+                        ) {
+                            Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("جستجو در تمام پیامک‌های بانکی گوشی")
+                        }
                     }
                 }
             } else {
-                Text(
-                    text = "تعداد ${messages.size} پیامک دریافت شد. می‌توانید دسته‌بندی را با منوی کشویی تغییر داده و ثبت کنید:",
-                    color = Color(0xFFB0B7C3),
-                    fontSize = 12.sp,
-                    modifier = Modifier.padding(vertical = 10.dp)
-                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "تعداد ${messages.size} پیامک دریافت شد:",
+                        color = Color(0xFFB0B7C3),
+                        fontSize = 12.sp
+                    )
+                    TextButton(onClick = {
+                        coroutineScope.launch {
+                            isLoading = true
+                            val all = DeviceSmsReader.getAllBankSms(context)
+                            messages = all
+                            showingAllBankSms = true
+                            isLoading = false
+                        }
+                    }) {
+                        Text("نمایش همه بانک‌ها", fontSize = 11.sp, color = Color(0xFF60A5FA))
+                    }
+                }
 
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
@@ -211,7 +322,7 @@ fun SenderSmsViewerSheet(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SenderSmsItemCard(
+fun SenderSmsItemCard(
     message: DeviceSenderSmsMessage,
     sender: BankSmsSender,
     categoryNames: List<String>,

@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -17,6 +18,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.data.model.BankAccount
 import com.example.data.model.MarketRate
@@ -48,6 +50,7 @@ fun DashboardScreen(
     val monthlyExpense by viewModel.totalExpenseToman.collectAsState()
     val currencyUnit by viewModel.currencyUnit.collectAsState()
     val marketRates by viewModel.marketRates.collectAsState()
+    val pendingTransactions by viewModel.pendingTransactions.collectAsState()
 
     var accountToEdit by remember { mutableStateOf<BankAccount?>(null) }
     var showAddAccountDialog by remember { mutableStateOf(false) }
@@ -178,6 +181,65 @@ fun DashboardScreen(
                 onAccountClick = { accountToEdit = it },
                 onAddAccount = { showAddAccountDialog = true }
             )
+        }
+
+        if (pendingTransactions.isNotEmpty()) {
+            item {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(onClick = onNavigateToSms),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF3F1D38)),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE25574).copy(alpha = 0.6f))
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Surface(
+                                shape = androidx.compose.foundation.shape.CircleShape,
+                                color = Color(0xFFF2B8B5),
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        Icons.Default.Sms,
+                                        contentDescription = null,
+                                        tint = Color(0xFF601410),
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                            Column {
+                                Text(
+                                    text = "پیامک‌های تراکنش نیازمند تایید",
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFFFFD8E4),
+                                    fontSize = 14.sp
+                                )
+                                Text(
+                                    text = "${pendingTransactions.size} پیامک بانکی جدید نیازمند بررسی و تایید هستند",
+                                    color = Color(0xFFCAC4D0),
+                                    fontSize = 12.sp
+                                )
+                            }
+                        }
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowForward,
+                            contentDescription = null,
+                            tint = Color(0xFFFFD8E4)
+                        )
+                    }
+                }
+            }
         }
 
         item {
