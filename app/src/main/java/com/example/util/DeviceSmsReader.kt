@@ -74,9 +74,7 @@ object DeviceSmsReader {
         
         return lowerAddr == lowerTarget || 
                (lowerTarget.length >= 3 && (lowerAddr.contains(lowerTarget) || lowerTarget.contains(lowerAddr)))
-    }
-        return false
-    }
+    } // خطوط اضافی و آکولاد مخرب از اینجا حذف شدند
 
     /**
      * Checks if the SMS contains a balance statement (مانده / موجودی).
