@@ -24,7 +24,8 @@ data class DeviceSenderSmsMessage(
     val address: String,
     val body: String,
     val timestamp: Long,
-    val detectedBank: String? = null
+    val detectedBank: String? = null,
+    val hasBalance: Boolean = false
 )
 
 object DeviceSmsReader {
@@ -46,6 +47,61 @@ object DeviceSmsReader {
             .replace("-", "")
             .replace(" ", "")
             .trimStart('0')
+    }
+
+    /**
+     * Strictly matches SMS address with the configured senderNumber.
+     * Does NOT check message body - guarantees that messages come only from the exact sender.
+     */
+    fun isAddressStrictMatch(address: String, senderNumber: String): Boolean {
+        val normAddr = cleanNumber(address)
+        val normTarget = cleanNumber(senderNumber)
+
+        if (normTarget.isNotBlank() && normAddr.isNotBlank()) {
+            // Exact match on cleaned numbers
+            if (normAddr == normTarget) return true
+
+            // Shortcode suffix/prefix (e.g. 9830009417 vs 30009417)
+            if (normAddr.endsWith(normTarget) || normTarget.endsWith(normAddr)) {
+                val minLen = minOf(normAddr.length, normTarget.length)
+                if (minLen >= 4) return true
+            }
+        }
+
+        // Textual sender match (e.g. BLUBANK, Mellat)
+        val lowerAddr = address.lowercase().trim()
+        val lowerTarget = senderNumber.lowercase().trim()
+        if (lowerTarget.isNotBlank()) {
+            if (lowerAddr == lowerTarget) return true
+            if (lowerTarget.length >= 4 && (lowerAddr.startsWith(lowerTarget) || lowerTarget.startsWith(lowerAddr))) return true
+        }
+
+        return false
+    }
+
+    /**
+     * Checks if the SMS contains a balance statement (مانده / موجودی).
+     * Financial transactions in Iranian banks always include a balance statement.
+     */
+    fun hasBalance(body: String): Boolean {
+        val norm = normalizeDigits(body)
+        return norm.contains("مانده") || norm.contains("موجودی")
+    }
+
+    /**
+     * Identifies OTP / dynamic password / رمز دوم messages which do NOT contain a transaction balance.
+     */
+    fun isOtpWithoutBalance(body: String): Boolean {
+        val norm = normalizeDigits(body)
+        val hasOtpWords = norm.contains("رمز پویا") ||
+                norm.contains("رمز موقت") ||
+                norm.contains("رمز دوم") ||
+                norm.contains("رمز یکبار مصرف") ||
+                norm.contains("کد تایید") ||
+                norm.contains("کد فعال سازی") ||
+                norm.contains("کد فعالسازی")
+
+        return hasOtpWords && !hasBalance(body)
     }
 
     fun detectBankName(address: String, body: String): String? {
@@ -114,26 +170,27 @@ object DeviceSmsReader {
     }
 
     fun isBankTransactionSms(address: String, body: String): Boolean {
-        // Quick check for transaction keywords
-        val text = body.lowercase()
+        val text = normalizeDigits(body).lowercase()
+
+        // Transaction SMS MUST have balance ("مانده" or "موجودی")
+        val hasBal = hasBalance(body)
+
         val hasTransactionKeyword = text.contains("واریز") ||
                 text.contains("برداشت") ||
                 text.contains("انتقال") ||
                 text.contains("خرید") ||
-                text.contains("مانده") ||
-                text.contains("تومان") ||
-                text.contains("ریال")
+                text.contains("خريد") ||
+                hasBal
 
         val hasBankKeyword = detectBankName(address, body) != null ||
                 text.contains("بانک") ||
                 text.contains("حساب") ||
                 text.contains("کارت")
 
-        // Exclude OTP codes that don't have any financial transaction
-        val isPureOtp = (text.contains("رمز موقت") || text.contains("رمز یکبار مصرف") || text.contains("کد تایید")) &&
-                !text.contains("واریز") && !text.contains("برداشت") && !text.contains("خرید")
+        val isOtp = isOtpWithoutBalance(body)
 
-        return (hasTransactionKeyword && hasBankKeyword) && !isPureOtp
+        // Strict: Must have balance and not be an OTP
+        return hasBal && hasTransactionKeyword && hasBankKeyword && !isOtp
     }
 
     suspend fun getUniqueSenders(context: Context): List<SmsSenderPreview> = withContext(Dispatchers.IO) {
@@ -196,10 +253,15 @@ object DeviceSmsReader {
         return@withContext sendersMap.values.sortedByDescending { it.timestamp }.toList()
     }
 
+    /**
+     * Gets messages strictly from the specified senderNumber.
+     * When requireBalance is true (default), filters out messages without balance (such as OTP / رمز دوم).
+     */
     suspend fun getMessagesForSender(
         context: Context,
         senderNumber: String,
         bankName: String? = null,
+        requireBalance: Boolean = true,
         limit: Int = 150
     ): List<DeviceSenderSmsMessage> = withContext(Dispatchers.IO) {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED) {
@@ -215,10 +277,6 @@ object DeviceSmsReader {
             Telephony.Sms.DATE
         )
 
-        val targetClean = cleanNumber(senderNumber)
-        val targetLower = senderNumber.lowercase().trim()
-        val bankNameTrim = bankName?.trim() ?: ""
-
         var cursor: Cursor? = null
         try {
             cursor = context.contentResolver.query(
@@ -226,7 +284,7 @@ object DeviceSmsReader {
                 projection,
                 null,
                 null,
-                Telephony.Sms.DATE + " DESC LIMIT 2000"
+                Telephony.Sms.DATE + " DESC LIMIT 2500"
             )
 
             cursor?.let {
@@ -241,33 +299,28 @@ object DeviceSmsReader {
                     val date = it.getLong(dateIndex)
                     val id = it.getLong(idIndex)
 
-                    val addrClean = cleanNumber(address)
-                    val addrLower = address.lowercase().trim()
-
-                    val isAddressMatch = targetClean.isNotBlank() && (
-                        addrClean == targetClean ||
-                        addrClean.endsWith(targetClean) ||
-                        targetClean.endsWith(addrClean) ||
-                        (targetClean.length >= 4 && addrClean.contains(targetClean)) ||
-                        (targetLower.length >= 3 && addrLower.contains(targetLower))
-                    )
-
-                    val isBankNameMatch = bankNameTrim.isNotBlank() && (
-                        addrLower.contains(bankNameTrim.lowercase()) ||
-                        body.contains(bankNameTrim, ignoreCase = true)
-                    )
-
-                    if (isAddressMatch || isBankNameMatch) {
-                        messages.add(
-                            DeviceSenderSmsMessage(
-                                id = id,
-                                address = address,
-                                body = body,
-                                timestamp = date,
-                                detectedBank = detectBankName(address, body) ?: bankName
-                            )
-                        )
+                    // 1. MUST strictly match sender address
+                    if (!isAddressStrictMatch(address, senderNumber)) {
+                        continue
                     }
+
+                    val msgHasBalance = hasBalance(body)
+
+                    // 2. MUST have balance if requireBalance is true (filters out OTP/رمز دوم)
+                    if (requireBalance && (!msgHasBalance || isOtpWithoutBalance(body))) {
+                        continue
+                    }
+
+                    messages.add(
+                        DeviceSenderSmsMessage(
+                            id = id,
+                            address = address,
+                            body = body,
+                            timestamp = date,
+                            detectedBank = detectBankName(address, body) ?: bankName,
+                            hasBalance = msgHasBalance
+                        )
+                    )
                 }
             }
         } catch (e: Exception) {
@@ -281,6 +334,7 @@ object DeviceSmsReader {
 
     suspend fun getAllBankSms(
         context: Context,
+        requireBalance: Boolean = true,
         limit: Int = 150
     ): List<DeviceSenderSmsMessage> = withContext(Dispatchers.IO) {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED) {
@@ -303,7 +357,7 @@ object DeviceSmsReader {
                 projection,
                 null,
                 null,
-                Telephony.Sms.DATE + " DESC LIMIT 2000"
+                Telephony.Sms.DATE + " DESC LIMIT 2500"
             )
 
             cursor?.let {
@@ -318,14 +372,23 @@ object DeviceSmsReader {
                     val date = it.getLong(dateIndex)
                     val id = it.getLong(idIndex)
 
-                    if (isBankTransactionSms(address, body)) {
+                    val msgHasBalance = hasBalance(body)
+
+                    if (requireBalance) {
+                        if (!msgHasBalance || isOtpWithoutBalance(body)) {
+                            continue
+                        }
+                    }
+
+                    if (isBankTransactionSms(address, body) || (msgHasBalance && !isOtpWithoutBalance(body))) {
                         messages.add(
                             DeviceSenderSmsMessage(
                                 id = id,
                                 address = address,
                                 body = body,
                                 timestamp = date,
-                                detectedBank = detectBankName(address, body)
+                                detectedBank = detectBankName(address, body),
+                                hasBalance = msgHasBalance
                             )
                         )
                     }

@@ -128,7 +128,7 @@ object SmsAiParser {
         }
 
         // 5. Extract Balance (مانده حساب)
-        val balancePattern = Pattern.compile("(?:موجودی|مانده)(?:\\s*:|:)?\\s*([0-9,٫]+)\\s*(ریال|تومان)?")
+        val balancePattern = Pattern.compile("(?:موجودی|مانده)(?:\\s+(?:حساب|کارت|کل|فعلی|جدید|نهایی|شما))?(?:\\s*:|:)?\\s*([0-9,٫]+)\\s*(ریال|تومان)?")
         val balanceMatcher = balancePattern.matcher(normalizedText)
         if (balanceMatcher.find()) {
             val rawBal = balanceMatcher.group(1)?.replace(",", "")?.replace("٫", "") ?: "0"

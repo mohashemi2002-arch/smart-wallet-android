@@ -5,15 +5,15 @@ import android.content.pm.PackageManager
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -22,7 +22,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -32,14 +31,15 @@ import com.example.data.SmsAiParser
 import com.example.data.model.*
 import com.example.util.DeviceSenderSmsMessage
 import com.example.util.DeviceSmsReader
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 /**
- * BottomSheet displaying all SMS messages received from a specific Bank SMS Sender.
- * Allows users to view the parsed transaction, select a category from an interactive
- * dropdown menu (منوی کشویی دسته‌بندی), and register it as an official transaction with 1 click.
+ * BottomSheet displaying SMS messages received strictly from a specific Bank SMS Sender.
+ * Enforces:
+ * 1. Strictly from the senderNumber (no fallback to other banks).
+ * 2. Highlights & requires balance ("مانده" / "موجودی") to filter out OTP / رمز دوم SMS.
+ * 3. Shows full raw original SMS body without truncation.
+ * 4. Interactive category dropdown menu with 1-click transaction registration.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -60,7 +60,7 @@ fun SenderSmsViewerSheet(
 
     var messages by remember { mutableStateOf<List<DeviceSenderSmsMessage>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
-    var showingAllBankSms by remember { mutableStateOf(false) }
+    var onlyWithBalance by remember { mutableStateOf(true) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
@@ -72,7 +72,8 @@ fun SenderSmsViewerSheet(
                 val result = DeviceSmsReader.getMessagesForSender(
                     context = context,
                     senderNumber = sender.senderNumber,
-                    bankName = sender.bankName
+                    bankName = sender.bankName,
+                    requireBalance = onlyWithBalance
                 )
                 messages = result
                 isLoading = false
@@ -98,13 +99,14 @@ fun SenderSmsViewerSheet(
         )
     }
 
-    LaunchedEffect(sender.senderNumber, hasPermission) {
+    LaunchedEffect(sender.senderNumber, hasPermission, onlyWithBalance) {
         if (hasPermission) {
             isLoading = true
             val result = DeviceSmsReader.getMessagesForSender(
                 context = context,
                 senderNumber = sender.senderNumber,
-                bankName = sender.bankName
+                bankName = sender.bankName,
+                requireBalance = onlyWithBalance
             )
             messages = result
             isLoading = false
@@ -116,7 +118,7 @@ fun SenderSmsViewerSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = Color(0xFF1E212B),
-        modifier = Modifier.fillMaxHeight(0.9f)
+        modifier = Modifier.fillMaxHeight(0.92f)
     ) {
         Column(
             modifier = Modifier
@@ -138,21 +140,22 @@ fun SenderSmsViewerSheet(
                     BankLogoImage(
                         bankName = sender.bankName,
                         cardNumber = null,
-                        containerSize = 40.dp,
-                        logoSize = 32.dp,
+                        containerSize = 42.dp,
+                        logoSize = 34.dp,
                         containerColor = Color(0xFF2C3242)
                     )
                     Column {
                         Text(
-                            text = if (showingAllBankSms) "تمام پیامک‌های بانکی دستگاه" else "پیامک‌های ${sender.bankName}",
+                            text = "پیامک‌های ${sender.bankName}",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = Color.White
                         )
                         Text(
-                            text = if (showingAllBankSms) "صندوق کلی پیامک‌های بانکی" else "سرشماره: ${sender.senderNumber}",
+                            text = "سرشماره اختصاصی: ${sender.senderNumber}",
                             style = MaterialTheme.typography.bodySmall,
-                            color = Color(0xFF9E9E9E)
+                            color = Color(0xFF60A5FA),
+                            fontWeight = FontWeight.SemiBold
                         )
                     }
                 }
@@ -163,6 +166,44 @@ fun SenderSmsViewerSheet(
             }
 
             HorizontalDivider(color = Color(0xFF2E3446))
+
+            // Filter Chips: Require Balance vs All Messages from this Sender
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                FilterChip(
+                    selected = onlyWithBalance,
+                    onClick = { onlyWithBalance = true },
+                    label = { Text("فقط تراکنش‌های دارای مانده", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
+                    leadingIcon = {
+                        if (onlyWithBalance) {
+                            Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(14.dp))
+                        }
+                    },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = Color(0xFF2563EB),
+                        selectedLabelColor = Color.White,
+                        containerColor = Color(0xFF262E3D),
+                        labelColor = Color(0xFF94A3B8)
+                    )
+                )
+
+                FilterChip(
+                    selected = !onlyWithBalance,
+                    onClick = { onlyWithBalance = false },
+                    label = { Text("همه پیامک‌ها (شامل رمز دوم)", fontSize = 11.sp) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = Color(0xFF475569),
+                        selectedLabelColor = Color.White,
+                        containerColor = Color(0xFF262E3D),
+                        labelColor = Color(0xFF94A3B8)
+                    )
+                )
+            }
 
             if (!hasPermission) {
                 Box(
@@ -213,7 +254,7 @@ fun SenderSmsViewerSheet(
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         CircularProgressIndicator(color = Color(0xFF5C82E6))
                         Spacer(Modifier.height(12.dp))
-                        Text("در حال واکشی پیامک‌های این سرشماره...", color = Color.LightGray, fontSize = 13.sp)
+                        Text("در حال جستجوی پیامک‌های سرشماره ${sender.senderNumber}...", color = Color.LightGray, fontSize = 13.sp)
                     }
                 }
             } else if (messages.isEmpty()) {
@@ -229,54 +270,29 @@ fun SenderSmsViewerSheet(
                     ) {
                         Icon(Icons.Default.Inbox, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(48.dp))
                         Text(
-                            text = "هیچ پیامکی از سرشماره ${sender.senderNumber} یافت نشد.",
-                            color = Color.Gray,
+                            text = if (onlyWithBalance) {
+                                "هیچ پیامک تراکنشی (دارای مانده) از سرشماره ${sender.senderNumber} یافت نشد."
+                            } else {
+                                "هیچ پیامکی از سرشماره ${sender.senderNumber} در صندوق پیامک‌های گوشی وجود ندارد."
+                            },
+                            color = Color.LightGray,
                             fontSize = 14.sp,
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center
                         )
-                        Button(
-                            onClick = {
-                                coroutineScope.launch {
-                                    isLoading = true
-                                    val all = DeviceSmsReader.getAllBankSms(context)
-                                    messages = all
-                                    showingAllBankSms = true
-                                    isLoading = false
-                                }
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6))
-                        ) {
-                            Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text("جستجو در تمام پیامک‌های بانکی گوشی")
+                        if (onlyWithBalance) {
+                            TextButton(onClick = { onlyWithBalance = false }) {
+                                Text("مشاهده همه پیامک‌ها (شامل پیامک‌های بدون مانده و رمز دوم)", fontSize = 12.sp, color = Color(0xFF60A5FA))
+                            }
                         }
                     }
                 }
             } else {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 10.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "تعداد ${messages.size} پیامک دریافت شد:",
-                        color = Color(0xFFB0B7C3),
-                        fontSize = 12.sp
-                    )
-                    TextButton(onClick = {
-                        coroutineScope.launch {
-                            isLoading = true
-                            val all = DeviceSmsReader.getAllBankSms(context)
-                            messages = all
-                            showingAllBankSms = true
-                            isLoading = false
-                        }
-                    }) {
-                        Text("نمایش همه بانک‌ها", fontSize = 11.sp, color = Color(0xFF60A5FA))
-                    }
-                }
+                Text(
+                    text = "تعداد ${messages.size} پیامک دریافت شد از سرشماره ${sender.senderNumber}:",
+                    color = Color(0xFFB0B7C3),
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
 
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
@@ -296,7 +312,6 @@ fun SenderSmsViewerSheet(
                             onRegister = { tx ->
                                 coroutineScope.launch {
                                     repository.transactionDao.insert(tx)
-                                    // Update bank card balance if available
                                     if (tx.balanceAfterToman != null && tx.balanceAfterToman > 0) {
                                         val matchedCard = bankAccounts.find {
                                             (tx.cardNumber != null && it.cardNumber.endsWith(tx.cardNumber)) ||
@@ -320,6 +335,15 @@ fun SenderSmsViewerSheet(
     }
 }
 
+/**
+ * Card displaying an individual SMS message from a specific bank sender.
+ * Displays:
+ * 1. Full raw original SMS body (متن اصلی پیامک) without truncation.
+ * 2. Extracted balance badge (مانده حساب) if available.
+ * 3. Amount & Type (واریز / برداشت).
+ * 4. Interactive category selection dropdown (منوی کشویی دسته‌بندی).
+ * 5. One-click registration button.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SenderSmsItemCard(
@@ -332,7 +356,6 @@ fun SenderSmsItemCard(
 ) {
     var isRegisteredLocal by remember { mutableStateOf(isAlreadyRegistered) }
     var expandedCategoryDropdown by remember { mutableStateOf(false) }
-    var expandedDetails by remember { mutableStateOf(false) }
 
     // Parse the SMS text
     val parsed = remember(message.body) {
@@ -351,7 +374,7 @@ fun SenderSmsItemCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Color(0xFF282E3F)),
-        border = androidx.compose.foundation.BorderStroke(
+        border = BorderStroke(
             1.dp,
             if (isRegisteredLocal) Color(0xFF4CAF50).copy(alpha = 0.5f) else Color(0xFF384055)
         )
@@ -360,17 +383,34 @@ fun SenderSmsItemCard(
             modifier = Modifier.padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // Header Row: Date & Registration Status
+            // Header Row: Date & Status & Sender Badge
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = PersianFormatters.formatDateTime(message.timestamp),
-                    fontSize = 11.sp,
-                    color = Color(0xFFA0A7B5)
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = PersianFormatters.formatDateTime(message.timestamp),
+                        fontSize = 11.sp,
+                        color = Color(0xFFA0A7B5)
+                    )
+
+                    Surface(
+                        shape = RoundedCornerShape(50),
+                        color = Color(0xFF1E2633)
+                    ) {
+                        Text(
+                            text = "سرشماره: ${message.address}",
+                            fontSize = 10.sp,
+                            color = Color(0xFF93C5FD),
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
 
                 if (isRegisteredLocal) {
                     Surface(
@@ -442,6 +482,51 @@ fun SenderSmsItemCard(
                 }
             }
 
+            // Balance Box (مانده حساب)
+            if (parsed.balanceToman != null && parsed.balanceToman > 0) {
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = Color(0xFF0F3A3A),
+                    border = BorderStroke(1.dp, Color(0xFF14B8A6).copy(alpha = 0.4f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, tint = Color(0xFF2DD4BF), modifier = Modifier.size(16.dp))
+                            Text("مانده حساب در پیامک:", fontSize = 12.sp, color = Color(0xFFCCFBF1), fontWeight = FontWeight.SemiBold)
+                        }
+                        Text(
+                            text = "${parsed.balanceToman.formatAsToman()} تومان",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF2DD4BF)
+                        )
+                    }
+                }
+            } else if (message.hasBalance) {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = Color(0xFF0F3A3A),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF2DD4BF), modifier = Modifier.size(15.dp))
+                        Text("پیامک دارای مانده است", fontSize = 11.sp, color = Color(0xFFCCFBF1))
+                    }
+                }
+            }
+
             // Category Selection Dropdown Menu (منوی کشویی دسته‌بندی)
             ExposedDropdownMenuBox(
                 expanded = expandedCategoryDropdown,
@@ -488,32 +573,55 @@ fun SenderSmsItemCard(
                 }
             }
 
-            // Raw SMS text accordion
+            // Full Raw Original SMS Text Box (متن اصلی پیامک بدون خلاصه سازی)
             Surface(
-                color = Color(0xFF1B202C),
-                shape = RoundedCornerShape(8.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { expandedDetails = !expandedDetails }
+                color = Color(0xFF182030),
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, Color(0xFF2D3B52)),
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Column(modifier = Modifier.padding(10.dp)) {
+                Column(
+                    modifier = Modifier.padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Chat,
+                                contentDescription = null,
+                                tint = Color(0xFF60A5FA),
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = "متن اصلی پیامک دریافتی:",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF93C5FD)
+                            )
+                        }
+
                         Text(
-                            text = if (expandedDetails) "متن کامل پیامک:" else message.body.take(65) + if (message.body.length > 65) "..." else "",
-                            color = Color(0xFFD1D5DB),
-                            fontSize = 11.sp,
-                            fontFamily = FontFamily.Monospace,
-                            maxLines = if (expandedDetails) 10 else 1
+                            text = if (message.hasBalance) "تراکنش بانکی ✓" else "پیامک بانکی",
+                            fontSize = 10.sp,
+                            color = if (message.hasBalance) Color(0xFF4ADE80) else Color(0xFF94A3B8),
+                            fontWeight = FontWeight.SemiBold
                         )
-                        Icon(
-                            imageVector = if (expandedDetails) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                            contentDescription = null,
-                            tint = Color.Gray,
-                            modifier = Modifier.size(18.dp)
+                    }
+
+                    SelectionContainer {
+                        Text(
+                            text = message.body,
+                            color = Color(0xFFF1F5F9),
+                            fontSize = 13.sp,
+                            lineHeight = 20.sp,
+                            modifier = Modifier.fillMaxWidth()
                         )
                     }
                 }
