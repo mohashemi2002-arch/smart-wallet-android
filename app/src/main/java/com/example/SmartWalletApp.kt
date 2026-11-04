@@ -27,6 +27,7 @@ import com.example.ui.screens.DebtsChecksScreen
 import com.example.ui.screens.MarketRatesScreen
 import com.example.ui.screens.PortfolioScreen
 import com.example.ui.screens.RegistrationScreen
+import com.example.ui.screens.FilteredSmsViewerScreen
 import com.example.ui.screens.ReportsScreen
 import com.example.ui.screens.SettingsScreen
 import com.example.ui.screens.SmsReaderScreen
@@ -43,7 +44,8 @@ private enum class WalletDestination {
     DEBTS_CHECKS,
     MARKET_RATES,
     REGISTRATION,
-    SMS_SENDERS
+    SMS_SENDERS,
+    SMS_FILTER
 }
 
 /**
@@ -57,6 +59,9 @@ fun SmartWalletApp() {
     val financeViewModel: FinanceViewModel = viewModel()
     var destination by rememberSaveable {
         mutableStateOf(WalletDestination.DASHBOARD)
+    }
+    var filterInitialSender by rememberSaveable {
+        mutableStateOf<String?>(null)
     }
 
     val showBottomBar = destination in setOf(
@@ -169,7 +174,16 @@ fun SmartWalletApp() {
 
                 WalletDestination.SMS_READER -> SmsReaderScreen(
                     viewModel = financeViewModel,
-                    onBack = { destination = WalletDestination.DASHBOARD }
+                    onBack = { destination = WalletDestination.DASHBOARD },
+                    onNavigateToFilteredSms = { senderNum ->
+                        filterInitialSender = senderNum
+                        destination = WalletDestination.SMS_FILTER
+                    }
+                )
+
+                WalletDestination.SMS_FILTER -> FilteredSmsViewerScreen(
+                    initialSenderNumber = filterInitialSender,
+                    onNavigateBack = { destination = WalletDestination.SMS_READER }
                 )
 
                 WalletDestination.DEBTS_CHECKS -> DebtsChecksScreen(

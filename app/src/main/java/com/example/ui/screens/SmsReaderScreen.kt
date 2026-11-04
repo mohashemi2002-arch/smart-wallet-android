@@ -47,7 +47,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun SmsReaderScreen(
     viewModel: FinanceViewModel,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onNavigateToFilteredSms: (String?) -> Unit = {}
 ) {
     val smsInputText by viewModel.smsInputText.collectAsState()
     val parsedResult by viewModel.parsedSmsState.collectAsState()
@@ -147,6 +148,13 @@ fun SmsReaderScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = { onNavigateToFilteredSms(null) }) {
+                        Icon(
+                            Icons.Default.FilterList,
+                            contentDescription = "فیلتر پیامک‌ها بر اساس سرشماره",
+                            tint = Color(0xFF60A5FA)
+                        )
+                    }
                     if (isPremium) SmartWalletPlusBadge(Modifier.padding(end = 8.dp))
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF1C1B1F))
@@ -309,6 +317,23 @@ fun SmsReaderScreen(
                                 Spacer(Modifier.width(4.dp))
                                 Text("به‌روزرسانی", fontSize = 12.sp)
                             }
+                        }
+
+                        // Dedicated full-screen SMS filter & raw verification button
+                        Button(
+                            onClick = { onNavigateToFilteredSms(null) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("open_filtered_sms_screen_button"),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF2563EB),
+                                contentColor = Color.White
+                            )
+                        ) {
+                            Icon(Icons.Default.FilterAlt, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("صفحه اختصاصی فیلتر پیامک‌ها و صحت‌سنجی متن خام", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         }
 
                         if (!hasReadSmsPermission) {
@@ -629,7 +654,8 @@ fun SmsReaderScreen(
                                 sender = sender,
                                 onToggleActive = { viewModel.toggleBankSmsSenderActive(sender) },
                                 onDelete = { viewModel.deleteBankSmsSender(sender) },
-                                onViewSms = { selectedSenderForSmsView = sender }
+                                onViewSms = { selectedSenderForSmsView = sender },
+                                onFilterScreen = { onNavigateToFilteredSms(sender.senderNumber) }
                             )
                         }
                     }
@@ -900,7 +926,8 @@ fun BankSmsSenderRow(
     sender: BankSmsSender,
     onToggleActive: () -> Unit,
     onDelete: () -> Unit,
-    onViewSms: () -> Unit = {}
+    onViewSms: () -> Unit = {},
+    onFilterScreen: () -> Unit = {}
 ) {
     Surface(
         modifier = Modifier
@@ -951,19 +978,39 @@ fun BankSmsSenderRow(
 
             Spacer(Modifier.height(8.dp))
 
-            Button(
-                onClick = onViewSms,
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF435574),
-                    contentColor = Color.White
-                ),
-                shape = RoundedCornerShape(10.dp),
-                contentPadding = PaddingValues(vertical = 4.dp, horizontal = 8.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(Icons.Default.ReceiptLong, contentDescription = null, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(6.dp))
-                Text("مشاهده پیامک‌های ${sender.bankName} و ثبت با منوی کشویی", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Button(
+                    onClick = onViewSms,
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF435574),
+                        contentColor = Color.White
+                    ),
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(vertical = 4.dp, horizontal = 8.dp)
+                ) {
+                    Icon(Icons.Default.ReceiptLong, contentDescription = null, modifier = Modifier.size(15.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("مشاهده کشویی", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+
+                Button(
+                    onClick = onFilterScreen,
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF1E3A8A),
+                        contentColor = Color.White
+                    ),
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(vertical = 4.dp, horizontal = 8.dp)
+                ) {
+                    Icon(Icons.Default.FilterAlt, contentDescription = null, modifier = Modifier.size(15.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("صحت‌سنجی متن خام", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
             }
         }
     }
