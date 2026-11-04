@@ -104,46 +104,109 @@ object DeviceSmsReader {
     fun detectBankName(address: String, body: String): String? {
         val combined = "$address $body"
         val bankKeywords = listOf(
+            // بلوبانک
             "بلوبانک" to "بلوبانک",
             "بلو بانک" to "بلوبانک",
             "BLUBANK" to "بلوبانک",
             "blubank" to "بلوبانک",
+            "30009417" to "بلوبانک",
+            "30009411" to "بلوبانک",
+
+            // بانک ملت
+            "BankMellat" to "بانک ملت",
+            "Bank Mellat" to "بانک ملت",
             "بانک ملت" to "بانک ملت",
-            "ملت" to "بانک ملت",
             "mellat" to "بانک ملت",
+            "ملت" to "بانک ملت",
+
+            // بانک ملی
+            "Bank Melli" to "بانک ملی ایران",
+            "BankMelli" to "بانک ملی ایران",
+            "BMI" to "بانک ملی ایران",
             "بانک ملی" to "بانک ملی ایران",
             "ملی ایران" to "بانک ملی ایران",
+
+            // بانک صادرات
+            "BankSaderat" to "بانک صادرات ایران",
+            "Bank Saderat" to "بانک صادرات ایران",
+            "BSI" to "بانک صادرات ایران",
             "بانک صادرات" to "بانک صادرات ایران",
             "صادرات ایران" to "بانک صادرات ایران",
             "صادرات" to "بانک صادرات ایران",
-            "بانک تجارت" to "بانک تجارت",
-            "تجارت" to "بانک تجارت",
-            "tejarat" to "بانک تجارت",
+
+            // بانک سپه
+            "Bank Sepah" to "بانک سپه",
+            "BankSepah" to "بانک سپه",
             "بانک سپه" to "بانک سپه",
             "سپه" to "بانک سپه",
             "sepah" to "بانک سپه",
+
+            // بانک تجارت
+            "BankTejarat" to "بانک تجارت",
+            "Bank Tejarat" to "بانک تجارت",
+            "بانک تجارت" to "بانک تجارت",
+            "تجارت" to "بانک تجارت",
+            "tejarat" to "بانک تجارت",
+
+            // بانک پاسارگاد
+            "Pasargad" to "بانک پاسارگاد",
+            "Bank Pasargad" to "بانک پاسارگاد",
             "بانک پاسارگاد" to "بانک پاسارگاد",
             "پاسارگاد" to "بانک پاسارگاد",
-            "pasargad" to "بانک پاسارگاد",
+
+            // بانک سامان
+            "SamanBank" to "بانک سامان",
+            "Saman Bank" to "بانک سامان",
             "بانک سامان" to "بانک سامان",
             "سامان" to "بانک سامان",
             "saman" to "بانک سامان",
+
+            // قرض‌الحسنه مهر ایران
+            "QMEHRIRAN" to "بانک قرض‌الحسنه مهر ایران",
+            "QMehrIran" to "بانک قرض‌الحسنه مهر ایران",
+            "مهر ایران" to "بانک قرض‌الحسنه مهر ایران",
+
+            // قرض‌الحسنه رسالت
+            "Rqbank" to "بانک قرض‌الحسنه رسالت",
+            "RQBank" to "بانک قرض‌الحسنه رسالت",
+            "رسالت" to "بانک قرض‌الحسنه رسالت",
+
+            // بانک پارسیان
+            "ParsianBank" to "بانک پارسیان",
+            "Parsian Bank" to "بانک پارسیان",
             "بانک پارسیان" to "بانک پارسیان",
             "پارسیان" to "بانک پارسیان",
             "parsian" to "بانک پارسیان",
+
+            // بانک کشاورزی
+            "Bank Keshavarzi" to "بانک کشاورزی",
+            "BankKeshavarzi" to "بانک کشاورزی",
             "بانک کشاورزی" to "بانک کشاورزی",
             "کشاورزی" to "بانک کشاورزی",
             "bki" to "بانک کشاورزی",
+
+            // بانک مسکن
+            "Bank Maskan" to "بانک مسکن",
+            "BankMaskan" to "بانک مسکن",
+            "بانک مسکن" to "بانک مسکن",
+            "مسکن" to "بانک مسکن",
+
+            // بانک شهر
+            "Shahr Bank" to "بانک شهر",
+            "ShahrBank" to "بانک شهر",
+            "بانک شهر" to "بانک شهر",
+            "shahr" to "بانک شهر",
+
+            // بانک آینده
+            "BaBank" to "بانک آینده",
+            "Ayandeh" to "بانک آینده",
+            "بانک آینده" to "بانک آینده",
+            "آینده" to "بانک آینده",
+
+            // سایر بانک‌ها
             "بانک رفاه" to "بانک رفاه کارگران",
             "رفاه کارگران" to "بانک رفاه کارگران",
             "رفاه" to "بانک رفاه کارگران",
-            "بانک مسکن" to "بانک مسکن",
-            "مسکن" to "بانک مسکن",
-            "بانک شهر" to "بانک شهر",
-            "shahr" to "بانک شهر",
-            "بانک آینده" to "بانک آینده",
-            "آینده" to "بانک آینده",
-            "ayandeh" to "بانک آینده",
             "بانک سینا" to "بانک سینا",
             "سینا" to "بانک سینا",
             "اقتصاد نوین" to "بانک اقتصاد نوین",
@@ -151,8 +214,6 @@ object DeviceSmsReader {
             "سرمایه" to "بانک سرمایه",
             "گردشگری" to "بانک گردشگری",
             "ایران زمین" to "بانک ایران زمین",
-            "رسالت" to "بانک قرض‌الحسنه رسالت",
-            "مهر ایران" to "بانک قرض‌الحسنه مهر ایران",
             "پست بانک" to "پست بانک ایران",
             "بانک دی" to "بانک دی",
             "خاورمیانه" to "بانک خاورمیانه",
@@ -394,6 +455,66 @@ object DeviceSmsReader {
             }
         } catch (e: Exception) {
             Log.e("DeviceSmsReader", "Error reading all bank SMS: ${e.message}")
+        } finally {
+            cursor?.close()
+        }
+
+        return@withContext messages
+    }
+
+    suspend fun getAllIncomingMessages(
+        context: Context,
+        limit: Int = 1000
+    ): List<DeviceSenderSmsMessage> = withContext(Dispatchers.IO) {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED) {
+            return@withContext emptyList()
+        }
+
+        val messages = mutableListOf<DeviceSenderSmsMessage>()
+        val uri: Uri = Uri.parse("content://sms/inbox")
+        val projection = arrayOf(
+            Telephony.Sms._ID,
+            Telephony.Sms.ADDRESS,
+            Telephony.Sms.BODY,
+            Telephony.Sms.DATE
+        )
+
+        var cursor: Cursor? = null
+        try {
+            cursor = context.contentResolver.query(
+                uri,
+                projection,
+                null,
+                null,
+                Telephony.Sms.DATE + " DESC LIMIT $limit"
+            )
+
+            cursor?.let {
+                val idIndex = it.getColumnIndexOrThrow(Telephony.Sms._ID)
+                val addressIndex = it.getColumnIndexOrThrow(Telephony.Sms.ADDRESS)
+                val bodyIndex = it.getColumnIndexOrThrow(Telephony.Sms.BODY)
+                val dateIndex = it.getColumnIndexOrThrow(Telephony.Sms.DATE)
+
+                while (it.moveToNext()) {
+                    val address = it.getString(addressIndex) ?: continue
+                    val body = it.getString(bodyIndex) ?: ""
+                    val date = it.getLong(dateIndex)
+                    val id = it.getLong(idIndex)
+
+                    messages.add(
+                        DeviceSenderSmsMessage(
+                            id = id,
+                            address = address,
+                            body = body,
+                            timestamp = date,
+                            detectedBank = detectBankName(address, body),
+                            hasBalance = hasBalance(body)
+                        )
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("DeviceSmsReader", "Error reading all incoming SMS: ${e.message}")
         } finally {
             cursor?.close()
         }

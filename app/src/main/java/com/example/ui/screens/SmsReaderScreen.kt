@@ -48,7 +48,8 @@ import kotlinx.coroutines.launch
 fun SmsReaderScreen(
     viewModel: FinanceViewModel,
     onBack: () -> Unit,
-    onNavigateToFilteredSms: (String?) -> Unit = {}
+    onNavigateToFilteredSms: (String?) -> Unit = {},
+    onNavigateToGroupedSms: (String?) -> Unit = {}
 ) {
     val smsInputText by viewModel.smsInputText.collectAsState()
     val parsedResult by viewModel.parsedSmsState.collectAsState()
@@ -148,6 +149,13 @@ fun SmsReaderScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = { onNavigateToGroupedSms(null) }) {
+                        Icon(
+                            Icons.Default.ListAlt,
+                            contentDescription = "لیست پیامک‌ها و گروه‌بندی بر اساس فرستنده",
+                            tint = Color(0xFF38BDF8)
+                        )
+                    }
                     IconButton(onClick = { onNavigateToFilteredSms(null) }) {
                         Icon(
                             Icons.Default.FilterList,
@@ -319,21 +327,42 @@ fun SmsReaderScreen(
                             }
                         }
 
-                        // Dedicated full-screen SMS filter & raw verification button
-                        Button(
-                            onClick = { onNavigateToFilteredSms(null) },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("open_filtered_sms_screen_button"),
-                            shape = RoundedCornerShape(14.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFF2563EB),
-                                contentColor = Color.White
-                            )
+                        // Dedicated buttons for SMS screens
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Icon(Icons.Default.FilterAlt, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text("صفحه اختصاصی فیلتر پیامک‌ها و صحت‌سنجی متن خام", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            Button(
+                                onClick = { onNavigateToGroupedSms(null) },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("open_grouped_sms_screen_button"),
+                                shape = RoundedCornerShape(14.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFF0284C7),
+                                    contentColor = Color.White
+                                )
+                            ) {
+                                Icon(Icons.Default.ListAlt, contentDescription = null, modifier = Modifier.size(17.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("لیست پیامک‌ها (گروه‌بندی)", fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                            }
+
+                            Button(
+                                onClick = { onNavigateToFilteredSms(null) },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("open_filtered_sms_screen_button"),
+                                shape = RoundedCornerShape(14.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFF2563EB),
+                                    contentColor = Color.White
+                                )
+                            ) {
+                                Icon(Icons.Default.FilterAlt, contentDescription = null, modifier = Modifier.size(17.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("صحت‌سنجی متن خام", fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                            }
                         }
 
                         if (!hasReadSmsPermission) {
