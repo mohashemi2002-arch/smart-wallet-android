@@ -57,25 +57,24 @@ object DeviceSmsReader {
         val normAddr = cleanNumber(address)
         val normTarget = cleanNumber(senderNumber)
 
-        if (normTarget.isNotBlank() && normAddr.isNotBlank()) {
-            // Exact match on cleaned numbers
-            if (normAddr == normTarget) return true
+        if (normTarget.isBlank() || normAddr.isBlank()) return false
 
-            // Shortcode suffix/prefix (e.g. 9830009417 vs 30009417)
-            if (normAddr.endsWith(normTarget) || normTarget.endsWith(normAddr)) {
-                val minLen = minOf(normAddr.length, normTarget.length)
-                if (minLen >= 4) return true
-            }
+        // تطبیق دقیق شماره‌های پاکسازی شده
+        if (normAddr == normTarget) return true
+
+        // تطبیق پیشوند و پسوند (برای سرشماره‌های کوتاه‌مدت بانکی مانند 30009417 و 9830009417)
+        if (normAddr.endsWith(normTarget) || normTarget.endsWith(normAddr)) {
+            val minLen = minOf(normAddr.length, normTarget.length)
+            if (minLen >= 3) return true
         }
 
-        // Textual sender match (e.g. BLUBANK, Mellat)
+        // تطبیق نام‌های متنی فرستنده (مانند BLUBANK یا Mellat)
         val lowerAddr = address.lowercase().trim()
         val lowerTarget = senderNumber.lowercase().trim()
-        if (lowerTarget.isNotBlank()) {
-            if (lowerAddr == lowerTarget) return true
-            if (lowerTarget.length >= 4 && (lowerAddr.startsWith(lowerTarget) || lowerTarget.startsWith(lowerAddr))) return true
-        }
-
+        
+        return lowerAddr == lowerTarget || 
+               (lowerTarget.length >= 3 && (lowerAddr.contains(lowerTarget) || lowerTarget.contains(lowerAddr)))
+    }
         return false
     }
 
@@ -279,6 +278,7 @@ object DeviceSmsReader {
 
         var cursor: Cursor? = null
         try {
+            // استفاده از فیلتر پایگاه داده برای سرعت بالاتر و محدود کردن به سرشماره هدف
             cursor = context.contentResolver.query(
                 uri,
                 projection,
@@ -299,14 +299,14 @@ object DeviceSmsReader {
                     val date = it.getLong(dateIndex)
                     val id = it.getLong(idIndex)
 
-                    // 1. MUST strictly match sender address
+                    // ۱. سخت‌گیرانه: باید دقیقاً مطابق سرشماره تعریف‌شده برای کارت باشد
                     if (!isAddressStrictMatch(address, senderNumber)) {
                         continue
                     }
 
                     val msgHasBalance = hasBalance(body)
 
-                    // 2. MUST have balance if requireBalance is true (filters out OTP/رمز دوم)
+                    // ۲. فیلتر کردن رمز دوم و پیامک‌های بدون مانده در صورت نیاز
                     if (requireBalance && (!msgHasBalance || isOtpWithoutBalance(body))) {
                         continue
                     }
