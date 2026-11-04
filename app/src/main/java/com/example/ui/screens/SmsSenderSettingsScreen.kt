@@ -13,6 +13,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.ReceiptLong
+import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -59,6 +61,7 @@ fun SmsSenderSettingsScreen(
     }
 
     var selectedSenderForSmsView by remember { mutableStateOf<BankSmsSender?>(null) }
+    var editingSenderForBank by remember { mutableStateOf<BankSmsSender?>(null) }
 
     Scaffold(
         topBar = {
@@ -119,11 +122,25 @@ fun SmsSenderSettingsScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(sender.bankName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color(0xFFE6E1E5))
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text("سرشماره: ${sender.senderNumber}", style = MaterialTheme.typography.bodyMedium, color = Color(0xFFCAC4D0))
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    com.example.ui.components.BankLogoImage(
+                                        bankName = sender.bankName,
+                                        cardNumber = null,
+                                        containerSize = 40.dp,
+                                        logoSize = 32.dp,
+                                        containerColor = Color(0xFF1E2633)
+                                    )
+                                    Column {
+                                        Text(sender.bankName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color(0xFFE6E1E5))
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text("سرشماره: ${sender.senderNumber}", style = MaterialTheme.typography.bodyMedium, color = Color(0xFFCAC4D0))
+                                    }
                                 }
+
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Switch(
                                         checked = sender.isActive,
@@ -146,20 +163,36 @@ fun SmsSenderSettingsScreen(
                                 }
                             }
 
-                            Spacer(modifier = Modifier.height(12.dp))
+                            Spacer(modifier = Modifier.height(10.dp))
 
-                            Button(
-                                onClick = { selectedSenderForSmsView = sender },
+                            Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFF5C82E6),
-                                    contentColor = Color.White
-                                ),
-                                shape = RoundedCornerShape(12.dp)
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Icon(Icons.Default.ReceiptLong, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(Modifier.width(8.dp))
-                                Text("مشاهده پیامک‌ها و ثبت تراکنش (منوی کشویی)", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                OutlinedButton(
+                                    onClick = { editingSenderForBank = sender },
+                                    modifier = Modifier.weight(0.9f),
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF93C5FD)),
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    Icon(Icons.Default.AccountBalance, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("انتخاب بانک", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
+
+                                Button(
+                                    onClick = { selectedSenderForSmsView = sender },
+                                    modifier = Modifier.weight(1.3f),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = Color(0xFF5C82E6),
+                                        contentColor = Color.White
+                                    ),
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    Icon(Icons.Default.ReceiptLong, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("مشاهده پیامک‌ها", fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                }
                             }
                         }
                     }
@@ -172,6 +205,27 @@ fun SmsSenderSettingsScreen(
         com.example.ui.components.SenderSmsViewerSheet(
             sender = sender,
             onDismiss = { selectedSenderForSmsView = null }
+        )
+    }
+
+    editingSenderForBank?.let { sender ->
+        com.example.ui.components.SelectBankForSenderDialog(
+            senderNumber = sender.senderNumber,
+            initialBankName = sender.bankName,
+            onDismiss = { editingSenderForBank = null },
+            onConfirm = { chosenBankName ->
+                coroutineScope.launch {
+                    repository.bankSmsSenderDao.update(
+                        sender.copy(bankName = chosenBankName)
+                    )
+                    Toast.makeText(
+                        context,
+                        "سرشماره ${sender.senderNumber} به $chosenBankName متصل شد",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+                editingSenderForBank = null
+            }
         )
     }
 

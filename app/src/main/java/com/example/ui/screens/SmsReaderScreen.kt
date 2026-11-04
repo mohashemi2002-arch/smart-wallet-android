@@ -40,6 +40,8 @@ import com.example.ui.components.SmsSenderPickerSheet
 import com.example.ui.viewmodel.FinanceViewModel
 import com.example.util.DeviceSenderSmsMessage
 import com.example.util.DeviceSmsReader
+import com.example.ui.components.SelectBankForSenderDialog
+import com.example.ui.components.IRANIAN_MAJOR_BANKS
 import com.example.data.FinanceRepository
 import kotlinx.coroutines.launch
 
@@ -66,6 +68,7 @@ fun SmsReaderScreen(
     var showAddSenderDialog by remember { mutableStateOf(false) }
     var showSmsPickerBottomSheet by remember { mutableStateOf(false) }
     var selectedSenderForSmsView by remember { mutableStateOf<BankSmsSender?>(null) }
+    var editingSenderForBank by remember { mutableStateOf<BankSmsSender?>(null) }
 
     val context = androidx.compose.ui.platform.LocalContext.current
     val repository = remember { FinanceRepository.getInstance(context) }
@@ -684,7 +687,8 @@ fun SmsReaderScreen(
                                 onToggleActive = { viewModel.toggleBankSmsSenderActive(sender) },
                                 onDelete = { viewModel.deleteBankSmsSender(sender) },
                                 onViewSms = { selectedSenderForSmsView = sender },
-                                onFilterScreen = { onNavigateToFilteredSms(sender.senderNumber) }
+                                onFilterScreen = { onNavigateToFilteredSms(sender.senderNumber) },
+                                onEditBank = { editingSenderForBank = sender }
                             )
                         }
                     }
@@ -948,6 +952,27 @@ fun SmsReaderScreen(
             onDismiss = { selectedSenderForSmsView = null }
         )
     }
+
+    editingSenderForBank?.let { sender ->
+        SelectBankForSenderDialog(
+            senderNumber = sender.senderNumber,
+            initialBankName = sender.bankName,
+            onDismiss = { editingSenderForBank = null },
+            onConfirm = { chosenBankName ->
+                coroutineScope.launch {
+                    repository.bankSmsSenderDao.update(
+                        sender.copy(bankName = chosenBankName)
+                    )
+                    android.widget.Toast.makeText(
+                        context,
+                        "سرشماره ${sender.senderNumber} به $chosenBankName متصل شد",
+                        android.widget.Toast.LENGTH_SHORT
+                    ).show()
+                }
+                editingSenderForBank = null
+            }
+        )
+    }
 }
 
 @Composable
@@ -956,7 +981,8 @@ fun BankSmsSenderRow(
     onToggleActive: () -> Unit,
     onDelete: () -> Unit,
     onViewSms: () -> Unit = {},
-    onFilterScreen: () -> Unit = {}
+    onFilterScreen: () -> Unit = {},
+    onEditBank: () -> Unit = {}
 ) {
     Surface(
         modifier = Modifier
@@ -977,18 +1003,24 @@ fun BankSmsSenderRow(
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable { onEditBank() }
                 ) {
                     BankLogoImage(
                         bankName = sender.bankName,
                         cardNumber = null,
-                        containerSize = 36.dp,
-                        logoSize = 28.dp,
+                        containerSize = 38.dp,
+                        logoSize = 30.dp,
                         containerColor = Color(0xFF2B2930)
                     )
 
                     Column {
-                        Text(sender.bankName, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold), color = Color(0xFFE6E1E5))
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(sender.bankName, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold), color = Color(0xFFE6E1E5))
+                            Icon(Icons.Default.Edit, contentDescription = "تغییر بانک", tint = Color(0xFF93C5FD), modifier = Modifier.size(14.dp))
+                        }
                         Text("سرشماره: ${sender.senderNumber}", style = MaterialTheme.typography.bodySmall, color = Color(0xFFCAC4D0))
                     }
                 }
@@ -1009,8 +1041,22 @@ fun BankSmsSenderRow(
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
+                OutlinedButton(
+                    onClick = onEditBank,
+                    modifier = Modifier.weight(0.9f),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = Color(0xFF93C5FD)
+                    ),
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(vertical = 4.dp, horizontal = 4.dp)
+                ) {
+                    Icon(Icons.Default.AccountBalance, contentDescription = null, modifier = Modifier.size(14.dp))
+                    Spacer(Modifier.width(3.dp))
+                    Text("انتخاب بانک", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                }
+
                 Button(
                     onClick = onViewSms,
                     modifier = Modifier.weight(1f),
@@ -1019,11 +1065,11 @@ fun BankSmsSenderRow(
                         contentColor = Color.White
                     ),
                     shape = RoundedCornerShape(10.dp),
-                    contentPadding = PaddingValues(vertical = 4.dp, horizontal = 8.dp)
+                    contentPadding = PaddingValues(vertical = 4.dp, horizontal = 4.dp)
                 ) {
-                    Icon(Icons.Default.ReceiptLong, contentDescription = null, modifier = Modifier.size(15.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("مشاهده کشویی", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Icon(Icons.Default.ReceiptLong, contentDescription = null, modifier = Modifier.size(14.dp))
+                    Spacer(Modifier.width(3.dp))
+                    Text("مشاهده کشویی", fontSize = 10.sp, fontWeight = FontWeight.Bold)
                 }
 
                 Button(
@@ -1034,11 +1080,11 @@ fun BankSmsSenderRow(
                         contentColor = Color.White
                     ),
                     shape = RoundedCornerShape(10.dp),
-                    contentPadding = PaddingValues(vertical = 4.dp, horizontal = 8.dp)
+                    contentPadding = PaddingValues(vertical = 4.dp, horizontal = 4.dp)
                 ) {
-                    Icon(Icons.Default.FilterAlt, contentDescription = null, modifier = Modifier.size(15.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("صحت‌سنجی متن خام", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Icon(Icons.Default.FilterAlt, contentDescription = null, modifier = Modifier.size(14.dp))
+                    Spacer(Modifier.width(3.dp))
+                    Text("متن خام", fontSize = 10.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -1051,8 +1097,21 @@ fun AddSmsSenderDialog(
     onOpenPicker: () -> Unit = {},
     onConfirm: (bankName: String, senderNumber: String) -> Unit
 ) {
-    var bankName by remember { mutableStateOf("") }
+    var bankName by remember { mutableStateOf("بلوبانک") }
     var senderNumber by remember { mutableStateOf("") }
+    var showSelectBankModal by remember { mutableStateOf(false) }
+
+    if (showSelectBankModal) {
+        SelectBankForSenderDialog(
+            senderNumber = if (senderNumber.isNotBlank()) senderNumber else "جدید",
+            initialBankName = bankName,
+            onDismiss = { showSelectBankModal = false },
+            onConfirm = { chosen ->
+                bankName = chosen
+                showSelectBankModal = false
+            }
+        )
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1082,23 +1141,60 @@ fun AddSmsSenderDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     HorizontalDivider(modifier = Modifier.weight(1f), color = Color(0xFF49454F))
-                    Text(" یا وارد کردن دستی ", color = Color(0xFFCAC4D0), fontSize = 11.sp)
+                    Text(" یا وارد کردن و انتخاب دستی ", color = Color(0xFFCAC4D0), fontSize = 11.sp)
                     HorizontalDivider(modifier = Modifier.weight(1f), color = Color(0xFF49454F))
                 }
 
                 OutlinedTextField(
-                    value = bankName,
-                    onValueChange = { bankName = it },
-                    label = { Text("نام بانک مربوطه (مثلاً بانک کشاورزی)") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                OutlinedTextField(
                     value = senderNumber,
                     onValueChange = { senderNumber = it },
-                    label = { Text("سرشماره اس‌ام‌اس (مثلاً 200070 یا +9820004000)") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    label = { Text("سرشماره یا نام فرستنده (مثلاً BLUBANK یا 30009417)") },
                     modifier = Modifier.fillMaxWidth()
                 )
+
+                // Bank Selection Card with Button
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color(0xFF1E2633),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF3B82F6)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showSelectBankModal = true }
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            BankLogoImage(
+                                bankName = bankName,
+                                cardNumber = null,
+                                containerSize = 34.dp,
+                                logoSize = 26.dp,
+                                containerColor = Color.White
+                            )
+                            Column {
+                                Text("بانک منتسب به این سرشماره:", fontSize = 11.sp, color = Color(0xFF94A3B8))
+                                Text(bankName, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color.White)
+                            }
+                        }
+
+                        Button(
+                            onClick = { showSelectBankModal = true },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB)),
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                        ) {
+                            Text("انتخاب بانک", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
             }
         },
         confirmButton = {
