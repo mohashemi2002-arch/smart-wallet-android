@@ -554,7 +554,9 @@ fun RawVerifiedSmsCard(
     categoryNames: List<String>,
     bankAccounts: List<BankAccount>,
     isAlreadyRegistered: Boolean,
-    onRegister: (Transaction) -> Unit
+    onRegister: (Transaction) -> Unit,
+    isSelected: Boolean = false,
+    onToggleSelect: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     var isRegisteredLocal by remember { mutableStateOf(isAlreadyRegistered) }
@@ -596,8 +598,20 @@ fun RawVerifiedSmsCard(
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.weight(1f)
                 ) {
+                    if (onToggleSelect != null) {
+                        Checkbox(
+                            checked = isSelected,
+                            onCheckedChange = { onToggleSelect() },
+                            colors = CheckboxDefaults.colors(
+                                checkedColor = Color(0xFF2563EB),
+                                uncheckedColor = Color(0xFF64748B)
+                            )
+                        )
+                    }
+
                     BankLogoImage(
                         bankName = sender.bankName,
                         cardNumber = null,

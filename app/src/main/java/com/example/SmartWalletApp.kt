@@ -32,6 +32,7 @@ import com.example.ui.screens.IncomingSmsGroupedScreen
 import com.example.ui.screens.ReportsScreen
 import com.example.ui.screens.SettingsScreen
 import com.example.ui.screens.SmsReaderScreen
+import com.example.ui.screens.SmsSenderBankLinkerScreen
 import com.example.ui.screens.SmsSenderSettingsScreen
 import com.example.ui.viewmodel.FinanceViewModel
 
@@ -47,7 +48,8 @@ private enum class WalletDestination {
     REGISTRATION,
     SMS_SENDERS,
     SMS_FILTER,
-    INCOMING_SMS_GROUPED
+    INCOMING_SMS_GROUPED,
+    SMS_BANK_LINKER
 }
 
 /**
@@ -184,6 +186,9 @@ fun SmartWalletApp() {
                     onNavigateToGroupedSms = { senderNum ->
                         filterInitialSender = senderNum
                         destination = WalletDestination.INCOMING_SMS_GROUPED
+                    },
+                    onNavigateToBankLinker = {
+                        destination = WalletDestination.SMS_BANK_LINKER
                     }
                 )
 
@@ -194,6 +199,10 @@ fun SmartWalletApp() {
 
                 WalletDestination.INCOMING_SMS_GROUPED -> IncomingSmsGroupedScreen(
                     initialSenderFilter = filterInitialSender,
+                    onNavigateBack = { destination = WalletDestination.SMS_READER }
+                )
+
+                WalletDestination.SMS_BANK_LINKER -> SmsSenderBankLinkerScreen(
                     onNavigateBack = { destination = WalletDestination.SMS_READER }
                 )
 

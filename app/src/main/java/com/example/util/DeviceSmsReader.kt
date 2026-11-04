@@ -16,7 +16,8 @@ data class SmsSenderPreview(
     val lastMessage: String,   // Preview snippet of the message
     val timestamp: Long,       // Message date
     val totalCount: Int,       // How many messages from this sender
-    val detectedBank: String? = null // Detected bank name if identified
+    val detectedBank: String? = null, // Detected bank name if identified
+    val associatedBank: String? = null // Explicit user/DB assigned bank entity
 )
 
 data class DeviceSenderSmsMessage(
@@ -25,7 +26,8 @@ data class DeviceSenderSmsMessage(
     val body: String,
     val timestamp: Long,
     val detectedBank: String? = null,
-    val hasBalance: Boolean = false
+    val hasBalance: Boolean = false,
+    val associatedBank: String? = null // Explicit bank entity assigned to this sender
 )
 
 object DeviceSmsReader {

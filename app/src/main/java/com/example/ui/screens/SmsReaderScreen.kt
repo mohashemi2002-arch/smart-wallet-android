@@ -51,7 +51,8 @@ fun SmsReaderScreen(
     viewModel: FinanceViewModel,
     onBack: () -> Unit,
     onNavigateToFilteredSms: (String?) -> Unit = {},
-    onNavigateToGroupedSms: (String?) -> Unit = {}
+    onNavigateToGroupedSms: (String?) -> Unit = {},
+    onNavigateToBankLinker: () -> Unit = {}
 ) {
     val smsInputText by viewModel.smsInputText.collectAsState()
     val parsedResult by viewModel.parsedSmsState.collectAsState()
@@ -152,6 +153,13 @@ fun SmsReaderScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = { onNavigateToBankLinker() }) {
+                        Icon(
+                            Icons.Default.AddLink,
+                            contentDescription = "اتصال سرشماره‌ها به بانک‌ها",
+                            tint = Color(0xFF34D399)
+                        )
+                    }
                     IconButton(onClick = { onNavigateToGroupedSms(null) }) {
                         Icon(
                             Icons.Default.ListAlt,
@@ -658,21 +666,42 @@ fun SmsReaderScreen(
                             }
                         }
 
-                        // Prominent drawer button: Pick from SMS inbox
-                        Button(
-                            onClick = { showSmsPickerBottomSheet = true },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("pick_sms_sender_drawer_button"),
-                            shape = RoundedCornerShape(14.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFF5C82E6),
-                                contentColor = Color.White
-                            )
+                        // Prominent buttons: Pick from SMS inbox and Bank Linker Manager
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Icon(Icons.Default.Inbox, contentDescription = null, modifier = Modifier.size(20.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text("📩 باز کردن صندوق پیامک‌ها و انتخاب سرشماره (کشویی)", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            Button(
+                                onClick = { onNavigateToBankLinker() },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("open_bank_linker_button"),
+                                shape = RoundedCornerShape(14.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFF059669),
+                                    contentColor = Color.White
+                                )
+                            ) {
+                                Icon(Icons.Default.AddLink, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("اتصال سرشماره به بانک", fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                            }
+
+                            Button(
+                                onClick = { showSmsPickerBottomSheet = true },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("pick_sms_sender_drawer_button"),
+                                shape = RoundedCornerShape(14.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFF5C82E6),
+                                    contentColor = Color.White
+                                )
+                            ) {
+                                Icon(Icons.Default.Inbox, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("صندوق کشویی", fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                            }
                         }
 
                         Text(

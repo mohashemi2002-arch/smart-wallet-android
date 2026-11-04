@@ -44,6 +44,7 @@ import com.example.data.SmsAiParser
 import com.example.data.model.*
 import com.example.ui.components.BankLogoImage
 import com.example.ui.components.PersianFormatters
+import com.example.ui.components.SelectBankForSenderDialog
 import com.example.ui.components.formatAsToman
 import com.example.util.DeviceSenderSmsMessage
 import com.example.util.DeviceSmsReader
@@ -100,6 +101,10 @@ fun IncomingSmsGroupedScreen(
     var allIncomingMessages by remember { mutableStateOf<List<DeviceSenderSmsMessage>>(emptyList()) }
     var isLoading by remember { mutableStateOf(false) }
 
+    // Multi-message selection for batch processing
+    var selectedMessageIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
+    var isProcessingSelected by remember { mutableStateOf(false) }
+
     // Selected filter for sender number (null means "همه فرستنده‌ها" / all senders)
     var activeSenderFilter by rememberSaveable { mutableStateOf<String?>(initialSenderFilter) }
     var searchQuery by rememberSaveable { mutableStateOf("") }
@@ -121,29 +126,51 @@ fun IncomingSmsGroupedScreen(
         }
     }
 
-    // Grouping all messages by sender number
-    val messagesBySender: Map<String, List<DeviceSenderSmsMessage>> = remember(allIncomingMessages) {
-        allIncomingMessages.groupBy { it.address }
+    // Sender bank assignment modal state
+    var assigningSenderBankForAddress by remember { mutableStateOf<String?>(null) }
+
+    // Grouping all messages by sender number and assigning associatedBank from Room DB
+    val messagesBySender: Map<String, List<DeviceSenderSmsMessage>> = remember(allIncomingMessages, bankSmsSenders) {
+        allIncomingMessages.map { msg ->
+            val persistedSender = bankSmsSenders.find { DeviceSmsReader.isAddressStrictMatch(it.senderNumber, msg.address) }
+            val explicitBank = persistedSender?.bankName
+            if (explicitBank != null) {
+                msg.copy(associatedBank = explicitBank, detectedBank = explicitBank)
+            } else {
+                msg
+            }
+        }.groupBy { it.address }
     }
 
     // List of sender summaries for the filter carousel
     val senderSummaries = remember(messagesBySender, bankSmsSenders) {
         messagesBySender.map { (address, list) ->
-            val detectedBank = list.firstNotNullOfOrNull { it.detectedBank }
-                ?: bankSmsSenders.find { DeviceSmsReader.isAddressStrictMatch(it.senderNumber, address) }?.bankName
+            val persistedBank = bankSmsSenders.find { DeviceSmsReader.isAddressStrictMatch(it.senderNumber, address) }?.bankName
+            val detectedBank = persistedBank
+                ?: list.firstNotNullOfOrNull { it.associatedBank }
+                ?: list.firstNotNullOfOrNull { it.detectedBank }
                 ?: DeviceSmsReader.detectBankName(address, "")
             SenderGroupSummary(
                 address = address,
                 count = list.size,
                 latestTimestamp = list.maxOfOrNull { it.timestamp } ?: 0L,
-                detectedBank = detectedBank
+                detectedBank = detectedBank,
+                associatedBank = persistedBank
             )
         }.sortedByDescending { it.count }
     }
 
     // Filter messages according to activeSenderFilter, requireBalanceOnly, and searchQuery
-    val displayMessages = remember(allIncomingMessages, activeSenderFilter, requireBalanceOnly, searchQuery) {
-        var list = allIncomingMessages
+    val displayMessages = remember(allIncomingMessages, activeSenderFilter, requireBalanceOnly, searchQuery, bankSmsSenders) {
+        var list = allIncomingMessages.map { msg ->
+            val persistedSender = bankSmsSenders.find { DeviceSmsReader.isAddressStrictMatch(it.senderNumber, msg.address) }
+            val explicitBank = persistedSender?.bankName
+            if (explicitBank != null) {
+                msg.copy(associatedBank = explicitBank, detectedBank = explicitBank)
+            } else {
+                msg
+            }
+        }
         if (!activeSenderFilter.isNullOrBlank()) {
             val target = activeSenderFilter!!
             list = list.filter { DeviceSmsReader.isAddressStrictMatch(it.address, target) || it.address.equals(target, ignoreCase = true) }
@@ -190,6 +217,25 @@ fun IncomingSmsGroupedScreen(
                     }
                 },
                 actions = {
+                    if (displayMessages.isNotEmpty()) {
+                        IconButton(
+                            onClick = {
+                                selectedMessageIds = if (selectedMessageIds.size == displayMessages.size) {
+                                    emptySet()
+                                } else {
+                                    displayMessages.map { it.id }.toSet()
+                                }
+                            }
+                        ) {
+                            Icon(
+                                imageVector = if (selectedMessageIds.size == displayMessages.size && displayMessages.isNotEmpty())
+                                    Icons.Default.SelectAll else Icons.Default.Checklist,
+                                contentDescription = "انتخاب همه",
+                                tint = if (selectedMessageIds.isNotEmpty()) Color(0xFF38BDF8) else Color(0xFF94A3B8)
+                            )
+                        }
+                    }
+
                     IconButton(
                         onClick = { loadAllMessages() },
                         modifier = Modifier.testTag("incoming_sms_refresh_button")
@@ -215,6 +261,93 @@ fun IncomingSmsGroupedScreen(
             verticalArrangement = Arrangement.spacedBy(14.dp),
             contentPadding = PaddingValues(top = 12.dp, bottom = 48.dp)
         ) {
+            // Selected Messages Processing Bar
+            if (selectedMessageIds.isNotEmpty()) {
+                item {
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = Color(0xFF1E3A8A),
+                        border = BorderStroke(1.dp, Color(0xFF60A5FA)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 10.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(Icons.Default.Checklist, contentDescription = null, tint = Color(0xFF93C5FD), modifier = Modifier.size(20.dp))
+                                Text(
+                                    text = "${selectedMessageIds.size} پیامک انتخاب شده جهت پردازش",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp,
+                                    color = Color.White
+                                )
+                            }
+
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                TextButton(
+                                    onClick = { selectedMessageIds = emptySet() },
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                                ) {
+                                    Text("لغو انتخاب", fontSize = 11.sp, color = Color(0xFFFCA5A5))
+                                }
+
+                                Button(
+                                    onClick = {
+                                        coroutineScope.launch {
+                                            isProcessingSelected = true
+                                            val selectedMsgs = displayMessages.filter { selectedMessageIds.contains(it.id) }
+                                            var processedCount = 0
+                                            selectedMsgs.forEach { msg ->
+                                                val parsed = SmsAiParser.parseSmsWithRegex(msg.body, msg.address)
+                                                val bank = msg.detectedBank ?: "بانک"
+                                                val tx = Transaction(
+                                                    amountToman = if (parsed.amountToman > 0) parsed.amountToman else 1000L,
+                                                    type = parsed.type,
+                                                    categoryName = parsed.categoryName.ifBlank { "متفرقه" },
+                                                    merchantName = parsed.merchantName.ifBlank { bank },
+                                                    cardNumber = parsed.cardNumber,
+                                                    dateMillis = msg.timestamp,
+                                                    rawSmsText = msg.body,
+                                                    isParsedFromSms = true,
+                                                    status = TransactionStatus.CONFIRMED,
+                                                    bankName = bank,
+                                                    balanceAfterToman = parsed.balanceToman,
+                                                    senderNumber = msg.address
+                                                )
+                                                repository.transactionDao.insert(tx)
+                                                processedCount++
+                                            }
+                                            selectedMessageIds = emptySet()
+                                            isProcessingSelected = false
+                                            Toast.makeText(context, "$processedCount پیامک با موفقیت پردازش و ثبت شدند", Toast.LENGTH_SHORT).show()
+                                        }
+                                    },
+                                    enabled = !isProcessingSelected,
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                                    shape = RoundedCornerShape(10.dp),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                                ) {
+                                    Icon(Icons.Default.DoneAll, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(Modifier.width(4.dp))
+                                    Text(
+                                        if (isProcessingSelected) "در حال پردازش..." else "پردازش و ثبت",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 11.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             // Permission Banner
             if (!hasPermission) {
                 item {
@@ -333,18 +466,26 @@ fun IncomingSmsGroupedScreen(
                                             (summary.address.equals(activeSenderFilter, ignoreCase = true) ||
                                                     DeviceSmsReader.isAddressStrictMatch(summary.address, activeSenderFilter!!))
 
-                                    FilterChip(
-                                        selected = isSelected,
-                                        onClick = {
+                                    Surface(
+                                        shape = RoundedCornerShape(12.dp),
+                                        color = if (isSelected) Color(0xFF2563EB) else Color(0xFF2D3748),
+                                        border = BorderStroke(1.dp, if (isSelected) Color(0xFF60A5FA) else Color(0xFF475569)),
+                                        modifier = Modifier.clickable {
                                             activeSenderFilter = if (isSelected) null else summary.address
-                                        },
-                                        leadingIcon = {
+                                        }
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
                                             if (summary.detectedBank != null) {
                                                 BankLogoImage(
                                                     bankName = summary.detectedBank,
                                                     cardNumber = null,
-                                                    containerSize = 20.dp,
-                                                    logoSize = 16.dp
+                                                    containerSize = 22.dp,
+                                                    logoSize = 18.dp,
+                                                    containerColor = Color.White
                                                 )
                                             } else {
                                                 Icon(
@@ -354,21 +495,93 @@ fun IncomingSmsGroupedScreen(
                                                     tint = if (isSelected) Color.White else Color(0xFF94A3B8)
                                                 )
                                             }
-                                        },
-                                        label = {
+
                                             Text(
                                                 text = "${summary.detectedBank ?: summary.address} (${summary.count})",
                                                 fontSize = 11.sp,
+                                                color = if (isSelected) Color.White else Color(0xFFCBD5E1),
                                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                                             )
-                                        },
-                                        colors = FilterChipDefaults.filterChipColors(
-                                            selectedContainerColor = Color(0xFF2563EB),
-                                            selectedLabelColor = Color.White,
-                                            containerColor = Color(0xFF2D3748),
-                                            labelColor = Color(0xFFCBD5E1)
-                                        )
-                                    )
+
+                                            // Quick button to assign/change bank entity for this sender group
+                                            IconButton(
+                                                onClick = {
+                                                    assigningSenderBankForAddress = summary.address
+                                                },
+                                                modifier = Modifier.size(20.dp)
+                                            ) {
+                                                Icon(
+                                                    Icons.Default.Edit,
+                                                    contentDescription = "انتساب به بانک",
+                                                    tint = if (isSelected) Color(0xFFBFDBFE) else Color(0xFF93C5FD),
+                                                    modifier = Modifier.size(13.dp)
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Active Sender Banner with Bank Assignment Button
+                            if (activeSenderFilter != null) {
+                                val currentSummary = senderSummaries.find {
+                                    it.address.equals(activeSenderFilter, ignoreCase = true) ||
+                                            DeviceSmsReader.isAddressStrictMatch(it.address, activeSenderFilter!!)
+                                }
+                                val bankDisplayName = currentSummary?.detectedBank ?: "نامشخص"
+
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = Color(0xFF1E293B),
+                                    border = BorderStroke(1.dp, Color(0xFF3B82F6).copy(alpha = 0.5f)),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            BankLogoImage(
+                                                bankName = bankDisplayName,
+                                                cardNumber = null,
+                                                containerSize = 28.dp,
+                                                logoSize = 22.dp,
+                                                containerColor = Color.White
+                                            )
+                                            Column {
+                                                Text(
+                                                    text = "بانک منتسب: $bankDisplayName",
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 12.sp,
+                                                    color = Color.White
+                                                )
+                                                Text(
+                                                    text = "فرستنده: ${currentSummary?.address ?: activeSenderFilter}",
+                                                    fontSize = 10.sp,
+                                                    color = Color(0xFF94A3B8)
+                                                )
+                                            }
+                                        }
+
+                                        Button(
+                                            onClick = {
+                                                assigningSenderBankForAddress = currentSummary?.address ?: activeSenderFilter
+                                            },
+                                            shape = RoundedCornerShape(8.dp),
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB)),
+                                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                                        ) {
+                                            Icon(Icons.Default.AccountBalance, contentDescription = null, modifier = Modifier.size(14.dp))
+                                            Spacer(Modifier.width(4.dp))
+                                            Text("تغییر/انتساب بانک", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
                                 }
                             }
 
@@ -530,6 +743,14 @@ fun IncomingSmsGroupedScreen(
                         tx.dateMillis == msg.timestamp ||
                         (!tx.rawSmsText.isNullOrBlank() && (tx.rawSmsText == msg.body || msg.body.contains(tx.rawSmsText!!)))
                     },
+                    isSelected = selectedMessageIds.contains(msg.id),
+                    onToggleSelect = {
+                        selectedMessageIds = if (selectedMessageIds.contains(msg.id)) {
+                            selectedMessageIds - msg.id
+                        } else {
+                            selectedMessageIds + msg.id
+                        }
+                    },
                     onRegister = { tx ->
                         coroutineScope.launch {
                             repository.transactionDao.insert(tx)
@@ -551,11 +772,47 @@ fun IncomingSmsGroupedScreen(
             }
         }
     }
+
+    // Modal Dialog to Assign Sender to a Bank Entity (Persisted in Room Database)
+    assigningSenderBankForAddress?.let { senderAddr ->
+        val currentAssignedBank = bankSmsSenders.find { DeviceSmsReader.isAddressStrictMatch(it.senderNumber, senderAddr) }?.bankName
+            ?: DeviceSmsReader.detectBankName(senderAddr, "")
+            ?: ""
+
+        SelectBankForSenderDialog(
+            senderNumber = senderAddr,
+            initialBankName = currentAssignedBank,
+            onDismiss = { assigningSenderBankForAddress = null },
+            onConfirm = { selectedBankName ->
+                coroutineScope.launch {
+                    val existing = bankSmsSenders.find { DeviceSmsReader.isAddressStrictMatch(it.senderNumber, senderAddr) }
+                    if (existing != null) {
+                        repository.bankSmsSenderDao.update(existing.copy(bankName = selectedBankName))
+                    } else {
+                        repository.bankSmsSenderDao.insert(
+                            BankSmsSender(
+                                bankName = selectedBankName,
+                                senderNumber = senderAddr,
+                                isActive = true
+                            )
+                        )
+                    }
+                    Toast.makeText(
+                        context,
+                        "سرشماره $senderAddr با موفقیت به $selectedBankName متصل و در پایگاه داده ذخیره شد",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+                assigningSenderBankForAddress = null
+            }
+        )
+    }
 }
 
 private data class SenderGroupSummary(
     val address: String,
     val count: Int,
     val latestTimestamp: Long,
-    val detectedBank: String?
+    val detectedBank: String?,
+    val associatedBank: String? = null
 )
