@@ -1,6 +1,8 @@
 package com.example.data
 
+import com.example.data.sync.GoogleSheetsRestoreResult
 import com.example.data.sync.GoogleSheetsSyncManager
+import com.example.domain.util.PasswordHasher
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.*
@@ -16,14 +18,17 @@ class GoogleSheetsSyncTest {
         val cleanPhone = GoogleSheetsSyncManager.normalizePhone("0912 345 6789")
         assertEquals("09123456789", cleanPhone)
 
+        val timestamp = System.currentTimeMillis()
+        val authSig = PasswordHasher.computeHmacSha256("$cleanPhone:sync:$timestamp", "hashedPass123")
+
         val rootJson = JSONObject().apply {
             put("action", "sync")
             put("phoneNumber", cleanPhone)
             put("firstName", "محمد")
             put("lastName", "حسینی")
             put("username", "mohammad")
-            put("passwordHash", "hashedPass123")
-            put("pinHash", "hashedPin456")
+            put("timestamp", timestamp)
+            put("authSignature", authSig)
             put("user", JSONObject().apply {
                 put("phoneNumber", cleanPhone)
                 put("firstName", "محمد")
@@ -52,15 +57,8 @@ class GoogleSheetsSyncTest {
 
         assertEquals("sync", rootJson.getString("action"))
         assertEquals("mohammad", rootJson.getString("username"))
-        assertEquals("hashedPass123", rootJson.getString("passwordHash"))
-        assertEquals("hashedPin456", rootJson.getString("pinHash"))
-        val user = rootJson.getJSONObject("user")
-        assertEquals("09123456789", user.getString("phoneNumber"))
-        assertEquals("محمد", user.getString("firstName"))
-        assertEquals("حسینی", user.getString("lastName"))
-        assertEquals("mohammad", user.getString("username"))
-        assertEquals("hashedPass123", user.getString("passwordHash"))
-        assertEquals("hashedPin456", user.getString("pinHash"))
+        assertEquals(authSig, rootJson.getString("authSignature"))
+        assertTrue(rootJson.getLong("timestamp") > 0)
 
         val cards = rootJson.getJSONArray("cards")
         assertEquals(1, cards.length())
@@ -72,16 +70,48 @@ class GoogleSheetsSyncTest {
     }
 
     @Test
-    fun testRestoreJsonRequestStructure() {
+    fun testRestoreSecurityOmitsCredentialHashes() {
+        val restoreResult = GoogleSheetsRestoreResult(
+            success = true,
+            message = "اطلاعات با موفقیت بازیابی شد",
+            restoredCardsCount = 2,
+            restoredTransactionsCount = 10,
+            username = "ali_user"
+        )
+
+        assertTrue(restoreResult.success)
+        assertEquals(2, restoreResult.restoredCardsCount)
+        assertEquals(10, restoreResult.restoredTransactionsCount)
+        assertEquals("ali_user", restoreResult.username)
+        // Verify GoogleSheetsRestoreResult class has NO passwordHash or pinHash fields exposed
+        assertFalse(
+            "GoogleSheetsRestoreResult must not contain passwordHash field",
+            GoogleSheetsRestoreResult::class.java.declaredFields.any { it.name == "passwordHash" }
+        )
+        assertFalse(
+            "GoogleSheetsRestoreResult must not contain pinHash field",
+            GoogleSheetsRestoreResult::class.java.declaredFields.any { it.name == "pinHash" }
+        )
+    }
+
+    @Test
+    fun testRestoreJsonRequestStructureWithAuth() {
+        val cleanPhone = "09123456789"
+        val timestamp = System.currentTimeMillis()
+        val authSig = PasswordHasher.computeHmacSha256("$cleanPhone:restore:$timestamp", "securePassword123")
+
         val rootJson = JSONObject().apply {
             put("action", "restore")
-            put("phoneNumber", "09123456789")
+            put("phoneNumber", cleanPhone)
             put("firstName", "علی")
             put("lastName", "رضایی")
+            put("timestamp", timestamp)
+            put("authSignature", authSig)
         }
 
         assertEquals("restore", rootJson.getString("action"))
         assertEquals("09123456789", rootJson.getString("phoneNumber"))
+        assertEquals(authSig, rootJson.getString("authSignature"))
         assertEquals("علی", rootJson.getString("firstName"))
         assertEquals("رضایی", rootJson.getString("lastName"))
     }

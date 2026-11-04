@@ -26,9 +26,7 @@ data class GoogleSheetsRestoreResult(
     val message: String,
     val restoredCardsCount: Int = 0,
     val restoredTransactionsCount: Int = 0,
-    val username: String? = null,
-    val passwordHash: String? = null,
-    val pinHash: String? = null
+    val username: String? = null
 )
 
 class GoogleSheetsSyncManager(
@@ -69,7 +67,7 @@ class GoogleSheetsSyncManager(
 
     /**
      * Send POST request to WEB_APP_URL with action: "sync"
-     * Content-Type must be 'text/plain;charset=utf-8' as required by Google Apps Script
+     * Signed with HMAC-SHA256 signature and timestamp to prevent replay and impersonation attacks.
      */
     suspend fun syncData(
         firstName: String,
@@ -92,20 +90,29 @@ class GoogleSheetsSyncManager(
             val accounts = database.bankAccountDao().getAllBankAccountsList()
             val transactions = database.transactionDao().getAllTransactionsSync()
 
+            val timestamp = System.currentTimeMillis()
+            val authSignature = if (finalPasswordHash.isNotBlank()) {
+                com.example.domain.util.PasswordHasher.computeHmacSha256(
+                    "$cleanPhone:sync:$timestamp",
+                    finalPasswordHash
+                )
+            } else ""
+
             val rootJson = JSONObject().apply {
                 put("action", "sync")
                 put("phoneNumber", cleanPhone)
                 put("firstName", firstName.trim())
                 put("lastName", lastName.trim())
                 put("username", finalUsername)
-                put("passwordHash", finalPasswordHash)
-                put("pinHash", finalPinHash)
+                put("timestamp", timestamp)
+                put("authSignature", authSignature)
 
                 put("user", JSONObject().apply {
                     put("phoneNumber", cleanPhone)
                     put("firstName", firstName.trim())
                     put("lastName", lastName.trim())
                     put("username", finalUsername)
+                    // Hashed credentials sent only for initial registration/sync storage
                     put("passwordHash", finalPasswordHash)
                     put("pinHash", finalPinHash)
                 })
@@ -161,10 +168,15 @@ class GoogleSheetsSyncManager(
 
             val response = client.newCall(request).execute()
             val responseBody = response.body?.string().orEmpty()
-            Log.d(TAG, "Google Sheets Sync Response code: ${response.code}, body: $responseBody")
+            Log.d(TAG, "Google Sheets Sync Response code: ${response.code}")
 
             if (!response.isSuccessful && response.code != 302) {
                 throw IllegalStateException("خطا در ارتباط با سرور فضای ابری: کد ${response.code}")
+            }
+
+            val responseJson = if (responseBody.isNotBlank()) JSONObject(responseBody) else JSONObject()
+            if (responseJson.optBoolean("success", false) == false && responseJson.optString("status") == "unauthorized") {
+                throw SecurityException(responseJson.optString("message", "احراز هویت سرور ناموفق بود"))
             }
 
             GoogleSheetsSyncResult(
@@ -178,21 +190,35 @@ class GoogleSheetsSyncManager(
 
     /**
      * Send POST request to WEB_APP_URL with action: "restore"
-     * Re-populates local Room DB with returned cards and transactions
+     * Re-populates local Room DB with returned cards and transactions.
+     * Authenticated via HMAC signature or password verification.
      */
     suspend fun restoreData(
         firstName: String,
         lastName: String,
-        phoneNumber: String
+        phoneNumber: String,
+        passwordOrAuthKey: String? = null
     ): Result<GoogleSheetsRestoreResult> = withContext(Dispatchers.IO) {
         runCatching {
             val cleanPhone = normalizePhone(phoneNumber)
+            val timestamp = System.currentTimeMillis()
+            val authSignature = if (!passwordOrAuthKey.isNullOrBlank()) {
+                com.example.domain.util.PasswordHasher.computeHmacSha256(
+                    "$cleanPhone:restore:$timestamp",
+                    passwordOrAuthKey
+                )
+            } else ""
 
             val rootJson = JSONObject().apply {
                 put("action", "restore")
                 put("phoneNumber", cleanPhone)
                 put("firstName", firstName.trim())
                 put("lastName", lastName.trim())
+                put("timestamp", timestamp)
+                put("authSignature", authSignature)
+                if (!passwordOrAuthKey.isNullOrBlank()) {
+                    put("passwordCandidate", passwordOrAuthKey)
+                }
             }
 
             val mediaType = "text/plain; charset=utf-8".toMediaTypeOrNull()
@@ -206,7 +232,6 @@ class GoogleSheetsSyncManager(
 
             val response = client.newCall(request).execute()
             val responseBody = response.body?.string().orEmpty()
-            Log.d(TAG, "Google Sheets Restore Response code: ${response.code}, body: $responseBody")
 
             if (!response.isSuccessful && response.code != 302) {
                 throw IllegalStateException("خطا در ارتباط با فضای ابری: کد ${response.code}")
@@ -217,13 +242,13 @@ class GoogleSheetsSyncManager(
             }
 
             val json = JSONObject(responseBody)
+            if (!json.optBoolean("success", false) && json.optString("status") == "unauthorized") {
+                throw SecurityException(json.optString("message", "دسترسی غیرمجاز: رمز یا مشخصات بازیابی اشتباه است."))
+            }
+
             val userObj = json.optJSONObject("user")
             val restoredUsername = userObj?.optString("username")?.takeIf { it.isNotBlank() }
                 ?: json.optString("username").takeIf { it.isNotBlank() }
-            val restoredPasswordHash = userObj?.optString("passwordHash")?.takeIf { it.isNotBlank() }
-                ?: json.optString("passwordHash").takeIf { it.isNotBlank() }
-            val restoredPinHash = userObj?.optString("pinHash")?.takeIf { it.isNotBlank() }
-                ?: json.optString("pinHash").takeIf { it.isNotBlank() }
 
             val cardsArray = json.optJSONArray("cards") ?: JSONArray()
             val txArray = json.optJSONArray("transactions") ?: JSONArray()
@@ -331,9 +356,7 @@ class GoogleSheetsSyncManager(
                 message = "اطلاعات با موفقیت از فضای ابری بازیابی شد!\nتعداد $restoredCards کارت و $restoredTxs تراکنش بازگردانی شدند.",
                 restoredCardsCount = restoredCards,
                 restoredTransactionsCount = restoredTxs,
-                username = restoredUsername,
-                passwordHash = restoredPasswordHash,
-                pinHash = restoredPinHash
+                username = restoredUsername
             )
         }
     }

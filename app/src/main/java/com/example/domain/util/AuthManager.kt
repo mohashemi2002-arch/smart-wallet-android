@@ -40,12 +40,11 @@ class AuthManager(private val context: Context) {
         private const val KEY_REMEMBER_ME = "remember_me"
         private const val KEY_BIOMETRIC_ENABLED = "biometric_enabled"
 
-        private const val SALT = "SmartWallet_Auth_Salt_2026_Secured#"
-
+        /**
+         * Backward-compatible delegation to PasswordHasher.
+         */
         fun hashSha256(input: String): String {
-            val md = MessageDigest.getInstance("SHA-256")
-            val bytes = md.digest((SALT + input).toByteArray(Charsets.UTF_8))
-            return bytes.joinToString("") { "%02x".format(it) }
+            return PasswordHasher.hash(input)
         }
     }
 
@@ -88,7 +87,7 @@ class AuthManager(private val context: Context) {
     }
 
     /**
-     * Registers a new user account on the device and syncs to cloud storage.
+     * Registers a new user account on the device with PBKDF2 hashed credentials and syncs to cloud storage.
      */
     fun register(
         username: String,
@@ -113,8 +112,9 @@ class AuthManager(private val context: Context) {
             return Result.failure(IllegalArgumentException("پین کد امنیتی باید دقیقاً ۴ رقم باشد"))
         }
 
-        val passHash = hashSha256(trimmedPass)
-        val pinHash = hashSha256(cleanPin)
+        // Generate individual PBKDF2 hashes with unique cryptographically random salts
+        val passHash = PasswordHasher.hash(trimmedPass)
+        val pinHash = PasswordHasher.hash(cleanPin)
 
         prefs.edit()
             .putBoolean(KEY_HAS_ACCOUNT, true)
@@ -148,7 +148,7 @@ class AuthManager(private val context: Context) {
         if (trimmed.length < 4) {
             return Result.failure(IllegalArgumentException("رمز عبور باید حداقل ۴ کاراکتر باشد"))
         }
-        val passHash = hashSha256(trimmed)
+        val passHash = PasswordHasher.hash(trimmed)
         prefs.edit().putString(KEY_PASSWORD_HASH, passHash).apply()
         triggerBackgroundSync()
         return Result.success(Unit)
@@ -162,7 +162,7 @@ class AuthManager(private val context: Context) {
         if (cleanPin.length != 4 || !cleanPin.all { it.isDigit() }) {
             return Result.failure(IllegalArgumentException("پین کد امنیتی باید دقیقاً ۴ رقم باشد"))
         }
-        val pinHash = hashSha256(cleanPin)
+        val pinHash = PasswordHasher.hash(cleanPin)
         prefs.edit().putString(KEY_PIN_HASH, pinHash).apply()
         triggerBackgroundSync()
         return Result.success(Unit)
@@ -225,18 +225,27 @@ class AuthManager(private val context: Context) {
     }
 
     /**
-     * Authenticates with Username and Password.
+     * Authenticates with Username and Password, automatically upgrading legacy SHA-256 hashes to PBKDF2.
      */
     fun loginWithPassword(username: String, password: String, rememberMe: Boolean? = null): Boolean {
         val trimmedUser = username.trim()
-        val passHash = hashSha256(password.trim())
+        val cleanPassword = password.trim()
         val savedUser = savedUsername
         val savedPassHash = prefs.getString(KEY_PASSWORD_HASH, "")
 
-        val isValid = (trimmedUser.equals(savedUser, ignoreCase = true) || trimmedUser == savedPhoneNumber) &&
-                passHash == savedPassHash
+        val isUserValid = trimmedUser.equals(savedUser, ignoreCase = true) || trimmedUser == savedPhoneNumber
+        val isPassValid = PasswordHasher.verify(cleanPassword, savedPassHash)
+
+        val isValid = isUserValid && isPassValid
 
         if (isValid) {
+            // Transparent migration: if stored hash was created with old static-salt SHA-256, upgrade to PBKDF2
+            if (PasswordHasher.isLegacyHash(savedPassHash)) {
+                val upgradedHash = PasswordHasher.hash(cleanPassword)
+                prefs.edit().putString(KEY_PASSWORD_HASH, upgradedHash).apply()
+                Log.i(TAG, "User password hash successfully migrated to PBKDF2.")
+            }
+
             if (rememberMe != null) {
                 isRememberMeEnabled = rememberMe
             }
@@ -246,17 +255,22 @@ class AuthManager(private val context: Context) {
     }
 
     /**
-     * Authenticates with 4-Digit PIN.
+     * Authenticates with 4-Digit PIN, automatically upgrading legacy SHA-256 hashes to PBKDF2.
      */
     fun loginWithPin(pin: String): Boolean {
         val cleanPin = pin.trim()
-        if (cleanPin.length != 4) return false
+        if (cleanPin.length != 4 || !cleanPin.all { it.isDigit() }) return false
 
-        val pinHash = hashSha256(cleanPin)
         val savedPinHash = prefs.getString(KEY_PIN_HASH, "")
+        val isValid = PasswordHasher.verify(cleanPin, savedPinHash)
 
-        val isValid = pinHash == savedPinHash
         if (isValid) {
+            // Transparent migration: if stored PIN was created with old static-salt SHA-256, upgrade to PBKDF2
+            if (PasswordHasher.isLegacyHash(savedPinHash)) {
+                val upgradedPinHash = PasswordHasher.hash(cleanPin)
+                prefs.edit().putString(KEY_PIN_HASH, upgradedPinHash).apply()
+                Log.i(TAG, "User PIN hash successfully migrated to PBKDF2.")
+            }
             _isAuthenticated.value = true
         }
         return isValid
@@ -362,7 +376,12 @@ class AuthManager(private val context: Context) {
         newPassword: String,
         newPin: String
     ): Result<String> {
-        val result = syncManager.restoreData(firstName, lastName, phoneNumber)
+        val result = syncManager.restoreData(
+            firstName = firstName,
+            lastName = lastName,
+            phoneNumber = phoneNumber,
+            passwordOrAuthKey = newPassword.takeIf { it.isNotBlank() } ?: savedUsername
+        )
         return result.mapCatching { restoreSummary ->
             val finalUsername = when {
                 newUsername.isNotBlank() -> newUsername.trim()
@@ -371,14 +390,14 @@ class AuthManager(private val context: Context) {
                 else -> firstName.trim()
             }
             val finalPasswordHash = when {
-                newPassword.isNotBlank() -> hashSha256(newPassword.trim())
-                !restoreSummary.passwordHash.isNullOrBlank() -> restoreSummary.passwordHash
-                else -> prefs.getString(KEY_PASSWORD_HASH, "") ?: ""
+                newPassword.isNotBlank() -> PasswordHasher.hash(newPassword.trim())
+                prefs.getString(KEY_PASSWORD_HASH, "")?.isNotBlank() == true -> prefs.getString(KEY_PASSWORD_HASH, "")!!
+                else -> ""
             }
             val finalPinHash = when {
-                newPin.isNotBlank() -> hashSha256(newPin.trim())
-                !restoreSummary.pinHash.isNullOrBlank() -> restoreSummary.pinHash
-                else -> prefs.getString(KEY_PIN_HASH, "") ?: ""
+                newPin.isNotBlank() -> PasswordHasher.hash(newPin.trim())
+                prefs.getString(KEY_PIN_HASH, "")?.isNotBlank() == true -> prefs.getString(KEY_PIN_HASH, "")!!
+                else -> ""
             }
 
             prefs.edit()
