@@ -167,15 +167,26 @@ object JalaliCalendarHelper {
         return if (isLeapYear(jYear)) 30 else 29
     }
 
+    fun formatToIsoDateTime(gYear: Int, gMonth: Int, gDay: Int, hour: Int, minute: Int, second: Int = 0): String {
+        return String.format(java.util.Locale.US, "%04d-%02d-%02dT%02d:%02d:%02d", gYear, gMonth, gDay, hour, minute, second)
+    }
+
+    fun getIsoStringFromMillis(millis: Long): String {
+        val sdf = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.US)
+        return sdf.format(java.util.Date(millis))
+    }
+
     /**
      * Parses bank SMS date and time from Iranian formats:
-     * - MMDD-HH:MM (e.g. 0730-17:23, 0803-15:28)
-     * - MMDD - HH:MM (e.g. 0814 - 00:16, 0813 - 21:06)
-     * - HH:MM - MMDD (e.g. 15:38 - 0813, 11:10 - 0625, 07:09 - 0628)
+     * - MMDD-HH:MM (e.g. 0730-17:23, 0803-15:28) - Month: 07, Day: 30
+     * - MMDD - HH:MM (e.g. 0814 - 00:16, 0813 - 21:06) - Month: 08, Day: 14
+     * - HH:MM - MMDD (e.g. 15:38 - 0813, 11:10 - 0625, 07:09 - 0628) - Month: 08, Day: 13
      * - Explicit: 1403/07/30 17:23 or تاریخ: 1405/03/31 ساعت: 08:39:00
      * - Compact: 14050330-23:19:50
+     *
+     * Standardizes all formats into full ISO 8601 date string (YYYY-MM-DDTHH:mm:ss) and epoch millis.
      */
-    fun parseBankSmsDateTime(smsText: String, fallbackMillis: Long = System.currentTimeMillis()): Long? {
+    fun parseBankSmsDateDetails(smsText: String, fallbackMillis: Long = System.currentTimeMillis()): ParsedBankDateResult? {
         val norm = SmsNormalizer.normalize(smsText)
             .replace('–', '-')
             .replace('—', '-')
@@ -196,7 +207,22 @@ object JalaliCalendarHelper {
                 val h = timeMatch?.groupValues?.getOrNull(1)?.toIntOrNull() ?: 12
                 val min = timeMatch?.groupValues?.getOrNull(2)?.toIntOrNull() ?: 0
                 val s = timeMatch?.groupValues?.getOrNull(3)?.toIntOrNull() ?: 0
-                return getMillisFromJalali(y, m, d, h, min, s)
+                val (gy, gm, gd) = jalaliToGregorian(y, m, d)
+                val millis = getMillisFromJalali(y, m, d, h, min, s)
+                val isoStr = formatToIsoDateTime(gy, gm, gd, h, min, s)
+                return ParsedBankDateResult(
+                    jalaliYear = y,
+                    jalaliMonth = m,
+                    jalaliDay = d,
+                    hour = h,
+                    minute = min,
+                    second = s,
+                    gregorianYear = gy,
+                    gregorianMonth = gm,
+                    gregorianDay = gd,
+                    epochMillis = millis,
+                    isoDateTime = isoStr
+                )
             }
 
             // 2. Compact 14-digit Jalali timestamp: 14050330-23:19:50
@@ -209,7 +235,22 @@ object JalaliCalendarHelper {
                 val h = compactMatch.groupValues[4].toInt()
                 val min = compactMatch.groupValues[5].toInt()
                 val s = compactMatch.groupValues.getOrNull(6)?.toIntOrNull() ?: 0
-                return getMillisFromJalali(y, m, d, h, min, s)
+                val (gy, gm, gd) = jalaliToGregorian(y, m, d)
+                val millis = getMillisFromJalali(y, m, d, h, min, s)
+                val isoStr = formatToIsoDateTime(gy, gm, gd, h, min, s)
+                return ParsedBankDateResult(
+                    jalaliYear = y,
+                    jalaliMonth = m,
+                    jalaliDay = d,
+                    hour = h,
+                    minute = min,
+                    second = s,
+                    gregorianYear = gy,
+                    gregorianMonth = gm,
+                    gregorianDay = gd,
+                    epochMillis = millis,
+                    isoDateTime = isoStr
+                )
             }
 
             // 3. HH:MM - MMDD (e.g. 15:38 - 0813, 11:10 - 0625, 07:09 - 0628)
@@ -218,23 +259,53 @@ object JalaliCalendarHelper {
             if (timeFirstMatch != null) {
                 val h = timeFirstMatch.groupValues[1].toInt()
                 val min = timeFirstMatch.groupValues[2].toInt()
-                val m = timeFirstMatch.groupValues[3].toInt()
-                val d = timeFirstMatch.groupValues[4].toInt()
+                val m = timeFirstMatch.groupValues[3].toInt() // e.g. 08 -> 8th Jalali month
+                val d = timeFirstMatch.groupValues[4].toInt() // e.g. 13 -> 13th day
                 val y = if (m > currentJalali.month + 1) currentYear - 1 else currentYear
-                return getMillisFromJalali(y, m, d, h, min, 0)
+                val (gy, gm, gd) = jalaliToGregorian(y, m, d)
+                val millis = getMillisFromJalali(y, m, d, h, min, 0)
+                val isoStr = formatToIsoDateTime(gy, gm, gd, h, min, 0)
+                return ParsedBankDateResult(
+                    jalaliYear = y,
+                    jalaliMonth = m,
+                    jalaliDay = d,
+                    hour = h,
+                    minute = min,
+                    second = 0,
+                    gregorianYear = gy,
+                    gregorianMonth = gm,
+                    gregorianDay = gd,
+                    epochMillis = millis,
+                    isoDateTime = isoStr
+                )
             }
 
             // 4. MMDD - HH:MM or MMDD-HH:MM (e.g. 0730-17:23, 0814 - 00:16, 0803-15:28)
             val dateFirstRegex = Regex("""(0[1-9]|1[0-2])([0-3]\d)\s*-\s*(\d{2}):(\d{2})(?::(\d{2}))?""")
             val dateFirstMatch = dateFirstRegex.find(norm)
             if (dateFirstMatch != null) {
-                val m = dateFirstMatch.groupValues[1].toInt()
-                val d = dateFirstMatch.groupValues[2].toInt()
+                val m = dateFirstMatch.groupValues[1].toInt() // e.g. 07 -> 7th Jalali month
+                val d = dateFirstMatch.groupValues[2].toInt() // e.g. 30 -> 30th day
                 val h = dateFirstMatch.groupValues[3].toInt()
                 val min = dateFirstMatch.groupValues[4].toInt()
                 val s = dateFirstMatch.groupValues.getOrNull(5)?.toIntOrNull() ?: 0
                 val y = if (m > currentJalali.month + 1) currentYear - 1 else currentYear
-                return getMillisFromJalali(y, m, d, h, min, s)
+                val (gy, gm, gd) = jalaliToGregorian(y, m, d)
+                val millis = getMillisFromJalali(y, m, d, h, min, s)
+                val isoStr = formatToIsoDateTime(gy, gm, gd, h, min, s)
+                return ParsedBankDateResult(
+                    jalaliYear = y,
+                    jalaliMonth = m,
+                    jalaliDay = d,
+                    hour = h,
+                    minute = min,
+                    second = s,
+                    gregorianYear = gy,
+                    gregorianMonth = gm,
+                    gregorianDay = gd,
+                    epochMillis = millis,
+                    isoDateTime = isoStr
+                )
             }
         } catch (e: Exception) {
             // Ignore format error and fallback
@@ -242,4 +313,22 @@ object JalaliCalendarHelper {
 
         return null
     }
+
+    fun parseBankSmsDateTime(smsText: String, fallbackMillis: Long = System.currentTimeMillis()): Long? {
+        return parseBankSmsDateDetails(smsText, fallbackMillis)?.epochMillis
+    }
 }
+
+data class ParsedBankDateResult(
+    val jalaliYear: Int,
+    val jalaliMonth: Int,
+    val jalaliDay: Int,
+    val hour: Int,
+    val minute: Int,
+    val second: Int = 0,
+    val gregorianYear: Int,
+    val gregorianMonth: Int,
+    val gregorianDay: Int,
+    val epochMillis: Long,
+    val isoDateTime: String
+)

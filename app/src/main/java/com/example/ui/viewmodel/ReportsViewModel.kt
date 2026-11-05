@@ -36,12 +36,35 @@ class ReportsViewModel(application: Application) : AndroidViewModel(application)
 
     val filteredTransactions: StateFlow<List<Transaction>> = combine(allTransactions, _filterState) { transactions, filters ->
         val now = System.currentTimeMillis()
-        val dayMillis = 24L * 60 * 60 * 1000
+        val currentJalali = com.example.util.JalaliCalendarHelper.getJalaliDateFromMillis(now)
         val startTime = when (filters.dateRangeType) {
-            DateRangeType.TODAY -> now - dayMillis
-            DateRangeType.THIS_WEEK -> now - (7 * dayMillis)
-            DateRangeType.THIS_MONTH -> now - (30 * dayMillis) // approximation
-            DateRangeType.LAST_3_MONTHS -> now - (90 * dayMillis)
+            DateRangeType.TODAY -> {
+                com.example.util.JalaliCalendarHelper.getStartAndEndOfJalaliDay(currentJalali.year, currentJalali.month, currentJalali.day).first
+            }
+            DateRangeType.THIS_WEEK -> {
+                // Saturday is the first day of the Iranian week (شنبه)
+                val cal = java.util.Calendar.getInstance()
+                cal.timeInMillis = now
+                val dow = cal.get(java.util.Calendar.DAY_OF_WEEK) // Sunday=1, ..., Saturday=7
+                val daysSinceSaturday = dow % 7
+                val saturdayCal = java.util.Calendar.getInstance()
+                saturdayCal.timeInMillis = now - (daysSinceSaturday * 24L * 60 * 60 * 1000)
+                val satJalali = com.example.util.JalaliCalendarHelper.getJalaliDateFromMillis(saturdayCal.timeInMillis)
+                com.example.util.JalaliCalendarHelper.getStartAndEndOfJalaliDay(satJalali.year, satJalali.month, satJalali.day).first
+            }
+            DateRangeType.THIS_MONTH -> {
+                // Start of current Shamsi month (یکم ماه جاری)
+                com.example.util.JalaliCalendarHelper.getStartAndEndOfJalaliMonth(currentJalali.year, currentJalali.month).first
+            }
+            DateRangeType.LAST_3_MONTHS -> {
+                var startMonth = currentJalali.month - 2
+                var startYear = currentJalali.year
+                if (startMonth <= 0) {
+                    startMonth += 12
+                    startYear--
+                }
+                com.example.util.JalaliCalendarHelper.getStartAndEndOfJalaliMonth(startYear, startMonth).first
+            }
             DateRangeType.ALL_TIME -> 0L
         }
 
@@ -78,5 +101,17 @@ class ReportsViewModel(application: Application) : AndroidViewModel(application)
 
     fun setAmountRange(min: Long?, max: Long?) {
         _filterState.value = _filterState.value.copy(minAmount = min, maxAmount = max)
+    }
+
+    fun updateTransactionCategory(transactionId: Long, newCategoryName: String) {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            val tx = transactionDao.getTransactionById(transactionId) ?: return@launch
+            val categoryDao = db.categoryDao()
+            val existing = categoryDao.getCategoryByName(newCategoryName)
+            if (existing == null) {
+                categoryDao.insert(com.example.data.model.Category(name = newCategoryName, colorHex = "#95A5A6"))
+            }
+            transactionDao.update(tx.copy(categoryName = newCategoryName))
+        }
     }
 }

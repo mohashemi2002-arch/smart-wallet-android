@@ -455,11 +455,30 @@ class FinanceRepository private constructor(context: Context) {
         resolveAccountAndSyncBalance(updated)
     }
 
+    suspend fun updateTransactionCategory(transactionId: Long, newCategoryName: String) = withContext(Dispatchers.IO) {
+        val tx = transactionDao.getTransactionById(transactionId) ?: return@withContext
+        val existingCategory = categoryDao.getCategoryByName(newCategoryName)
+        if (existingCategory == null) {
+            categoryDao.insert(Category(name = newCategoryName, colorHex = "#95A5A6"))
+        }
+        val updated = tx.copy(categoryName = newCategoryName)
+        transactionDao.update(updated)
+        triggerAutoCloudSync()
+    }
+
     suspend fun approveAllPendingTransactions() = withContext(Dispatchers.IO) {
         val pendingList = transactionDao.getPendingTransactionsFlow().first()
-            .sortedBy { it.dateMillis } // صعودی: از دورترین تاریخ به نزدیک‌ترین تاریخ
-        for (pending in pendingList) {
-            approvePendingTransaction(pending)
+        // Group by account or bank to process each account independently and chronologically
+        val groupedByAccount = pendingList.groupBy { tx ->
+            val cardOrAcc = tx.cardNumber?.filter { it.isDigit() }?.takeLast(4)
+            cardOrAcc ?: tx.bankName ?: "DEFAULT"
+        }
+        
+        for ((_, list) in groupedByAccount) {
+            val sortedList = list.sortedWith(compareBy<Transaction> { it.dateMillis }.thenBy { it.id })
+            for (pending in sortedList) {
+                approvePendingTransaction(pending)
+            }
         }
     }
 
@@ -476,6 +495,19 @@ class FinanceRepository private constructor(context: Context) {
     suspend fun clearAllTransactions() = withContext(Dispatchers.IO) {
         transactionDao.clearAll()
         parsedSmsDao.clearAll()
+        triggerAutoCloudSync()
+    }
+
+    suspend fun clearAllTransactionsAndResetBalances() = withContext(Dispatchers.IO) {
+        db.withTransaction {
+            transactionDao.clearAll()
+            parsedSmsDao.clearAll()
+            val accounts = bankAccountDao.getAllBankAccountsList()
+            for (acc in accounts) {
+                bankAccountDao.setDirectBalance(acc.id, 0L)
+            }
+        }
+        triggerAutoCloudSync()
     }
 
     suspend fun clearPendingTransactions() = withContext(Dispatchers.IO) {

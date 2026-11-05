@@ -264,7 +264,12 @@ object DeviceSmsReader {
         val hasBal = hasBalance(body)
         if (!hasBal) return false
 
-        // 3. Must have financial transaction verb
+        // 3. Must have financial transaction verb or signed amount
+        val hasSignedAmount = Regex("""(?m)^[+-]\s*[0-9,]+""").containsMatchIn(text) ||
+                Regex("""(?m)^[0-9,]+\s*[+-]""").containsMatchIn(text) ||
+                Regex("""(?m):[+-][0-9,]+""").containsMatchIn(text) ||
+                Regex("""(?m):[0-9,]+[+-]""").containsMatchIn(text)
+
         val hasTransactionKeyword = text.contains("واریز") ||
                 text.contains("برداشت") ||
                 text.contains("انتقال") ||
@@ -276,9 +281,15 @@ object DeviceSmsReader {
                 text.contains("اصلاحی") ||
                 text.contains("اصلاحي") ||
                 text.contains("پایا") ||
+                text.contains("پايا") ||
                 text.contains("ساتنا") ||
                 text.contains("یارانه") ||
-                text.contains("يارانه")
+                text.contains("يارانه") ||
+                text.contains("مساعده") ||
+                text.contains("حقوق") ||
+                text.contains("شرح آزاد") ||
+                text.contains("شارژ") ||
+                hasSignedAmount
         if (!hasTransactionKeyword) return false
 
         // 4. Must be associated with an Iranian Bank

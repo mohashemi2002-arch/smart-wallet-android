@@ -121,7 +121,7 @@ fun SmsReaderScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        viewModel.clearAllTransactions()
+                        viewModel.clearAllTransactionsAndResetBalances()
                         showClearAllDialog = false
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = ColorExpenseRed)

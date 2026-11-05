@@ -30,7 +30,7 @@ class CategoryRepository(private val context: Context) {
 
         val DEFAULT_EXPENSE_CATEGORIES = listOf(
             TransactionCategory("exp_cash", "نقدی", "EXPENSE", "cash", "#F59E0B"),
-            TransactionCategory("exp_food", "خوردنی", "EXPENSE", "food", "#F97316"),
+            TransactionCategory("exp_food", "خوراکی و سوپرمارکت", "EXPENSE", "food", "#F97316"),
             TransactionCategory("exp_fuel", "بنزین", "EXPENSE", "fuel", "#EF4444"),
             TransactionCategory("exp_car", "خودرو", "EXPENSE", "car", "#06B6D4"),
             TransactionCategory("exp_home", "خونه", "EXPENSE", "home", "#3B82F6"),

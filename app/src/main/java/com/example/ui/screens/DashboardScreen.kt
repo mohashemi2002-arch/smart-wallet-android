@@ -25,12 +25,15 @@ import com.example.data.model.MarketRate
 import com.example.data.model.Transaction
 import com.example.data.model.TransactionType
 import com.example.ui.components.AddBankAccountDialog
+import com.example.ui.components.AllTransactionsDialog
 import com.example.ui.components.BankLogoImage
+import com.example.ui.components.CategorySelectionBottomSheet
 import com.example.ui.components.CurrencyUnit
 import com.example.ui.components.EditAccountBottomSheet
 import com.example.ui.components.PersianCurrencyFormatter
 import com.example.ui.viewmodel.FinanceViewModel
 import com.example.util.BankLogoHelper
+import androidx.compose.ui.draw.clip
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -45,6 +48,7 @@ fun DashboardScreen(
 ) {
     val accounts by viewModel.bankAccounts.collectAsState()
     val transactions by viewModel.transactions.collectAsState()
+    val allTransactions by viewModel.allTransactions.collectAsState()
     val totalBalance by viewModel.totalNetWorthToman.collectAsState()
     val monthlyIncome by viewModel.totalIncomeToman.collectAsState()
     val monthlyExpense by viewModel.totalExpenseToman.collectAsState()
@@ -54,6 +58,32 @@ fun DashboardScreen(
 
     var accountToEdit by remember { mutableStateOf<BankAccount?>(null) }
     var showAddAccountDialog by remember { mutableStateOf(false) }
+    var showAllTransactionsDialog by remember { mutableStateOf(false) }
+    var editingTransaction by remember { mutableStateOf<Transaction?>(null) }
+
+    if (showAllTransactionsDialog) {
+        AllTransactionsDialog(
+            transactions = transactions,
+            allTransactions = allTransactions,
+            currencyUnit = currencyUnit,
+            bankAccounts = accounts,
+            viewModel = viewModel,
+            onDismiss = { showAllTransactionsDialog = false }
+        )
+    }
+
+    editingTransaction?.let { tx ->
+        val catType = if (tx.type == TransactionType.INCOME) "INCOME" else "EXPENSE"
+        CategorySelectionBottomSheet(
+            categoryType = catType,
+            selectedCategoryName = tx.categoryName,
+            onCategorySelected = { cat ->
+                viewModel.updateTransactionCategory(tx.id, cat.name)
+                editingTransaction = null
+            },
+            onDismiss = { editingTransaction = null }
+        )
+    }
 
     if (accountToEdit != null) {
         EditAccountBottomSheet(
@@ -262,7 +292,9 @@ fun DashboardScreen(
         item {
             RecentTransactionsSection(
                 transactions = transactions,
-                currencyUnit = currencyUnit
+                currencyUnit = currencyUnit,
+                onViewAll = { showAllTransactionsDialog = true },
+                onTransactionClick = { editingTransaction = it }
             )
         }
 
@@ -716,7 +748,9 @@ private fun MarketOverviewSection(
 @Composable
 private fun RecentTransactionsSection(
     transactions: List<Transaction>,
-    currencyUnit: CurrencyUnit
+    currencyUnit: CurrencyUnit,
+    onViewAll: () -> Unit = {},
+    onTransactionClick: (Transaction) -> Unit = {}
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -735,11 +769,20 @@ private fun RecentTransactionsSection(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(
-                text = "تراکنش‌های اخیر",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "تراکنش‌های اخیر",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                TextButton(onClick = onViewAll) {
+                    Text("مشاهده همه", style = MaterialTheme.typography.labelMedium)
+                }
+            }
 
             if (transactions.isEmpty()) {
                 Text(
@@ -752,15 +795,24 @@ private fun RecentTransactionsSection(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 8.dp),
+                            .clip(RoundedCornerShape(10.dp))
+                            .clickable { onTransactionClick(transaction) }
+                            .padding(vertical = 8.dp, horizontal = 4.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = transaction.merchantName.ifBlank { transaction.categoryName },
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Medium
-                        )
+                        Column {
+                            Text(
+                                text = transaction.merchantName.ifBlank { transaction.categoryName },
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                text = "دسته‌بندی: ${transaction.categoryName}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                         Text(
                             text = formatWithUnit(transaction.amountToman, currencyUnit),
                             style = MaterialTheme.typography.bodyMedium,

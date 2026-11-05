@@ -389,6 +389,30 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    fun updateTransactionCategory(transactionId: Long, newCategoryName: String) {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                repository.updateTransactionCategory(transactionId, newCategoryName)
+                _statusMessage.value = "دسته‌بندی تراکنش با موفقیت به «$newCategoryName» تغییر یافت."
+            } catch (e: Exception) {
+                android.util.Log.e("FinanceViewModel", "Error updating transaction category", e)
+                _statusMessage.value = "خطا در تغییر دسته‌بندی تراکنش"
+            }
+        }
+    }
+
+    fun clearAllTransactionsAndResetBalances() {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                repository.clearAllTransactionsAndResetBalances()
+                _statusMessage.value = "تمام تراکنش‌ها پاکسازی و موجودی حساب‌ها ریست شد."
+            } catch (e: Exception) {
+                android.util.Log.e("FinanceViewModel", "Error clearing all transactions and resetting balances", e)
+                _statusMessage.value = "خطا در پاکسازی کامل تراکنش‌ها"
+            }
+        }
+    }
+
     fun clearPendingTransactions() {
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             try {

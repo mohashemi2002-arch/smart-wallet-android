@@ -253,4 +253,88 @@ class IranianBankSmsParserTest {
         assertEquals("بانک ملی", parsed.bankName)
         assertNotNull(parsed.dateMillis)
     }
+
+    @Test
+    fun testUnifiedBankSmsParserBankMelliMmddToIso() {
+        val sms = """
+            بانك ملي ايران
+            يارانه:3,000,000+
+            حساب:02003
+            مانده:3,068,009
+            0730-17:23
+        """.trimIndent()
+
+        val parsed = com.example.util.UnifiedBankSmsParser.parse(sms, "09830009417")
+
+        assertEquals(300_000L, parsed.amountToman)
+        assertEquals(TransactionType.INCOME, parsed.type)
+        assertEquals("بانک ملی", parsed.bankName)
+        assertEquals("02003", parsed.accountNumber)
+
+        // Test Date: 0730 is 7th Jalali month (Mehr), 30th day
+        val dateDetails = com.example.util.UnifiedBankSmsParser.parseBankDate(sms)
+        assertNotNull(dateDetails)
+        assertEquals(7, dateDetails!!.jalaliMonth)
+        assertEquals(30, dateDetails.jalaliDay)
+        assertEquals(17, dateDetails.hour)
+        assertEquals(23, dateDetails.minute)
+
+        // Standardized ISO date string format YYYY-MM-DDTHH:mm:ss
+        assertNotNull(parsed.isoDateTime)
+        assertTrue(parsed.isoDateTime!!.matches(Regex("""^\d{4}-\d{2}-\d{2}T17:23:00$""")))
+        // In 1403, 07/30 (Mehr 30) corresponds to Gregorian 2024-10-21 or 2025-10-22
+        assertTrue(parsed.isoDateTime!!.endsWith("T17:23:00"))
+    }
+
+    @Test
+    fun testUnifiedBankSmsParserBankSaderatMmddToIso() {
+        val sms = """
+            پايانه فروش: 2,550,000-
+            حساب:80001
+            مانده:216,568,075
+            0814 - 00:16
+        """.trimIndent()
+
+        val parsed = com.example.util.UnifiedBankSmsParser.parse(sms, "BankSaderat")
+
+        assertEquals(255_000L, parsed.amountToman)
+        assertEquals(TransactionType.EXPENSE, parsed.type)
+        assertEquals("بانک صادرات", parsed.bankName)
+        assertEquals("80001", parsed.accountNumber)
+
+        // Test Date: 0814 is 8th Jalali month (Aban), 14th day
+        val dateDetails = com.example.util.UnifiedBankSmsParser.parseBankDate(sms)
+        assertNotNull(dateDetails)
+        assertEquals(8, dateDetails!!.jalaliMonth)
+        assertEquals(14, dateDetails.jalaliDay)
+        assertEquals(0, dateDetails.hour)
+        assertEquals(16, dateDetails.minute)
+
+        // Standardized ISO date string format YYYY-MM-DDTHH:mm:ss
+        assertNotNull(parsed.isoDateTime)
+        assertTrue(parsed.isoDateTime!!.matches(Regex("""^\d{4}-\d{2}-\d{2}T00:16:00$""")))
+        assertTrue(parsed.isoDateTime!!.endsWith("T00:16:00"))
+    }
+
+    @Test
+    fun testUnifiedBankSmsParserTimeFirstMmdd() {
+        val sms = """
+            مساعده: 158,472,000+
+            حساب:80001
+            مانده:219,118,075
+            15:38 - 0813
+        """.trimIndent()
+
+        val dateDetails = com.example.util.UnifiedBankSmsParser.parseBankDate(sms)
+        assertNotNull(dateDetails)
+        // 0813 is 8th Jalali month, 13th day
+        assertEquals(8, dateDetails!!.jalaliMonth)
+        assertEquals(13, dateDetails.jalaliDay)
+        assertEquals(15, dateDetails.hour)
+        assertEquals(38, dateDetails.minute)
+
+        val parsed = com.example.util.UnifiedBankSmsParser.parse(sms, "BankSaderat")
+        assertNotNull(parsed.isoDateTime)
+        assertTrue(parsed.isoDateTime!!.endsWith("T15:38:00"))
+    }
 }

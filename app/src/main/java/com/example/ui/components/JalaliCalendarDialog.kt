@@ -324,3 +324,201 @@ fun JalaliCalendarDialog(
         }
     }
 }
+
+@OptIn(ExperimentalAnimationApi::class)
+@Composable
+fun JalaliDatePickerDialog(
+    initialDateMillis: Long,
+    onDateSelected: (Long) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val initialJalali = JalaliCalendarHelper.getJalaliDateFromMillis(initialDateMillis)
+    val currentJalali = JalaliCalendarHelper.getJalaliDateFromMillis(System.currentTimeMillis())
+
+    var viewedYear by remember { mutableStateOf(initialJalali.year) }
+    var viewedMonth by remember { mutableStateOf(initialJalali.month) }
+    var selectedDay by remember { mutableStateOf(initialJalali.day) }
+
+    val daysInMonth = JalaliCalendarHelper.getMonthLength(viewedYear, viewedMonth)
+    val firstDayOfMonthMillis = JalaliCalendarHelper.getMillisFromJalali(viewedYear, viewedMonth, 1)
+    val firstDayOfWeek = JalaliCalendarHelper.getJalaliDateFromMillis(firstDayOfMonthMillis).dayOfWeekName
+
+    val weekDays = arrayOf("شنبه", "یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنج‌شنبه", "جمعه")
+    val weekDayInitials = arrayOf("ش", "ی", "د", "س", "چ", "پ", "ج")
+    val emptyCellsBefore = weekDays.indexOf(firstDayOfWeek)
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.92f)
+                .wrapContentHeight(),
+            shape = RoundedCornerShape(28.dp),
+            color = Color(0xFF0F172A),
+            tonalElevation = 8.dp
+        ) {
+            Column(
+                modifier = Modifier.padding(20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "تقویم خورشیدی",
+                    color = Color(0xFF94A3B8),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium
+                )
+                Text(
+                    text = "${selectedDay} ${JalaliCalendarHelper.monthNames[viewedMonth - 1]} $viewedYear",
+                    color = Color.White,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(top = 6.dp, bottom = 18.dp)
+                )
+
+                // Month Navigator
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFF1E293B), RoundedCornerShape(16.dp))
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = {
+                        if (viewedMonth == 12) {
+                            viewedMonth = 1
+                            viewedYear++
+                        } else {
+                            viewedMonth++
+                        }
+                    }) {
+                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "ماه بعد", tint = Color.White)
+                    }
+
+                    AnimatedContent(
+                        targetState = "${JalaliCalendarHelper.monthNames[viewedMonth - 1]} $viewedYear",
+                        transitionSpec = {
+                            fadeIn(animationSpec = tween(200)) togetherWith fadeOut(animationSpec = tween(80))
+                        }, label = "pickerMonthAnim"
+                    ) { targetText ->
+                        Text(
+                            text = targetText,
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp
+                        )
+                    }
+
+                    IconButton(onClick = {
+                        if (viewedMonth == 1) {
+                            viewedMonth = 12
+                            viewedYear--
+                        } else {
+                            viewedMonth--
+                        }
+                    }) {
+                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "ماه قبل", tint = Color.White)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Weekday headers
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    weekDayInitials.forEach { dayInitial ->
+                        Text(
+                            text = dayInitial,
+                            color = Color(0xFF64748B),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Days Grid
+                val totalCells = emptyCellsBefore + daysInMonth
+                val rows = (totalCells + 6) / 7
+
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(7),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height((rows * 44).dp),
+                    userScrollEnabled = false
+                ) {
+                    items(totalCells) { index ->
+                        if (index < emptyCellsBefore) {
+                            Box(modifier = Modifier.size(40.dp))
+                        } else {
+                            val dayNumber = index - emptyCellsBefore + 1
+                            val isSelected = (dayNumber == selectedDay)
+                            val isToday = (viewedYear == currentJalali.year && viewedMonth == currentJalali.month && dayNumber == currentJalali.day)
+
+                            Box(
+                                modifier = Modifier
+                                    .padding(2.dp)
+                                    .aspectRatio(1f)
+                                    .clip(CircleShape)
+                                    .background(
+                                        when {
+                                            isSelected -> MaterialTheme.colorScheme.primary
+                                            isToday -> MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                                            else -> Color.Transparent
+                                        }
+                                    )
+                                    .clickable {
+                                        selectedDay = dayNumber
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = dayNumber.toString(),
+                                    color = when {
+                                        isSelected -> Color.White
+                                        isToday -> MaterialTheme.colorScheme.primary
+                                        else -> Color.White
+                                    },
+                                    fontSize = 14.sp,
+                                    fontWeight = if (isSelected || isToday) FontWeight.Bold else FontWeight.Normal
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Actions
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismiss) {
+                        Text("انصراف", color = Color(0xFFF87171))
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = {
+                            val chosenMillis = JalaliCalendarHelper.getMillisFromJalali(viewedYear, viewedMonth, selectedDay, 12, 0, 0)
+                            onDateSelected(chosenMillis)
+                            onDismiss()
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                    ) {
+                        Text("انتخاب تاریخ")
+                    }
+                }
+            }
+        }
+    }
+}
+

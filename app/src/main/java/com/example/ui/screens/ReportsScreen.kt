@@ -65,6 +65,7 @@ fun ReportsScreen(
         expenseTransactions.groupBy { it.categoryName }
             .mapValues { it.value.sumOf { tx -> tx.amountToman } }
     }
+    var editingTransaction by remember { mutableStateOf<Transaction?>(null) }
 
     Scaffold(
         topBar = {
@@ -200,11 +201,28 @@ fun ReportsScreen(
                     key = { it.id }
                 ) { tx ->
                     Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-                        ReportTransactionCard(tx = tx)
+                        ReportTransactionCard(
+                            tx = tx,
+                            onEditCategory = { editingTransaction = tx }
+                        )
                     }
                 }
             }
         }
+    }
+
+    // Category Change Bottom Sheet for Confirmed Transaction
+    editingTransaction?.let { tx ->
+        val catType = if (tx.type == TransactionType.INCOME) "INCOME" else "EXPENSE"
+        com.example.ui.components.CategorySelectionBottomSheet(
+            categoryType = catType,
+            selectedCategoryName = tx.categoryName,
+            onCategorySelected = { cat ->
+                viewModel.updateTransactionCategory(tx.id, cat.name)
+                editingTransaction = null
+            },
+            onDismiss = { editingTransaction = null }
+        )
     }
 }
 
@@ -737,14 +755,19 @@ private fun FilterTabButton(
  * Modern card representing a single transaction in the reports feed.
  */
 @Composable
-private fun ReportTransactionCard(tx: Transaction) {
+private fun ReportTransactionCard(
+    tx: Transaction,
+    onEditCategory: () -> Unit
+) {
     val isIncome = tx.type == TransactionType.INCOME
     val (catColor, catIcon) = CategoryIconMap.getIconForCategory(tx.categoryName)
     val amountColor = if (isIncome) ColorIncomeGreen else ColorExpenseRed
     val prefix = if (isIncome) "+" else "-"
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onEditCategory() },
         shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface

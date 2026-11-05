@@ -197,8 +197,8 @@ fun AddOrEditTransactionDialog(
                                         .clickable {
                                             selectedMode = mode
                                             if (mode == TransactionMode.EXPENSE && (selectedCategoryName == "حقوق" || selectedCategoryName == "جابجایی")) {
-                                                selectedCategoryName = "خوردنی"
-                                            } else if (mode == TransactionMode.INCOME && (selectedCategoryName == "خوردنی" || selectedCategoryName == "جابجایی")) {
+                                                selectedCategoryName = "خوراکی و سوپرمارکت"
+                                            } else if (mode == TransactionMode.INCOME && (selectedCategoryName == "خوراکی و سوپرمارکت" || selectedCategoryName == "جابجایی")) {
                                                 selectedCategoryName = "حقوق"
                                             } else if (mode == TransactionMode.TRANSFER) {
                                                 selectedCategoryName = "جابجایی"
@@ -609,6 +609,18 @@ fun AddOrEditTransactionDialog(
                 }
             }
         }
+    }
+
+    // Jalali Date Picker Dialog
+    if (showDatePickerDialog) {
+        JalaliDatePickerDialog(
+            initialDateMillis = currentDateMillis,
+            onDateSelected = { pickedMillis ->
+                currentDateMillis = pickedMillis
+                showDatePickerDialog = false
+            },
+            onDismiss = { showDatePickerDialog = false }
+        )
     }
 
     // Category Selection Sheet
