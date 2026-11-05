@@ -482,6 +482,25 @@ class FinanceRepository private constructor(context: Context) {
         }
     }
 
+    suspend fun smartAiReviewAndApprovePendingTransactions(): com.example.util.AiBatchReviewResult = withContext(Dispatchers.IO) {
+        val pendingList = transactionDao.getPendingTransactionsFlow().first()
+        val aiResult = com.example.util.SmartTransactionAiEngine.analyzeAndOptimizeTransactions(pendingList)
+        
+        val groupedByAccount = aiResult.processedTransactions.groupBy { tx ->
+            val cardOrAcc = tx.cardNumber?.filter { it.isDigit() }?.takeLast(4)
+            cardOrAcc ?: tx.bankName ?: "DEFAULT"
+        }
+        
+        for ((_, list) in groupedByAccount) {
+            val sortedList = list.sortedWith(compareBy<Transaction> { it.dateMillis }.thenBy { it.id })
+            for (pending in sortedList) {
+                transactionDao.update(pending)
+                approvePendingTransaction(pending)
+            }
+        }
+        aiResult
+    }
+
     suspend fun rejectPendingTransaction(transaction: Transaction) = withContext(Dispatchers.IO) {
         transactionDao.deleteById(transaction.id)
         if (!transaction.rawSmsText.isNullOrBlank()) {

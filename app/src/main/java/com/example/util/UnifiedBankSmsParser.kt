@@ -72,13 +72,24 @@ object UnifiedBankSmsParser {
         val isSaderatText = normalizedText.contains("صادرات") || normalizedText.contains("Saderat", ignoreCase = true)
         val isSaderat = isSaderatSender || isSaderatText
 
-        val isMehr = (senderAddress != null && senderAddress.contains("QMEHR", ignoreCase = true)) || normalizedText.contains("مهر ایران")
+        val isMehrSender = senderAddress != null && (senderAddress.contains("QMEHR", ignoreCase = true) || senderAddress.contains("MEHR", ignoreCase = true) || senderAddress.contains("qmehr724", ignoreCase = true))
+        val isMehrText = normalizedText.contains("مهر ایران") || normalizedText.contains("قرض‌الحسنه مهر") || normalizedText.contains("qmehr724") || normalizedText.lines().any { it.trim().startsWith("640101") }
+        val isMehr = isMehrSender || isMehrText
 
         // 2. Extract Account Number (شماره حساب)
         val accountLabelPattern = Pattern.compile("حساب\\s*:?\\s*(\\d+)")
         val accountMatcher = accountLabelPattern.matcher(normalizedText)
         if (accountMatcher.find()) {
             accountNumber = accountMatcher.group(1)?.trim()
+        } else {
+            // Standalone account number in line (e.g. Bank Mehr 18-digit account number 640101018243027001)
+            for (line in normalizedText.lines()) {
+                val trimmed = line.trim()
+                if (trimmed.matches(Regex("""^\d{13,20}$"""))) {
+                    accountNumber = trimmed
+                    break
+                }
+            }
         }
 
         // 3. Extract Card Number (شماره کارت)
@@ -86,7 +97,7 @@ object UnifiedBankSmsParser {
         val cardNumberMatcher = cardMatcher.matcher(normalizedText)
         if (cardNumberMatcher.find()) {
             val matchedCard = cardNumberMatcher.group(1)?.replace("-", "")?.replace("کارت", "")?.replace("كارت", "")?.replace(":", "")?.trim()
-            if (matchedCard != null && matchedCard != accountNumber && !matchedCard.startsWith("140")) {
+            if (matchedCard != null && matchedCard != accountNumber && !matchedCard.startsWith("140") && (accountNumber == null || !accountNumber.contains(matchedCard))) {
                 cardNumber = matchedCard
             }
         }

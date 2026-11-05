@@ -366,6 +366,26 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    private val _aiReviewResult = kotlinx.coroutines.flow.MutableStateFlow<com.example.util.AiBatchReviewResult?>(null)
+    val aiReviewResult: kotlinx.coroutines.flow.StateFlow<com.example.util.AiBatchReviewResult?> = _aiReviewResult
+
+    fun runSmartAiReviewAndApprove() {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val result = repository.smartAiReviewAndApprovePendingTransactions()
+                _aiReviewResult.value = result
+                _statusMessage.value = result.summaryInsight
+            } catch (e: Exception) {
+                android.util.Log.e("FinanceViewModel", "Error running AI review and approval", e)
+                _statusMessage.value = "خطا در پردازش هوشمند تراکنش‌ها با هوش مصنوعی"
+            }
+        }
+    }
+
+    fun dismissAiReviewResult() {
+        _aiReviewResult.value = null
+    }
+
     fun rejectPendingTransaction(transaction: Transaction) {
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             try {
@@ -577,6 +597,67 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
             _isParsingSms.value = false
             _statusMessage.value = "تعداد $processedCount پیامک تراکنش بانکی جدید استخراج و در صف بررسی قرار گرفت."
         }
+    }
+
+    fun processPastedSmsText(rawPastedText: String) {
+        viewModelScope.launch {
+            if (rawPastedText.isBlank()) return@launch
+            _isParsingSms.value = true
+
+            val chunks = splitPastedSmsText(rawPastedText)
+            var count = 0
+            for (chunk in chunks) {
+                val res = repository.processIncomingSms(chunk, senderAddress = "MANUAL")
+                if (res.amountToman > 0) {
+                    count++
+                }
+            }
+            _isParsingSms.value = false
+            _statusMessage.value = if (count > 0) {
+                "تعداد $count پیامک با موفقیت استخراج و به صف بررسی و تایید افزوده شد."
+            } else {
+                "پیامک تراکنش معتبری در متن واردشده شناسایی نشد."
+            }
+        }
+    }
+
+    private fun splitPastedSmsText(rawText: String): List<String> {
+        val normalized = com.example.util.SmsNormalizer.normalize(rawText).trim()
+        if (normalized.isBlank()) return emptyList()
+
+        val doubleLineChunks = normalized.split(Regex("""\n\s*\n+""")).map { it.trim() }.filter { it.isNotBlank() }
+        if (doubleLineChunks.size > 1 && doubleLineChunks.any { it.contains("مانده") || it.contains("موجودی") }) {
+            return doubleLineChunks
+        }
+
+        val result = mutableListOf<String>()
+        val currentSmsLines = mutableListOf<String>()
+
+        val lines = normalized.lines()
+        for (line in lines) {
+            val trimmed = line.trim()
+            if (trimmed.isBlank()) continue
+
+            val isBoundary = (trimmed.contains("بانک") || trimmed.contains("بانك")) ||
+                    trimmed.matches(Regex("""^\d{13,20}$""")) ||
+                    trimmed.startsWith("انتقال به") ||
+                    (trimmed == "خرید" || trimmed == "خريد")
+
+            if (isBoundary && currentSmsLines.isNotEmpty()) {
+                val currentText = currentSmsLines.joinToString("\n")
+                if (currentText.contains("مانده") || currentText.contains("موجودی") || currentText.contains("رمز") || currentText.contains("ریال")) {
+                    result.add(currentText)
+                    currentSmsLines.clear()
+                }
+            }
+            currentSmsLines.add(line)
+        }
+
+        if (currentSmsLines.isNotEmpty()) {
+            result.add(currentSmsLines.joinToString("\n"))
+        }
+
+        return if (result.isNotEmpty()) result else listOf(rawText)
     }
 
     fun togglePremium() {

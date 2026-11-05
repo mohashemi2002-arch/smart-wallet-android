@@ -80,6 +80,8 @@ fun SmsReaderScreen(
     var showAddSenderDialog by remember { mutableStateOf(false) }
     var showSmsPickerBottomSheet by remember { mutableStateOf(false) }
     var editingSenderForBank by remember { mutableStateOf<BankSmsSender?>(null) }
+    var showManualPasteDialog by remember { mutableStateOf(false) }
+    var manualPastedText by remember { mutableStateOf("") }
 
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -157,6 +159,165 @@ fun SmsReaderScreen(
             dismissButton = {
                 OutlinedButton(onClick = { showClearPendingDialog = false }) {
                     Text("انصراف")
+                }
+            }
+        )
+    }
+
+    // Dialog: Manual SMS Paste / Test Workbench
+    if (showManualPasteDialog) {
+        AlertDialog(
+            onDismissRequest = { showManualPasteDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(Icons.Default.ContentPaste, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Text("ورود یا تست متن پیامک بانکی", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                }
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = "می‌توانید یک یا چند پیامک بانکی (بانک مهر ایران، ملی، صادرات، ملت و ...) را اینجا بچسبانید تا سیستم به‌طور هوشمند آن‌ها را تحلیل و در صف تایید قرار دهد:",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        lineHeight = 20.sp
+                    )
+                    OutlinedTextField(
+                        value = manualPastedText,
+                        onValueChange = { manualPastedText = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 120.dp, max = 220.dp),
+                        placeholder = {
+                            Text(
+                                "نمونه بانک مهر ایران:\n640101018243027001\n40,021,500-\n1405/8/4-10:05\nمانده:26,462",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                            )
+                        },
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (manualPastedText.isNotBlank()) {
+                            viewModel.processPastedSmsText(manualPastedText)
+                            manualPastedText = ""
+                            showManualPasteDialog = false
+                        }
+                    },
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("بررسی و افزودن به صف")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = { showManualPasteDialog = false },
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("انصراف")
+                }
+            }
+        )
+    }
+
+    // Dialog: Smart AI Batch Review Report
+    val aiReviewResult by viewModel.aiReviewResult.collectAsState()
+    if (aiReviewResult != null) {
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissAiReviewResult() },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.AutoAwesome,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(36.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = "گزارش بررسی هوشمند تراکنش‌ها با هوش مصنوعی",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    textAlign = TextAlign.Center
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = aiReviewResult!!.summaryInsight,
+                        style = MaterialTheme.typography.bodyMedium,
+                        lineHeight = 22.sp
+                    )
+
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("تعداد کل تراکنش‌های بررسی‌شده:", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("${PersianFormatters.toPersianDigits(aiReviewResult!!.totalCount.toString())} مورد", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("دسته‌بندی با اطمینان هوش مصنوعی:", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("${PersianFormatters.toPersianDigits(aiReviewResult!!.highConfidenceCount.toString())} مورد", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = ColorIncomeGreen)
+                            }
+                            if (aiReviewResult!!.enrichedFromOtpCount > 0) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text("تطبیق پذیرنده از پیامک رمز پویا:", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text("${PersianFormatters.toPersianDigits(aiReviewResult!!.enrichedFromOtpCount.toString())} مورد", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                }
+                            }
+                            if (aiReviewResult!!.detectedFeesCount > 0) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text("کارمزد بانکی شناسایی‌شده:", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text("${PersianFormatters.toPersianDigits(aiReviewResult!!.detectedFeesCount.toString())} مورد", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("زنجیره زمانی مانده حساب:", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(
+                                    text = if (aiReviewResult!!.balanceChainValid) "معتبر و پیوسته ✓" else "همگام با آخرین پیامک",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (aiReviewResult!!.balanceChainValid) ColorIncomeGreen else MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { viewModel.dismissAiReviewResult() },
+                    shape = RoundedCornerShape(50)
+                ) {
+                    Text("متوجه شدم")
                 }
             }
         )
@@ -259,7 +420,7 @@ fun SmsReaderScreen(
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Button(
                                 onClick = {
@@ -295,9 +456,18 @@ fun SmsReaderScreen(
                                     Text("در حال اسکن...")
                                 } else {
                                     Icon(Icons.Default.Sms, contentDescription = null, modifier = Modifier.size(18.dp))
-                                    Spacer(Modifier.width(8.dp))
-                                    Text("اسکن پیامک‌های بانکی جدید", fontWeight = FontWeight.Bold)
+                                    Spacer(Modifier.width(6.dp))
+                                    Text("اسکن پیامک‌ها", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                                 }
+                            }
+
+                            FilledTonalButton(
+                                onClick = { showManualPasteDialog = true },
+                                shape = RoundedCornerShape(14.dp)
+                            ) {
+                                Icon(Icons.Default.ContentPaste, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("ورود متنی", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                             }
 
                             OutlinedButton(
@@ -306,8 +476,8 @@ fun SmsReaderScreen(
                                 border = BorderStroke(1.dp, ColorExpenseRed.copy(alpha = 0.5f))
                             ) {
                                 Icon(Icons.Default.DeleteSweep, contentDescription = null, tint = ColorExpenseRed, modifier = Modifier.size(18.dp))
-                                Spacer(Modifier.width(6.dp))
-                                Text("پاکسازی کل", color = ColorExpenseRed, fontSize = 12.sp)
+                                Spacer(Modifier.width(4.dp))
+                                Text("پاکسازی", color = ColorExpenseRed, fontSize = 12.sp)
                             }
                         }
                     }
@@ -343,7 +513,24 @@ fun SmsReaderScreen(
                     }
 
                     if (pendingTransactions.isNotEmpty()) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            FilledTonalButton(
+                                onClick = { viewModel.runSmartAiReviewAndApprove() },
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                shape = RoundedCornerShape(50),
+                                colors = ButtonDefaults.filledTonalButtonColors(
+                                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            ) {
+                                Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(15.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("تایید هوشمند با AI", fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                            }
+
                             TextButton(
                                 onClick = { viewModel.approveAllPendingTransactions() },
                                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)

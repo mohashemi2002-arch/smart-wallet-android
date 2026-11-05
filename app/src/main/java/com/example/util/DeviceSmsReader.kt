@@ -164,8 +164,12 @@ object DeviceSmsReader {
             "saman" to "بانک سامان",
 
             // قرض‌الحسنه مهر ایران
+            "B.QMEHRIRAN" to "بانک قرض‌الحسنه مهر ایران",
             "QMEHRIRAN" to "بانک قرض‌الحسنه مهر ایران",
             "QMehrIran" to "بانک قرض‌الحسنه مهر ایران",
+            "QMEHR" to "بانک قرض‌الحسنه مهر ایران",
+            "qmehr" to "بانک قرض‌الحسنه مهر ایران",
+            "qmehr724" to "بانک قرض‌الحسنه مهر ایران",
             "مهر ایران" to "بانک قرض‌الحسنه مهر ایران",
 
             // قرض‌الحسنه رسالت
@@ -225,6 +229,10 @@ object DeviceSmsReader {
             if (combined.contains(kw, ignoreCase = true)) {
                 return bank
             }
+        }
+        val normalizedBody = normalizeDigits(body)
+        if (normalizedBody.lines().any { it.trim().startsWith("640101") || it.trim().matches(Regex("""^6401\d{10,16}$""")) }) {
+            return "بانک قرض‌الحسنه مهر ایران"
         }
         return null
     }
@@ -294,9 +302,11 @@ object DeviceSmsReader {
 
         // 4. Must be associated with an Iranian Bank
         val detectedBank = detectBankName(address, body)
+        val hasAccountLine = Regex("""(?m)^\d{13,20}$""").containsMatchIn(text)
         val hasBankKeyword = detectedBank != null ||
                 text.contains("بانک") ||
-                text.contains("بانك")
+                text.contains("بانك") ||
+                hasAccountLine
 
         return hasBankKeyword
     }

@@ -195,18 +195,16 @@ object JalaliCalendarHelper {
         val currentYear = currentJalali.year
 
         try {
-            // 1. Explicit full Jalali Date: 140x/MM/DD with optional time
-            val fullDateRegex = Regex("""(?:تاريخ|تاریخ)?\s*:?\s*(1[34]\d{2})[/-](0[1-9]|1[0-2])[/-](0[1-9]|[12]\d|3[01])""")
+            // 1. Explicit full Jalali Date: 140x/M/D with optional -HH:MM or ساعت: HH:MM
+            val fullDateRegex = Regex("""(?:تاريخ|تاریخ)?\s*:?\s*(1[34]\d{2})[/-](0?[1-9]|1[0-2])[/-](0?[1-9]|[12]\d|3[01])(?:(?:\s*[-–]\s*|\s+)(?:ساعت\s*:?\s*)?(\d{1,2}):(\d{2})(?::(\d{2}))?)?""")
             val fullDateMatch = fullDateRegex.find(norm)
             if (fullDateMatch != null) {
                 val y = fullDateMatch.groupValues[1].toInt()
                 val m = fullDateMatch.groupValues[2].toInt()
                 val d = fullDateMatch.groupValues[3].toInt()
-                val timeRegex = Regex("""(?:ساعت)?\s*:?\s*(\d{2}):(\d{2})(?::(\d{2}))?""")
-                val timeMatch = timeRegex.find(norm)
-                val h = timeMatch?.groupValues?.getOrNull(1)?.toIntOrNull() ?: 12
-                val min = timeMatch?.groupValues?.getOrNull(2)?.toIntOrNull() ?: 0
-                val s = timeMatch?.groupValues?.getOrNull(3)?.toIntOrNull() ?: 0
+                val h = fullDateMatch.groupValues.getOrNull(4)?.toIntOrNull() ?: 12
+                val min = fullDateMatch.groupValues.getOrNull(5)?.toIntOrNull() ?: 0
+                val s = fullDateMatch.groupValues.getOrNull(6)?.toIntOrNull() ?: 0
                 val (gy, gm, gd) = jalaliToGregorian(y, m, d)
                 val millis = getMillisFromJalali(y, m, d, h, min, s)
                 val isoStr = formatToIsoDateTime(gy, gm, gd, h, min, s)
