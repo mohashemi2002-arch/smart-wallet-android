@@ -342,13 +342,60 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    fun approvePendingTransactionWithCategory(transaction: Transaction, newCategoryName: String) {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                repository.approvePendingTransactionWithCategory(transaction, newCategoryName)
+                _statusMessage.value = "تراکنش با دسته «$newCategoryName» تایید شد."
+            } catch (e: Exception) {
+                android.util.Log.e("FinanceViewModel", "Error approving pending transaction with category", e)
+                _statusMessage.value = "خطا در تایید تراکنش"
+            }
+        }
+    }
+
+    fun approveAllPendingTransactions() {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                repository.approveAllPendingTransactions()
+                _statusMessage.value = "تمام تراکنش‌های در انتظار با موفقیت تایید و ثبت شدند."
+            } catch (e: Exception) {
+                android.util.Log.e("FinanceViewModel", "Error approving all pending transactions", e)
+                _statusMessage.value = "خطا در تایید دسته‌جمعی تراکنش‌ها"
+            }
+        }
+    }
+
     fun rejectPendingTransaction(transaction: Transaction) {
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             try {
-                repository.deleteTransaction(transaction)
+                repository.rejectPendingTransaction(transaction)
                 _statusMessage.value = "تراکنش پیامکی رد و حذف شد."
             } catch (e: Exception) {
                 android.util.Log.e("FinanceViewModel", "Error rejecting pending transaction", e)
+            }
+        }
+    }
+
+    fun clearAllTransactions() {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                repository.clearAllTransactions()
+                _statusMessage.value = "تمام تراکنش‌ها با موفقیت پاکسازی شدند."
+            } catch (e: Exception) {
+                android.util.Log.e("FinanceViewModel", "Error clearing all transactions", e)
+                _statusMessage.value = "خطا در پاکسازی تراکنش‌ها"
+            }
+        }
+    }
+
+    fun clearPendingTransactions() {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                repository.clearPendingTransactions()
+                _statusMessage.value = "تراکنش‌های در انتظار تایید حذف شدند."
+            } catch (e: Exception) {
+                android.util.Log.e("FinanceViewModel", "Error clearing pending transactions", e)
             }
         }
     }
@@ -470,43 +517,32 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
                 return@launch
             }
 
-            val activeSendersList = bankSmsSenders.value.filter { it.isActive }
-            
-            // Query real SMS from device inbox
-            val deviceMessages = if (activeSendersList.isNotEmpty()) {
-                val collected = mutableListOf<com.example.util.DeviceSenderSmsMessage>()
-                for (sender in activeSendersList) {
-                    val msgs = com.example.util.DeviceSmsReader.getMessagesForSender(
-                        context = getApplication(),
-                        senderNumber = sender.senderNumber,
-                        bankName = sender.bankName,
-                        limit = 50
-                    )
-                    collected.addAll(msgs)
-                }
-                if (collected.isEmpty()) {
-                    com.example.util.DeviceSmsReader.getAllBankSms(getApplication(), limit = 100)
-                } else {
-                    collected
-                }
-            } else {
-                com.example.util.DeviceSmsReader.getAllBankSms(getApplication(), limit = 100)
+            // Query strictly filtered real bank SMS from device inbox
+            val deviceMessages = com.example.util.DeviceSmsReader.getAllBankSms(
+                context = getApplication(),
+                requireBalance = true,
+                limit = 200
+            ).filter {
+                !com.example.util.DeviceSmsReader.isNonBankSender(it.address) &&
+                com.example.util.DeviceSmsReader.isBankTransactionSms(it.address, it.body)
             }
 
             if (deviceMessages.isEmpty()) {
-                _statusMessage.value = "هیچ پیامک بانکی در صندوق پیامک‌های دستگاه یافت نشد."
+                _statusMessage.value = "هیچ پیامک تراکنش بانکی جدید و معتبری در گوشی یافت نشد."
                 _isParsingSms.value = false
                 return@launch
             }
 
             var processedCount = 0
             for (msg in deviceMessages) {
-                repository.processIncomingSms(smsText = msg.body, senderAddress = msg.address)
-                processedCount++
+                val res = repository.processIncomingSms(smsText = msg.body, senderAddress = msg.address)
+                if (res.amountToman > 0) {
+                    processedCount++
+                }
             }
 
             _isParsingSms.value = false
-            _statusMessage.value = "تعداد $processedCount پیامک تراکنش بانکی با موفقیت خوانده و به لیست اضافه شد."
+            _statusMessage.value = "تعداد $processedCount پیامک تراکنش بانکی جدید استخراج و در صف بررسی قرار گرفت."
         }
     }
 

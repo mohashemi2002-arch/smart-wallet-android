@@ -38,7 +38,9 @@ import kotlinx.coroutines.launch
 fun SettingsScreen(
     onNavigateBack: () -> Unit = {},
     onNavigateToRegistration: () -> Unit = {},
-    onNavigateToSmsSenders: () -> Unit = {}
+    onNavigateToSmsSenders: () -> Unit = {},
+    onNavigateToGroupedSms: () -> Unit = {},
+    onNavigateToFilteredSms: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -505,6 +507,102 @@ fun SettingsScreen(
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text("بررسی بروزرسانی")
                                 }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // SMS Tools & Diagnostic Card (moved away from Bank SMS menu)
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    ),
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Sms,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Text(
+                                text = "ابزارهای پیامک گوشی و سرشماره‌ها",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        Text(
+                            text = "مشاهده تمام پیامک‌های ورودی گوشی، فیلتر سرشماره‌ها و عیب‌یابی متن خام پیامک‌ها:",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        // 1. Grouped SMS Viewer
+                        OutlinedButton(
+                            onClick = onNavigateToGroupedSms,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Default.ListAlt, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Text("صندوق پیامک‌های گوشی (گروه‌بندی بر اساس فرستنده)", modifier = Modifier.weight(1f), fontSize = 12.sp)
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, modifier = Modifier.size(16.dp))
+                            }
+                        }
+
+                        // 2. Filtered Raw SMS Viewer
+                        OutlinedButton(
+                            onClick = onNavigateToFilteredSms,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Default.FilterAlt, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Text("صحت‌سنجی و بررسی متن خام پیامک‌ها", modifier = Modifier.weight(1f), fontSize = 12.sp)
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, modifier = Modifier.size(16.dp))
+                            }
+                        }
+
+                        // 3. Bank Senders Manager
+                        OutlinedButton(
+                            onClick = onNavigateToSmsSenders,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Default.AccountBalance, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Text("مدیریت و ثبت سرشماره‌های بانکی", modifier = Modifier.weight(1f), fontSize = 12.sp)
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, modifier = Modifier.size(16.dp))
                             }
                         }
                     }

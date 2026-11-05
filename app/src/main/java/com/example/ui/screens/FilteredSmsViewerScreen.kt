@@ -855,8 +855,12 @@ fun RawVerifiedSmsCard(
             if (!isRegisteredLocal) {
                 Button(
                     onClick = {
+                        if (amountValue <= 0) {
+                            Toast.makeText(context, "مبلغ تراکنش معتبر نیست", Toast.LENGTH_SHORT).show()
+                            return@Button
+                        }
                         val tx = Transaction(
-                            amountToman = if (amountValue > 0) amountValue else 1000L,
+                            amountToman = amountValue,
                             type = selectedType,
                             categoryName = selectedCategory.ifBlank { "متفرقه" },
                             merchantName = selectedMerchant.ifBlank { sender.bankName },

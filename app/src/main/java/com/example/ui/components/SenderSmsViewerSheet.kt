@@ -631,8 +631,9 @@ fun SenderSmsItemCard(
             if (!isRegisteredLocal) {
                 Button(
                     onClick = {
+                        if (amountValue <= 0) return@Button
                         val tx = Transaction(
-                            amountToman = if (amountValue > 0) amountValue else 1000L,
+                            amountToman = amountValue,
                             type = selectedType,
                             categoryName = selectedCategory.ifBlank { "متفرقه" },
                             merchantName = selectedMerchant.ifBlank { sender.bankName },

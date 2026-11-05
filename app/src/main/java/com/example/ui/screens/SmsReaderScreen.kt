@@ -1,11 +1,10 @@
 package com.example.ui.screens
 
-import com.example.ui.components.formatAsToman
-
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.animation.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -13,37 +12,36 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.data.FinanceRepository
 import com.example.data.model.BankAccount
 import com.example.data.model.BankSmsSender
+import com.example.data.model.Transaction
+import com.example.data.model.TransactionStatus
 import com.example.data.model.TransactionType
-import com.example.ui.components.AddBankAccountDialog
-import com.example.ui.components.BankCardItem
-import com.example.ui.components.BankLogoImage
-import com.example.ui.components.CurrencyUnit
-import com.example.ui.components.PersianFormatters
-import com.example.ui.components.SenderSmsItemCard
-import com.example.ui.components.SmartWalletPlusBadge
-import com.example.ui.components.SmsSenderPickerSheet
+import com.example.ui.components.*
 import com.example.ui.viewmodel.FinanceViewModel
-import com.example.util.DeviceSenderSmsMessage
-import com.example.util.DeviceSmsReader
-import com.example.ui.components.SelectBankForSenderDialog
-import com.example.ui.components.IRANIAN_MAJOR_BANKS
-import com.example.data.FinanceRepository
 import kotlinx.coroutines.launch
+
+private val ColorIncomeGreen = Color(0xFF10B981)
+private val ColorExpenseRed = Color(0xFFEF4444)
+private val ColorIncomeSoft = Color(0xFFE6F7F0)
+private val ColorExpenseSoft = Color(0xFFFEECEC)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -54,85 +52,34 @@ fun SmsReaderScreen(
     onNavigateToGroupedSms: (String?) -> Unit = {},
     onNavigateToBankLinker: () -> Unit = {}
 ) {
-    val smsInputText by viewModel.smsInputText.collectAsState()
-    val parsedResult by viewModel.parsedSmsState.collectAsState()
-    val isParsing by viewModel.isParsingSms.collectAsState()
-    val isPremium by viewModel.isPremium.collectAsState()
-    val currencyUnit by viewModel.currencyUnit.collectAsState()
-    val statusMessage by viewModel.statusMessage.collectAsState()
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val repository = remember { FinanceRepository.getInstance(context) }
 
     val pendingTransactions by viewModel.pendingTransactions.collectAsState()
     val bankAccounts by viewModel.bankAccounts.collectAsState()
     val bankSmsSenders by viewModel.bankSmsSenders.collectAsState()
+    val isParsing by viewModel.isParsingSms.collectAsState()
+    val statusMessage by viewModel.statusMessage.collectAsState()
+    val currencyUnit by viewModel.currencyUnit.collectAsState()
 
-    var showAddAccountDialog by remember { mutableStateOf(false) }
-    var showAddSenderDialog by remember { mutableStateOf(false) }
-    var showSmsPickerBottomSheet by remember { mutableStateOf(false) }
-    var selectedSenderForSmsView by remember { mutableStateOf<BankSmsSender?>(null) }
-    var editingSenderForBank by remember { mutableStateOf<BankSmsSender?>(null) }
-
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val repository = remember { FinanceRepository.getInstance(context) }
-    val coroutineScope = rememberCoroutineScope()
     val dbCategories by repository.allCategories.collectAsState(initial = emptyList())
-    val registeredTransactions by repository.allTransactions.collectAsState(initial = emptyList())
+    val confirmedTransactions by repository.confirmedTransactions.collectAsState(initial = emptyList())
 
     val categoryNames = remember(dbCategories) {
         val names = dbCategories.map { it.name }.filter { it.isNotBlank() }
         if (names.isNotEmpty()) names else listOf(
-            "خوراکی و سوپرمارکت", "حمل و نقل", "خرید و پوشاک", "پزشکی و سلامت",
-            "قبوض و ساختمان", "تفریح و سرگرمی", "درآمد و حقوق", "متفرقه"
+            "خوراکی و سوپرمارکت", "حمل و نقل", "مسکن و اجاره", "قبوض و خدمات",
+            "سلامت و درمان", "پوشاک و خرید", "تفریح و سرگرمی", "درآمد و حقوق", "متفرقه"
         )
     }
 
-    var hasReadSmsPermission by remember {
-        mutableStateOf(
-            androidx.core.content.ContextCompat.checkSelfPermission(
-                context,
-                android.Manifest.permission.READ_SMS
-            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
-        )
-    }
-
-    var deviceBankMessages by remember { mutableStateOf<List<DeviceSenderSmsMessage>>(emptyList()) }
-    var isLoadingDeviceSms by remember { mutableStateOf(false) }
-    var selectedBankFilter by remember { mutableStateOf("همه") }
-
-    LaunchedEffect(hasReadSmsPermission) {
-        if (hasReadSmsPermission) {
-            isLoadingDeviceSms = true
-            val msgs = DeviceSmsReader.getAllBankSms(context, limit = 100)
-            deviceBankMessages = msgs
-            isLoadingDeviceSms = false
-        }
-    }
-
-    val permissionLauncher = rememberLauncherForActivityResult(
-        contract = androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions()
-    ) { permissions ->
-        val granted = permissions[android.Manifest.permission.READ_SMS] == true
-        hasReadSmsPermission = granted
-        val allGranted = permissions.values.all { it }
-        if (allGranted || granted) {
-            viewModel.scanRecentSmsFromSenders()
-            coroutineScope.launch {
-                isLoadingDeviceSms = true
-                val msgs = DeviceSmsReader.getAllBankSms(context, limit = 100)
-                deviceBankMessages = msgs
-                isLoadingDeviceSms = false
-            }
-        }
-    }
-
-    val sampleSmsList = remember {
-        listOf(
-            "برداشت مبلغ 1,250,000 ریال از حساب 6037****8910 - خرید داروخانه دکتر رضایی - بانک ملی",
-            "خرید اسنپ مبلغ 85,000 تومان - کارت 6104****4321 - بانک ملت",
-            "واریز مبلغ 150,000,000 ریال به حساب 6221****1111 - واریز حقوق - بانک پارسیان",
-            "برداشت مبلغ 3,200,000 ریال بابت خرید دیجی‌کالا - بلوبانک",
-            "برداشت 4,500,000 ریال از حساب 5022****9988 - هایپرمارکت افق - بانک پاسارگاد"
-        )
-    }
+    var showClearAllDialog by remember { mutableStateOf(false) }
+    var showClearPendingDialog by remember { mutableStateOf(false) }
+    var showAddAccountDialog by remember { mutableStateOf(false) }
+    var showAddSenderDialog by remember { mutableStateOf(false) }
+    var showSmsPickerBottomSheet by remember { mutableStateOf(false) }
+    var editingSenderForBank by remember { mutableStateOf<BankSmsSender?>(null) }
 
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -143,143 +90,342 @@ fun SmsReaderScreen(
         }
     }
 
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val granted = permissions[android.Manifest.permission.READ_SMS] == true
+        if (granted) {
+            viewModel.scanRecentSmsFromSenders()
+        } else {
+            Toast.makeText(context, "دسترسی پیامک برای خوانش پیامک‌های بانکی الزامی است", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // Dialog: Clear All Transactions Confirmation
+    if (showClearAllDialog) {
+        AlertDialog(
+            onDismissRequest = { showClearAllDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(Icons.Default.DeleteSweep, contentDescription = null, tint = ColorExpenseRed)
+                    Text("پاکسازی تمام تراکنش‌ها", fontWeight = FontWeight.Bold)
+                }
+            },
+            text = {
+                Text(
+                    text = "با تایید این بخش، تمام تراکنش‌های ثبت‌شده و پیامک‌های قبلی پاکسازی می‌شوند تا بتوانید از ابتدا، پیامک‌های واقعی بانکی را اسکن و دوباره دسته‌بندی و تایید کنید.\n\nآیا از پاکسازی کامل اطمینان دارید؟",
+                    style = MaterialTheme.typography.bodyMedium,
+                    lineHeight = 22.sp
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.clearAllTransactions()
+                        showClearAllDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = ColorExpenseRed)
+                ) {
+                    Text("بله، پاکسازی کامل")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showClearAllDialog = false }) {
+                    Text("انصراف")
+                }
+            }
+        )
+    }
+
+    // Dialog: Clear Pending Transactions Confirmation
+    if (showClearPendingDialog) {
+        AlertDialog(
+            onDismissRequest = { showClearPendingDialog = false },
+            title = { Text("حذف موارد در انتظار", fontWeight = FontWeight.Bold) },
+            text = { Text("آیا از حذف تمام تراکنش‌های در انتظار تایید اطمینان دارید؟") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.clearPendingTransactions()
+                        showClearPendingDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = ColorExpenseRed)
+                ) {
+                    Text("حذف موارد")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showClearPendingDialog = false }) {
+                    Text("انصراف")
+                }
+            }
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("پردازش اس‌ام‌اس و حساب‌های بانکی", fontWeight = FontWeight.Bold, color = Color(0xFFE6E1E5)) },
+                title = {
+                    Column {
+                        Text(
+                            text = "پیامک‌های بانکی و تایید تراکنش‌ها",
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                        )
+                        Text(
+                            text = "اسکن، تایید و دسته‌بندی تراکنش‌های بانکی",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "بازگشت", tint = Color(0xFFE6E1E5))
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "بازگشت")
                     }
                 },
                 actions = {
+                    // Clear All Transactions Button
+                    IconButton(
+                        onClick = { showClearAllDialog = true }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.DeleteSweep,
+                            contentDescription = "پاکسازی تمام تراکنش‌ها",
+                            tint = ColorExpenseRed
+                        )
+                    }
+                    // Bank Linker
                     IconButton(onClick = { onNavigateToBankLinker() }) {
                         Icon(
-                            Icons.Default.AddLink,
+                            imageVector = Icons.Default.AddLink,
                             contentDescription = "اتصال سرشماره‌ها به بانک‌ها",
-                            tint = Color(0xFF34D399)
+                            tint = MaterialTheme.colorScheme.primary
                         )
                     }
-                    IconButton(onClick = { onNavigateToGroupedSms(null) }) {
-                        Icon(
-                            Icons.Default.ListAlt,
-                            contentDescription = "لیست پیامک‌ها و گروه‌بندی بر اساس فرستنده",
-                            tint = Color(0xFF38BDF8)
-                        )
-                    }
-                    IconButton(onClick = { onNavigateToFilteredSms(null) }) {
-                        Icon(
-                            Icons.Default.FilterList,
-                            contentDescription = "فیلتر پیامک‌ها بر اساس سرشماره",
-                            tint = Color(0xFF60A5FA)
-                        )
-                    }
-                    if (isPremium) SmartWalletPlusBadge(Modifier.padding(end = 8.dp))
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF1C1B1F))
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
             )
         },
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        containerColor = Color(0xFF1C1B1F)
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { paddingValues ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            contentPadding = PaddingValues(bottom = 80.dp)
+                .padding(paddingValues),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // 1. Android Background Listener Status Bento Card
+            // 1. Bank SMS Smart Scanner Hero Card
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF2B2930)),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF49454F)),
-                    shape = RoundedCornerShape(28.dp)
+                    shape = RoundedCornerShape(22.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    ),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
                 ) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(18.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             Surface(
                                 shape = CircleShape,
-                                color = Color(0xFFB1E5D3),
-                                modifier = Modifier.size(12.dp)
+                                color = ColorIncomeGreen,
+                                modifier = Modifier.size(10.dp)
                             ) {}
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "شنود خودکار پیامک‌های بانکی فعال است",
-                                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                                    color = Color(0xFFE6E1E5)
-                                )
-                                Text(
-                                    text = "پیامک‌های دریافتی از سرشماره‌های معرفی‌شده با BroadcastReceiver استخراج و با عبارات کلیدی (آفلاین) پردازش شده و جهت تایید در اینجا نمایش داده می‌شوند.",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = Color(0xFFCAC4D0)
-                                )
-                            }
+                            Text(
+                                text = "فیلتر هوشمند و استخراج پیامک‌های بانکی",
+                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
                         }
 
-                        Button(
-                            onClick = {
-                                val hasReadSms = androidx.core.content.ContextCompat.checkSelfPermission(
-                                    context,
-                                    android.Manifest.permission.READ_SMS
-                                ) == android.content.pm.PackageManager.PERMISSION_GRANTED
-                                val hasReceiveSms = androidx.core.content.ContextCompat.checkSelfPermission(
-                                    context,
-                                    android.Manifest.permission.RECEIVE_SMS
-                                ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                        Text(
+                            text = "تنها پیامک‌های دارای مانده‌حساب و کلمات واریز/برداشت از بانک‌های معتبر شناسایی می‌شوند. پیامک‌های شخصی، تبلیغات، اپراتورها (ایرانسل/همراه اول) و رمز پویا به طور خودکار حذف می‌گردند.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            lineHeight = 20.sp
+                        )
 
-                                if (hasReadSms && hasReceiveSms) {
-                                    viewModel.scanRecentSmsFromSenders()
-                                } else {
-                                    permissionLauncher.launch(
-                                        arrayOf(
-                                            android.Manifest.permission.READ_SMS,
-                                            android.Manifest.permission.RECEIVE_SMS
-                                        )
-                                    )
-                                }
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("scan_recent_sms_button"),
-                            enabled = !isParsing,
-                            shape = RoundedCornerShape(16.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFFD0BCFF),
-                                contentColor = Color(0xFF381E72)
-                            )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            if (isParsing) {
-                                CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color(0xFF381E72), strokeWidth = 2.dp)
-                                Spacer(Modifier.width(8.dp))
-                                Text("در حال استعلام پیامک‌های بانکی...")
-                            } else {
-                                Icon(Icons.Default.Sms, contentDescription = null, tint = Color(0xFF381E72))
-                                Spacer(Modifier.width(8.dp))
-                                Text("خوانش اس‌ام‌اس‌های جدید از سرشماره‌های فعال", fontWeight = FontWeight.Bold)
+                            Button(
+                                onClick = {
+                                    val hasRead = androidx.core.content.ContextCompat.checkSelfPermission(
+                                        context,
+                                        android.Manifest.permission.READ_SMS
+                                    ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+                                    if (hasRead) {
+                                        viewModel.scanRecentSmsFromSenders()
+                                    } else {
+                                        permissionLauncher.launch(
+                                            arrayOf(
+                                                android.Manifest.permission.READ_SMS,
+                                                android.Manifest.permission.RECEIVE_SMS
+                                            )
+                                        )
+                                    }
+                                },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("scan_bank_sms_button"),
+                                enabled = !isParsing,
+                                shape = RoundedCornerShape(14.dp)
+                            ) {
+                                if (isParsing) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(18.dp),
+                                        color = Color.White,
+                                        strokeWidth = 2.dp
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("در حال اسکن...")
+                                } else {
+                                    Icon(Icons.Default.Sms, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("اسکن پیامک‌های بانکی جدید", fontWeight = FontWeight.Bold)
+                                }
+                            }
+
+                            OutlinedButton(
+                                onClick = { showClearAllDialog = true },
+                                shape = RoundedCornerShape(14.dp),
+                                border = BorderStroke(1.dp, ColorExpenseRed.copy(alpha = 0.5f))
+                            ) {
+                                Icon(Icons.Default.DeleteSweep, contentDescription = null, tint = ColorExpenseRed, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("پاکسازی کل", color = ColorExpenseRed, fontSize = 12.sp)
                             }
                         }
                     }
                 }
             }
 
-            // 1.2 Device Bank Transaction SMS Inbox Section
+            // 2. Pending Approval & Categorization Workbench
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = "تراکنش‌های در انتظار بررسی و تایید",
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                        )
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (pendingTransactions.isNotEmpty()) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
+                        ) {
+                            Text(
+                                text = "${PersianFormatters.toPersianDigits(pendingTransactions.size.toString())} مورد",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                                color = if (pendingTransactions.isNotEmpty()) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    if (pendingTransactions.isNotEmpty()) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            TextButton(
+                                onClick = { viewModel.approveAllPendingTransactions() },
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Icon(Icons.Default.DoneAll, contentDescription = null, tint = ColorIncomeGreen, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("تایید همه", color = ColorIncomeGreen, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            }
+
+                            TextButton(
+                                onClick = { showClearPendingDialog = true },
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Text("حذف همه", color = ColorExpenseRed, fontSize = 12.sp)
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (pendingTransactions.isEmpty()) {
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(20.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                        ),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.12f))
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CheckCircle,
+                                contentDescription = null,
+                                tint = ColorIncomeGreen,
+                                modifier = Modifier.size(36.dp)
+                            )
+                            Text(
+                                text = "هیچ تراکنشی در انتظار تایید نیست",
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "برای دریافت و دسته‌بندی پیامک‌های جدید، دکمه «اسکن پیامک‌های بانکی جدید» را بزنید.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+                }
+            } else {
+                items(
+                    items = pendingTransactions,
+                    key = { it.id }
+                ) { pending ->
+                    PendingTransactionReviewCard(
+                        transaction = pending,
+                        availableCategories = categoryNames,
+                        onApprove = { chosenCategory ->
+                            viewModel.approvePendingTransactionWithCategory(pending, chosenCategory)
+                        },
+                        onReject = {
+                            viewModel.rejectPendingTransaction(pending)
+                        }
+                    )
+                }
+            }
+
+            // 3. Bank Cards & Accounts Management Carousel
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF232A38)),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF384357)),
-                    shape = RoundedCornerShape(28.dp)
+                    shape = RoundedCornerShape(22.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
                 ) {
                     Column(
                         modifier = Modifier
@@ -296,302 +442,17 @@ fun SmsReaderScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Icon(Icons.Default.Inbox, contentDescription = null, tint = Color(0xFF60A5FA), modifier = Modifier.size(24.dp))
-                                Column {
-                                    Text(
-                                        text = "صندوق پیامک‌های بانکی گوشی",
-                                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                        color = Color.White
-                                    )
-                                    Text(
-                                        text = if (hasReadSmsPermission) "تعداد ${deviceBankMessages.size} پیامک تراکنش شناسایی شد" else "نیازمند اعطای دسترسی پیامک",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = Color(0xFF94A3B8)
-                                    )
-                                }
-                            }
-
-                            FilledTonalButton(
-                                onClick = {
-                                    if (hasReadSmsPermission) {
-                                        coroutineScope.launch {
-                                            isLoadingDeviceSms = true
-                                            val msgs = DeviceSmsReader.getAllBankSms(context, limit = 100)
-                                            deviceBankMessages = msgs
-                                            isLoadingDeviceSms = false
-                                        }
-                                    } else {
-                                        permissionLauncher.launch(
-                                            arrayOf(
-                                                android.Manifest.permission.READ_SMS,
-                                                android.Manifest.permission.RECEIVE_SMS
-                                            )
-                                        )
-                                    }
-                                },
-                                shape = RoundedCornerShape(50),
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                            ) {
-                                Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(Modifier.width(4.dp))
-                                Text("به‌روزرسانی", fontSize = 12.sp)
-                            }
-                        }
-
-                        // Dedicated buttons for SMS screens
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Button(
-                                onClick = { onNavigateToGroupedSms(null) },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .testTag("open_grouped_sms_screen_button"),
-                                shape = RoundedCornerShape(14.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFF0284C7),
-                                    contentColor = Color.White
-                                )
-                            ) {
-                                Icon(Icons.Default.ListAlt, contentDescription = null, modifier = Modifier.size(17.dp))
-                                Spacer(Modifier.width(6.dp))
-                                Text("لیست پیامک‌ها (گروه‌بندی)", fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                            }
-
-                            Button(
-                                onClick = { onNavigateToFilteredSms(null) },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .testTag("open_filtered_sms_screen_button"),
-                                shape = RoundedCornerShape(14.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFF2563EB),
-                                    contentColor = Color.White
-                                )
-                            ) {
-                                Icon(Icons.Default.FilterAlt, contentDescription = null, modifier = Modifier.size(17.dp))
-                                Spacer(Modifier.width(6.dp))
-                                Text("صحت‌سنجی متن خام", fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                            }
-                        }
-
-                        if (!hasReadSmsPermission) {
-                            Card(
-                                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E2633)),
-                                shape = RoundedCornerShape(16.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Column(
-                                    modifier = Modifier.padding(16.dp).fillMaxWidth(),
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                                ) {
-                                    Text(
-                                        "برای خواندن و استخراج پیامک‌های بانکی از گوشی، لطفاً دسترسی پیامک را تایید کنید:",
-                                        color = Color.LightGray,
-                                        fontSize = 13.sp,
-                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                                    )
-                                    Button(
-                                        onClick = {
-                                            permissionLauncher.launch(
-                                                arrayOf(
-                                                    android.Manifest.permission.READ_SMS,
-                                                    android.Manifest.permission.RECEIVE_SMS
-                                                )
-                                            )
-                                        },
-                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6))
-                                    ) {
-                                        Text("اعطای دسترسی به پیامک‌ها", fontWeight = FontWeight.Bold)
-                                    }
-                                }
-                            }
-                        } else if (isLoadingDeviceSms) {
-                            Box(
-                                modifier = Modifier.fillMaxWidth().padding(24.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                ) {
-                                    CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color(0xFF60A5FA), strokeWidth = 2.dp)
-                                    Text("در حال جستجو و خواندن پیامک‌های بانکی از گوشی...", color = Color.LightGray, fontSize = 12.sp)
-                                }
-                            }
-                        } else if (deviceBankMessages.isEmpty()) {
-                            Text(
-                                text = "هیچ پیامک بانکی در صندوق پیامک‌های گوشی یافت نشد. دکمه «به‌روزرسانی» یا «خوانش اس‌ام‌اس‌های جدید» را بزنید.",
-                                color = Color.Gray,
-                                fontSize = 13.sp,
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)
-                            )
-                        } else {
-                            val availableBanks = remember(deviceBankMessages) {
-                                listOf("همه") + deviceBankMessages.mapNotNull { it.detectedBank }.distinct()
-                            }
-
-                            if (availableBanks.size > 2) {
-                                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    items(availableBanks) { bName ->
-                                        FilterChip(
-                                            selected = selectedBankFilter == bName,
-                                            onClick = { selectedBankFilter = bName },
-                                            label = { Text(bName, fontSize = 11.sp) },
-                                            colors = FilterChipDefaults.filterChipColors(
-                                                selectedContainerColor = Color(0xFF3B82F6),
-                                                selectedLabelColor = Color.White
-                                            )
-                                        )
-                                    }
-                                }
-                            }
-
-                            val filteredMessages = remember(deviceBankMessages, selectedBankFilter) {
-                                if (selectedBankFilter == "همه") deviceBankMessages
-                                else deviceBankMessages.filter { it.detectedBank == selectedBankFilter }
-                            }
-
-                            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                filteredMessages.take(25).forEach { msg ->
-                                    val detectedSender = BankSmsSender(
-                                        bankName = msg.detectedBank ?: "بانک",
-                                        senderNumber = msg.address,
-                                        isActive = true
-                                    )
-                                    SenderSmsItemCard(
-                                        message = msg,
-                                        sender = detectedSender,
-                                        categoryNames = categoryNames,
-                                        bankAccounts = bankAccounts,
-                                        isAlreadyRegistered = registeredTransactions.any { tx ->
-                                            tx.dateMillis == msg.timestamp ||
-                                            (!tx.rawSmsText.isNullOrBlank() && (tx.rawSmsText == msg.body || msg.body.contains(tx.rawSmsText!!)))
-                                        },
-                                        onRegister = { tx ->
-                                            coroutineScope.launch {
-                                                repository.transactionDao.insert(tx)
-                                                if (tx.balanceAfterToman != null && tx.balanceAfterToman > 0) {
-                                                    val matchedCard = bankAccounts.find {
-                                                        (tx.cardNumber != null && it.cardNumber.endsWith(tx.cardNumber)) ||
-                                                        it.bankName == detectedSender.bankName
-                                                    }
-                                                    if (matchedCard != null) {
-                                                        repository.bankAccountDao.update(
-                                                            matchedCard.copy(balanceToman = tx.balanceAfterToman)
-                                                        )
-                                                    }
-                                                }
-                                                android.widget.Toast.makeText(context, "تراکنش با موفقیت ثبت شد", android.widget.Toast.LENGTH_SHORT).show()
-                                            }
-                                        }
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // 1.5 Pending Transactions Section
-            if (pendingTransactions.isNotEmpty()) {
-                item {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFF3F1D38)), // A subtle alert color
-                        shape = RoundedCornerShape(24.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier.fillMaxWidth().padding(18.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            Text(
-                                text = "تراکنش‌های نیازمند تایید (${pendingTransactions.size})",
-                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                color = Color(0xFFFFD8E4)
-                            )
-                            
-                            LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                items(pendingTransactions) { pending ->
-                                    val isExpense = pending.type == TransactionType.EXPENSE
-                                    Card(
-                                        modifier = Modifier.width(300.dp),
-                                        colors = CardDefaults.cardColors(containerColor = Color(0xFF4A4458)),
-                                        shape = RoundedCornerShape(16.dp)
-                                    ) {
-                                        Column(modifier = Modifier.padding(12.dp)) {
-                                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                                Text(text = if (isExpense) "برداشت" else "واریز", color = if (isExpense) Color(0xFFF2B8B5) else Color(0xFFB1E5D3), fontWeight = FontWeight.Bold)
-                                                Text(text = pending.amountToman.formatAsToman() + if (currencyUnit == com.example.ui.components.CurrencyUnit.RIAL) " ریال" else " تومان", color = Color.White, fontWeight = FontWeight.Bold)
-                                            }
-                                            Spacer(Modifier.height(8.dp))
-                                            Text(text = "فروشگاه: ${pending.merchantName}", color = Color(0xFFCAC4D0), fontSize = 12.sp)
-                                            Text(text = "کارت: ${pending.cardNumber ?: "نامشخص"}", color = Color(0xFFCAC4D0), fontSize = 12.sp)
-                                            
-                                            Spacer(Modifier.height(12.dp))
-                                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                                Button(
-                                                    onClick = { viewModel.approvePendingTransaction(pending) },
-                                                    modifier = Modifier.weight(1f),
-                                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB1E5D3), contentColor = Color(0xFF0F5223))
-                                                ) {
-                                                    Text("تایید")
-                                                }
-                                                OutlinedButton(
-                                                    onClick = { viewModel.rejectPendingTransaction(pending) },
-                                                    modifier = Modifier.weight(1f),
-                                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFF2B8B5))
-                                                ) {
-                                                    Text("رد")
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // 2. Bank Cards & Accounts Management Section
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF2B2930)),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF49454F)),
-                    shape = RoundedCornerShape(28.dp)
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(18.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Icon(Icons.Default.CreditCard, contentDescription = null, tint = Color(0xFFD0BCFF))
+                                Icon(Icons.Default.CreditCard, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                                 Text(
                                     text = "کارت‌ها و حساب‌های بانکی شما",
                                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                    color = Color(0xFFE6E1E5)
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
                             }
 
                             FilledTonalButton(
                                 onClick = { showAddAccountDialog = true },
                                 shape = RoundedCornerShape(50),
-                                modifier = Modifier.testTag("add_bank_card_button"),
                                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
                             ) {
                                 Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -602,14 +463,12 @@ fun SmsReaderScreen(
 
                         if (bankAccounts.isEmpty()) {
                             Text(
-                                text = "هنوز هیچ کارت یا حساب بانکی ثبت نشده است.",
+                                text = "هنوز حسابی اضافه نکرده‌اید. با ثبت اولین کارت یا اسکن پیامک‌ها، کارت‌ها به طور خودکار ثبت می‌شوند.",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = Color(0xFFCAC4D0)
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         } else {
-                            LazyRow(
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
+                            LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                 items(bankAccounts) { account ->
                                     BankCardItem(
                                         account = account,
@@ -623,13 +482,13 @@ fun SmsReaderScreen(
                 }
             }
 
-            // 3. Bank SMS Sender Numbers Configuration Section
+            // 4. Active Bank SMS Senders Section
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF2B2930)),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF49454F)),
-                    shape = RoundedCornerShape(28.dp)
+                    shape = RoundedCornerShape(22.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
                 ) {
                     Column(
                         modifier = Modifier
@@ -646,276 +505,39 @@ fun SmsReaderScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Icon(Icons.Default.PermPhoneMsg, contentDescription = null, tint = Color(0xFFD0BCFF))
+                                Icon(Icons.Default.AccountBalance, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                                 Text(
-                                    text = "سرشماره‌های اس‌ام‌اس بانکی",
+                                    text = "سرشماره‌های بانکی فعال",
                                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                    color = Color(0xFFE6E1E5)
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
                             }
 
-                            OutlinedButton(
-                                onClick = { showAddSenderDialog = true },
+                            FilledTonalButton(
+                                onClick = { showSmsPickerBottomSheet = true },
                                 shape = RoundedCornerShape(50),
-                                modifier = Modifier.testTag("add_sms_sender_button"),
-                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
                             ) {
                                 Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(Modifier.width(4.dp))
-                                Text("سرشماره جدید", fontSize = 12.sp)
+                                Text("افزودن سرشماره", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                             }
                         }
 
-                        // Prominent buttons: Pick from SMS inbox and Bank Linker Manager
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Button(
-                                onClick = { onNavigateToBankLinker() },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .testTag("open_bank_linker_button"),
-                                shape = RoundedCornerShape(14.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFF059669),
-                                    contentColor = Color.White
-                                )
-                            ) {
-                                Icon(Icons.Default.AddLink, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(Modifier.width(6.dp))
-                                Text("اتصال سرشماره به بانک", fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                            }
-
-                            Button(
-                                onClick = { showSmsPickerBottomSheet = true },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .testTag("pick_sms_sender_drawer_button"),
-                                shape = RoundedCornerShape(14.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFF5C82E6),
-                                    contentColor = Color.White
-                                )
-                            ) {
-                                Icon(Icons.Default.Inbox, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(Modifier.width(6.dp))
-                                Text("صندوق کشویی", fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                            }
-                        }
-
-                        Text(
-                            text = "پیامک‌های دریافتی فقط از این سرشماره‌ها آنالیز و استخراج می‌شوند:",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color(0xFFCAC4D0)
-                        )
-
-                        bankSmsSenders.forEach { sender ->
-                            BankSmsSenderRow(
-                                sender = sender,
-                                onToggleActive = { viewModel.toggleBankSmsSenderActive(sender) },
-                                onDelete = { viewModel.deleteBankSmsSender(sender) },
-                                onViewSms = { selectedSenderForSmsView = sender },
-                                onFilterScreen = { onNavigateToFilteredSms(sender.senderNumber) },
-                                onEditBank = { editingSenderForBank = sender }
+                        if (bankSmsSenders.isEmpty()) {
+                            Text(
+                                text = "سرشماره‌ای ثبت نشده است. می‌توانید با دکمه بالا سرشماره‌های بانک‌های خود را معرفی نمایید.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                        }
-                    }
-                }
-            }
-
-            // 4. Interactive SMS Test Playground Section
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF2B2930)),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF49454F)),
-                    shape = RoundedCornerShape(28.dp)
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(18.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Text(
-                            text = "تست و بررسی دستی متن پیامک بانکی",
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                            color = Color(0xFFE6E1E5)
-                        )
-
-                        LazyRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            items(sampleSmsList) { sample ->
-                                SuggestionChip(
-                                    onClick = {
-                                        viewModel.setSmsInputText(sample)
-                                        viewModel.parseSmsInput()
-                                    },
-                                    label = {
-                                        Text(
-                                            text = sample.take(28) + "...",
-                                            fontSize = 11.sp,
-                                            color = Color(0xFFD0BCFF)
-                                        )
-                                    },
-                                    colors = SuggestionChipDefaults.suggestionChipColors(containerColor = Color(0xFF36343B)),
-                                    border = SuggestionChipDefaults.suggestionChipBorder(enabled = true, borderColor = Color(0xFF49454F)),
-                                    shape = RoundedCornerShape(50)
+                        } else {
+                            bankSmsSenders.forEach { sender ->
+                                BankSmsSenderRow(
+                                    sender = sender,
+                                    onToggleActive = { viewModel.toggleBankSmsSenderActive(sender) },
+                                    onDelete = { viewModel.deleteBankSmsSender(sender) },
+                                    onEditBank = { editingSenderForBank = sender }
                                 )
-                            }
-                        }
-
-                        OutlinedTextField(
-                            value = smsInputText,
-                            onValueChange = { viewModel.setSmsInputText(it) },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(100.dp)
-                                .testTag("sms_input_field"),
-                            placeholder = { Text("متن پیامک بانکی را اینجا وارد نمایید...", color = Color(0xFF938F99)) },
-                            shape = RoundedCornerShape(16.dp),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedContainerColor = Color(0xFF36343B),
-                                unfocusedContainerColor = Color(0xFF36343B),
-                                focusedBorderColor = Color(0xFFD0BCFF),
-                                unfocusedBorderColor = Color(0xFF49454F),
-                                focusedTextColor = Color(0xFFE6E1E5),
-                                unfocusedTextColor = Color(0xFFE6E1E5)
-                            )
-                        )
-
-                        Button(
-                            onClick = { viewModel.parseSmsInput() },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("parse_sms_button"),
-                            enabled = smsInputText.isNotBlank() && !isParsing,
-                            shape = RoundedCornerShape(50),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFFD0BCFF),
-                                contentColor = Color(0xFF381E72)
-                            )
-                        ) {
-                            if (isParsing) {
-                                CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color(0xFF381E72), strokeWidth = 2.dp)
-                                Spacer(Modifier.width(8.dp))
-                                Text("در حال آنالیز Gemini AI...", color = Color(0xFF381E72))
-                            } else {
-                                Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = Color(0xFF381E72))
-                                Spacer(Modifier.width(8.dp))
-                                Text("آنالیز هوشمند متن", fontWeight = FontWeight.Bold, color = Color(0xFF381E72))
-                            }
-                        }
-                    }
-                }
-            }
-
-            // 5. Parsed Output Card
-            item {
-                AnimatedVisibility(
-                    visible = parsedResult != null,
-                    enter = fadeIn() + expandVertically()
-                ) {
-                    parsedResult?.let { result ->
-                        val isExpense = result.type == TransactionType.EXPENSE
-                        val typeColor = if (isExpense) Color(0xFFC62828) else Color(0xFF2E7D32)
-
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("parsed_sms_result_card"),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
-                            ),
-                            shape = RoundedCornerShape(16.dp)
-                        ) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp),
-                                verticalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                    ) {
-                                        Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                                        Text(text = "نتیجه استخراج شده", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
-                                    }
-
-                                    Surface(
-                                        shape = RoundedCornerShape(12.dp),
-                                        color = if (result.parsedByAi) Color(0xFF004D40) else Color(0xFFE65100)
-                                    ) {
-                                        Text(
-                                            text = if (result.parsedByAi) "Gemini AI" else "Local Regex",
-                                            color = Color.White,
-                                            fontSize = 10.sp,
-                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
-                                }
-
-                                HorizontalDivider()
-
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Column {
-                                        Text("مبلغ:", style = MaterialTheme.typography.bodySmall)
-                                        Text(
-                                            text = result.amountToman.formatAsToman() + if (currencyUnit == com.example.ui.components.CurrencyUnit.RIAL) " ریال" else " تومان",
-                                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                                            color = typeColor
-                                        )
-                                    }
-
-                                    Column(horizontalAlignment = Alignment.End) {
-                                        Text("نوع:", style = MaterialTheme.typography.bodySmall)
-                                        Text(
-                                            text = if (isExpense) "برداشت (هزینه)" else "واریز (درآمد)",
-                                            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
-                                            color = typeColor
-                                        )
-                                    }
-                                }
-
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Column {
-                                        Text("فروشگاه / طرف حساب:", style = MaterialTheme.typography.bodySmall)
-                                        Text(result.merchantName, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold))
-                                    }
-
-                                    Column(horizontalAlignment = Alignment.End) {
-                                        Text("دسته‌بندی:", style = MaterialTheme.typography.bodySmall)
-                                        Text(result.categoryName, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold))
-                                    }
-                                }
-
-                                Button(
-                                    onClick = { viewModel.confirmParsedSmsTransaction() },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .testTag("confirm_sms_transaction_button"),
-                                    colors = ButtonDefaults.buttonColors(containerColor = typeColor),
-                                    shape = RoundedCornerShape(12.dp)
-                                ) {
-                                    Icon(Icons.Default.Add, contentDescription = null)
-                                    Spacer(Modifier.width(8.dp))
-                                    Text("تایید و ثبت در تراکنش‌ها و بروزرسانی کارت")
-                                }
                             }
                         }
                     }
@@ -924,7 +546,7 @@ fun SmsReaderScreen(
         }
     }
 
-    // Dialog: Add New Bank Card / Account
+    // Dialog: Add New Bank Account
     if (showAddAccountDialog) {
         AddBankAccountDialog(
             onDismiss = { showAddAccountDialog = false },
@@ -946,13 +568,11 @@ fun SmsReaderScreen(
         )
     }
 
-    // Drawer: Select Bank Sender from Device SMS Inbox
+    // BottomSheet: Select Bank Sender from Device Inbox
     if (showSmsPickerBottomSheet) {
         SmsSenderPickerSheet(
             onDismiss = { showSmsPickerBottomSheet = false },
-            onSenderSelected = { address ->
-                // Handled in onSenderAndBankSelected
-            },
+            onSenderSelected = { /* handled below */ },
             onSenderAndBankSelected = { address, detectedBank ->
                 viewModel.addBankSmsSender(detectedBank, address)
                 showSmsPickerBottomSheet = false
@@ -960,28 +580,9 @@ fun SmsReaderScreen(
         )
     }
 
-    // Dialog: Add New SMS Sender Number
-    if (showAddSenderDialog) {
-        AddSmsSenderDialog(
-            onDismiss = { showAddSenderDialog = false },
-            onOpenPicker = {
-                showAddSenderDialog = false
-                showSmsPickerBottomSheet = true
-            },
-            onConfirm = { bankName, senderNumber ->
-                viewModel.addBankSmsSender(bankName, senderNumber)
-                showAddSenderDialog = false
-            }
-        )
-    }
 
-    selectedSenderForSmsView?.let { sender ->
-        com.example.ui.components.SenderSmsViewerSheet(
-            sender = sender,
-            onDismiss = { selectedSenderForSmsView = null }
-        )
-    }
 
+    // Dialog: Edit Sender Bank Mapping
     editingSenderForBank?.let { sender ->
         SelectBankForSenderDialog(
             senderNumber = sender.senderNumber,
@@ -992,10 +593,10 @@ fun SmsReaderScreen(
                     repository.bankSmsSenderDao.update(
                         sender.copy(bankName = chosenBankName)
                     )
-                    android.widget.Toast.makeText(
+                    Toast.makeText(
                         context,
                         "سرشماره ${sender.senderNumber} به $chosenBankName متصل شد",
-                        android.widget.Toast.LENGTH_SHORT
+                        Toast.LENGTH_SHORT
                     ).show()
                 }
                 editingSenderForBank = null
@@ -1004,116 +605,236 @@ fun SmsReaderScreen(
     }
 }
 
+/**
+ * Card for reviewing and categorizing a single pending bank transaction.
+ */
 @Composable
-fun BankSmsSenderRow(
-    sender: BankSmsSender,
-    onToggleActive: () -> Unit,
-    onDelete: () -> Unit,
-    onViewSms: () -> Unit = {},
-    onFilterScreen: () -> Unit = {},
-    onEditBank: () -> Unit = {}
+private fun PendingTransactionReviewCard(
+    transaction: Transaction,
+    availableCategories: List<String>,
+    onApprove: (String) -> Unit,
+    onReject: () -> Unit
 ) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onViewSms() },
-        shape = RoundedCornerShape(16.dp),
-        color = Color(0xFF36343B)
+    val isIncome = transaction.type == TransactionType.INCOME
+    var selectedCategory by remember(transaction.id, transaction.categoryName) {
+        mutableStateOf(transaction.categoryName.ifBlank { "خوراکی و سوپرمارکت" })
+    }
+    var showCategoryDropdown by remember { mutableStateOf(false) }
+    var isExpandedSms by remember { mutableStateOf(false) }
+
+    val (catColor, catIcon) = CategoryIconMap.getIconForCategory(selectedCategory)
+    val bankTitle = transaction.bankName?.ifBlank { "بانک" } ?: "بانک"
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            // Header: Bank info & Type Badge
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    modifier = Modifier
-                        .weight(1f)
-                        .clickable { onEditBank() }
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     BankLogoImage(
-                        bankName = sender.bankName,
-                        cardNumber = null,
-                        containerSize = 38.dp,
-                        logoSize = 30.dp,
-                        containerColor = Color(0xFF2B2930)
+                        bankName = bankTitle,
+                        cardNumber = transaction.cardNumber,
+                        containerSize = 36.dp,
+                        logoSize = 28.dp,
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
                     )
 
                     Column {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text(sender.bankName, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold), color = Color(0xFFE6E1E5))
-                            Icon(Icons.Default.Edit, contentDescription = "تغییر بانک", tint = Color(0xFF93C5FD), modifier = Modifier.size(14.dp))
+                        Text(
+                            text = bankTitle,
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        if (!transaction.cardNumber.isNullOrBlank()) {
+                            Text(
+                                text = transaction.cardNumber,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
-                        Text("سرشماره: ${sender.senderNumber}", style = MaterialTheme.typography.bodySmall, color = Color(0xFFCAC4D0))
                     }
                 }
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Switch(
-                        checked = sender.isActive,
-                        onCheckedChange = { onToggleActive() },
-                        colors = SwitchDefaults.colors(checkedThumbColor = Color(0xFF381E72), checkedTrackColor = Color(0xFFD0BCFF))
+                // Type Badge
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = if (isIncome) ColorIncomeSoft else ColorExpenseSoft
+                ) {
+                    Text(
+                        text = if (isIncome) "واریز" else "برداشت / خرید",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = if (isIncome) ColorIncomeGreen else ColorExpenseRed
+                        ),
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                     )
-                    IconButton(onClick = onDelete) {
-                        Icon(Icons.Default.Delete, contentDescription = "حذف", tint = Color(0xFFF2B8B5), modifier = Modifier.size(18.dp))
+                }
+            }
+
+            // Amount and Balance
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column {
+                    Text(
+                        text = "مبلغ تراکنش:",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "${if (isIncome) "+" else "-"}${transaction.amountToman.formatAsToman()} تومان",
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontWeight = FontWeight.ExtraBold,
+                            color = if (isIncome) ColorIncomeGreen else ColorExpenseRed
+                        )
+                    )
+                }
+
+                if (transaction.balanceAfterToman != null && transaction.balanceAfterToman > 0) {
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            text = "مانده بعد از تراکنش:",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = "${transaction.balanceAfterToman.formatAsToman()} تومان",
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
                     }
                 }
             }
 
-            Spacer(Modifier.height(8.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
 
+            // Category Selection Row (قابلیت دسته‌بندی)
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    text = "دسته‌بندی تراکنش (قابل تغییر):",
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                // Quick Category Carousel / Selector
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    items(availableCategories) { catName ->
+                        val isSelected = catName == selectedCategory
+                        val (cColor, cIcon) = CategoryIconMap.getIconForCategory(catName)
+
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = { selectedCategory = catName },
+                            label = { Text(catName, fontSize = 11.sp) },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = cIcon,
+                                    contentDescription = null,
+                                    tint = if (isSelected) Color.White else cColor,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = cColor,
+                                selectedLabelColor = Color.White
+                            )
+                        )
+                    }
+                }
+            }
+
+            // Raw SMS text accordion
+            if (!transaction.rawSmsText.isNullOrBlank()) {
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { isExpandedSms = !isExpandedSms }
+                ) {
+                    Column(modifier = Modifier.padding(10.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "متن پیامک بانکی",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Icon(
+                                imageVector = if (isExpandedSms) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        if (isExpandedSms) {
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                text = transaction.rawSmsText ?: "",
+                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                                color = MaterialTheme.colorScheme.onSurface,
+                                lineHeight = 16.sp
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Actions: Confirm vs Reject
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
+                Button(
+                    onClick = { onApprove(selectedCategory) },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = ColorIncomeGreen,
+                        contentColor = Color.White
+                    )
+                ) {
+                    Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("تایید و ثبت در حساب", fontWeight = FontWeight.Bold)
+                }
+
                 OutlinedButton(
-                    onClick = onEditBank,
-                    modifier = Modifier.weight(0.9f),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = Color(0xFF93C5FD)
-                    ),
-                    shape = RoundedCornerShape(10.dp),
-                    contentPadding = PaddingValues(vertical = 4.dp, horizontal = 4.dp)
+                    onClick = onReject,
+                    modifier = Modifier.weight(0.6f),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = ColorExpenseRed),
+                    border = BorderStroke(1.dp, ColorExpenseRed.copy(alpha = 0.5f))
                 ) {
-                    Icon(Icons.Default.AccountBalance, contentDescription = null, modifier = Modifier.size(14.dp))
-                    Spacer(Modifier.width(3.dp))
-                    Text("انتخاب بانک", fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                }
-
-                Button(
-                    onClick = onViewSms,
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF435574),
-                        contentColor = Color.White
-                    ),
-                    shape = RoundedCornerShape(10.dp),
-                    contentPadding = PaddingValues(vertical = 4.dp, horizontal = 4.dp)
-                ) {
-                    Icon(Icons.Default.ReceiptLong, contentDescription = null, modifier = Modifier.size(14.dp))
-                    Spacer(Modifier.width(3.dp))
-                    Text("مشاهده کشویی", fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                }
-
-                Button(
-                    onClick = onFilterScreen,
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF1E3A8A),
-                        contentColor = Color.White
-                    ),
-                    shape = RoundedCornerShape(10.dp),
-                    contentPadding = PaddingValues(vertical = 4.dp, horizontal = 4.dp)
-                ) {
-                    Icon(Icons.Default.FilterAlt, contentDescription = null, modifier = Modifier.size(14.dp))
-                    Spacer(Modifier.width(3.dp))
-                    Text("متن خام", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("رد / حذف")
                 }
             }
         }
@@ -1121,126 +842,68 @@ fun BankSmsSenderRow(
 }
 
 @Composable
-fun AddSmsSenderDialog(
-    onDismiss: () -> Unit,
-    onOpenPicker: () -> Unit = {},
-    onConfirm: (bankName: String, senderNumber: String) -> Unit
+fun BankSmsSenderRow(
+    sender: BankSmsSender,
+    onToggleActive: () -> Unit,
+    onDelete: () -> Unit,
+    onEditBank: () -> Unit = {}
 ) {
-    var bankName by remember { mutableStateOf("بلوبانک") }
-    var senderNumber by remember { mutableStateOf("") }
-    var showSelectBankModal by remember { mutableStateOf(false) }
-
-    if (showSelectBankModal) {
-        SelectBankForSenderDialog(
-            senderNumber = if (senderNumber.isNotBlank()) senderNumber else "جدید",
-            initialBankName = bankName,
-            onDismiss = { showSelectBankModal = false },
-            onConfirm = { chosen ->
-                bankName = chosen
-                showSelectBankModal = false
-            }
-        )
-    }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("تعریف سرشماره اس‌ام‌اس بانکی", fontWeight = FontWeight.Bold, color = Color(0xFFE6E1E5)) },
-        containerColor = Color(0xFF2B2930),
-        text = {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.fillMaxWidth()
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable { onEditBank() }
             ) {
-                Button(
-                    onClick = onOpenPicker,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF5C82E6),
-                        contentColor = Color.White
-                    )
-                ) {
-                    Icon(Icons.Default.Inbox, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("📩 انتخاب از صندوق پیامک‌ها (کشویی)", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                }
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    HorizontalDivider(modifier = Modifier.weight(1f), color = Color(0xFF49454F))
-                    Text(" یا وارد کردن و انتخاب دستی ", color = Color(0xFFCAC4D0), fontSize = 11.sp)
-                    HorizontalDivider(modifier = Modifier.weight(1f), color = Color(0xFF49454F))
-                }
-
-                OutlinedTextField(
-                    value = senderNumber,
-                    onValueChange = { senderNumber = it },
-                    label = { Text("سرشماره یا نام فرستنده (مثلاً BLUBANK یا 30009417)") },
-                    modifier = Modifier.fillMaxWidth()
+                BankLogoImage(
+                    bankName = sender.bankName,
+                    cardNumber = null,
+                    containerSize = 36.dp,
+                    logoSize = 28.dp,
+                    containerColor = MaterialTheme.colorScheme.surface
                 )
 
-                // Bank Selection Card with Button
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = Color(0xFF1E2633),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF3B82F6)),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { showSelectBankModal = true }
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(12.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            BankLogoImage(
-                                bankName = bankName,
-                                cardNumber = null,
-                                containerSize = 34.dp,
-                                logoSize = 26.dp,
-                                containerColor = Color.White
-                            )
-                            Column {
-                                Text("بانک منتسب به این سرشماره:", fontSize = 11.sp, color = Color(0xFF94A3B8))
-                                Text(bankName, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color.White)
-                            }
-                        }
-
-                        Button(
-                            onClick = { showSelectBankModal = true },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB)),
-                            shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
-                        ) {
-                            Text("انتخاب بانک", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
+                Column {
+                    Text(
+                        text = sender.bankName,
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = sender.senderNumber,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    if (bankName.isNotBlank() && senderNumber.isNotBlank()) {
-                        onConfirm(bankName, senderNumber)
-                    }
-                },
-                enabled = bankName.isNotBlank() && senderNumber.isNotBlank(),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD0BCFF), contentColor = Color(0xFF381E72))
-            ) {
-                Text("ثبت سرشماره", fontWeight = FontWeight.Bold)
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Switch(
+                    checked = sender.isActive,
+                    onCheckedChange = { onToggleActive() }
+                )
+                IconButton(onClick = onDelete) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = "حذف سرشماره",
+                        tint = ColorExpenseRed.copy(alpha = 0.8f),
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("انصراف", color = Color(0xFFCAC4D0)) }
         }
-    )
+    }
 }

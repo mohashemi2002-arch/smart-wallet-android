@@ -173,6 +173,14 @@ fun SmartWalletApp() {
                     },
                     onNavigateToSmsSenders = {
                         destination = WalletDestination.SMS_SENDERS
+                    },
+                    onNavigateToGroupedSms = {
+                        filterInitialSender = null
+                        destination = WalletDestination.INCOMING_SMS_GROUPED
+                    },
+                    onNavigateToFilteredSms = {
+                        filterInitialSender = null
+                        destination = WalletDestination.SMS_FILTER
                     }
                 )
 

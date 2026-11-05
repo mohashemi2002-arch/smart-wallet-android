@@ -229,28 +229,65 @@ object DeviceSmsReader {
         return null
     }
 
+    fun isNonBankSender(address: String): Boolean {
+        val clean = cleanNumber(address)
+        // 1. Personal Iranian mobile numbers: 90xxxxxxxx, 91xxxxxxxx, 92xxxxxxxx, 93xxxxxxxx, 99xxxxxxxx
+        if (clean.length == 10 && (clean.startsWith("90") || clean.startsWith("91") || clean.startsWith("92") || 
+            clean.startsWith("93") || clean.startsWith("99") || clean.startsWith("98"))) {
+            return true
+        }
+
+        // 2. Telecom operators, promotional masks, app services
+        val lower = address.lowercase().trim()
+        val blockedKeywords = listOf(
+            "irancell", "irnc", "mci", "hamrah", "rightel", "snapp", "tapsi", "isport",
+            "isqi", "ofoq", "mygov", "jabama", "missed", "divar", "sheypoor", "torob", "basalam",
+            "bazar", "cafebazaar", "rubika", "eitaa", "gap", "soroush", "bale", "digikala"
+        )
+        if (blockedKeywords.any { lower.contains(it) }) {
+            return true
+        }
+        return false
+    }
+
     fun isBankTransactionSms(address: String, body: String): Boolean {
+        if (isNonBankSender(address)) return false
+
         val text = normalizeDigits(body).lowercase()
 
-        // Transaction SMS MUST have balance ("مانده" or "موجودی")
-        val hasBal = hasBalance(body)
+        // 1. Never accept OTP / Dynamic passwords
+        if (isOtpWithoutBalance(body) || text.contains("رمز پویا") || text.contains("کد تایید") || text.contains("کد تأیید")) {
+            return false
+        }
 
+        // 2. Iranian Bank Transactions ALWAYS require balance (مانده / موجودی)
+        val hasBal = hasBalance(body)
+        if (!hasBal) return false
+
+        // 3. Must have financial transaction verb
         val hasTransactionKeyword = text.contains("واریز") ||
                 text.contains("برداشت") ||
                 text.contains("انتقال") ||
                 text.contains("خرید") ||
                 text.contains("خريد") ||
-                hasBal
+                text.contains("پایانه فروش") ||
+                text.contains("پايانه فروش") ||
+                text.contains("حواله") ||
+                text.contains("اصلاحی") ||
+                text.contains("اصلاحي") ||
+                text.contains("پایا") ||
+                text.contains("ساتنا") ||
+                text.contains("یارانه") ||
+                text.contains("يارانه")
+        if (!hasTransactionKeyword) return false
 
-        val hasBankKeyword = detectBankName(address, body) != null ||
+        // 4. Must be associated with an Iranian Bank
+        val detectedBank = detectBankName(address, body)
+        val hasBankKeyword = detectedBank != null ||
                 text.contains("بانک") ||
-                text.contains("حساب") ||
-                text.contains("کارت")
+                text.contains("بانك")
 
-        val isOtp = isOtpWithoutBalance(body)
-
-        // Strict: Must have balance and not be an OTP
-        return hasBal && hasTransactionKeyword && hasBankKeyword && !isOtp
+        return hasBankKeyword
     }
 
     suspend fun getUniqueSenders(context: Context): List<SmsSenderPreview> = withContext(Dispatchers.IO) {
@@ -435,24 +472,24 @@ object DeviceSmsReader {
 
                     val msgHasBalance = hasBalance(body)
 
-                    if (requireBalance) {
-                        if (!msgHasBalance || isOtpWithoutBalance(body)) {
-                            continue
-                        }
+                    if (isNonBankSender(address)) {
+                        continue
                     }
 
-                    if (isBankTransactionSms(address, body) || (msgHasBalance && !isOtpWithoutBalance(body))) {
-                        messages.add(
-                            DeviceSenderSmsMessage(
-                                id = id,
-                                address = address,
-                                body = body,
-                                timestamp = date,
-                                detectedBank = detectBankName(address, body),
-                                hasBalance = msgHasBalance
-                            )
-                        )
+                    if (!isBankTransactionSms(address, body)) {
+                        continue
                     }
+
+                    messages.add(
+                        DeviceSenderSmsMessage(
+                            id = id,
+                            address = address,
+                            body = body,
+                            timestamp = date,
+                            detectedBank = detectBankName(address, body),
+                            hasBalance = msgHasBalance
+                        )
+                    )
                 }
             }
         } catch (e: Exception) {

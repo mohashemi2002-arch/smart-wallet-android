@@ -192,17 +192,47 @@ class FinanceRepository private constructor(context: Context) {
     }
 
     suspend fun processIncomingSms(smsText: String, senderAddress: String? = null): ParsedSmsResult = withContext(Dispatchers.IO) {
+        // 0. Strict filter: Discard non-bank senders and non-bank messages
+        if (senderAddress != null && com.example.util.DeviceSmsReader.isNonBankSender(senderAddress)) {
+            return@withContext ParsedSmsResult(
+                amountToman = 0L,
+                type = TransactionType.EXPENSE,
+                merchantName = "غیربانکی",
+                categoryName = "متفرقه",
+                rawText = smsText,
+                confidence = 0.0f
+            )
+        }
+
+        if (!com.example.util.DeviceSmsReader.isBankTransactionSms(senderAddress ?: "", smsText)) {
+            return@withContext ParsedSmsResult(
+                amountToman = 0L,
+                type = TransactionType.EXPENSE,
+                merchantName = "پیامک غیرتراکنشی",
+                categoryName = "متفرقه",
+                rawText = smsText,
+                confidence = 0.0f
+            )
+        }
+
         val result = SmsAiParser.parseSms(smsText, senderAddress = senderAddress)
         
-        // If OTP SMS, do not create transaction or adjust balance
-        if (SmsAiParser.isOtpSms(smsText)) {
+        // If OTP SMS or invalid monetary amount, do not create transaction
+        if (SmsAiParser.isOtpSms(smsText) || result.amountToman <= 0L) {
             return@withContext result
         }
+
+        // Avoid duplicate insertion if this exact SMS was already processed
+        if (parsedSmsDao.existsByRawText(smsText)) {
+            return@withContext result
+        }
+
+        val bankTitle = result.bankName ?: com.example.util.DeviceSmsReader.detectBankName(senderAddress ?: "", smsText) ?: "بانک"
 
         // 1. Create and persist ParsedSmsEntity in Room
         val parsedSmsEntity = ParsedSmsEntity(
             senderAddress = senderAddress ?: "",
-            bankName = result.bankName ?: result.merchantName.ifBlank { "بانک" },
+            bankName = bankTitle,
             rawSmsText = smsText,
             amountToman = result.amountToman,
             type = result.type,
@@ -221,14 +251,14 @@ class FinanceRepository private constructor(context: Context) {
         val newTransaction = Transaction(
             amountToman = result.amountToman,
             type = result.type,
-            categoryName = result.categoryName,
-            merchantName = result.merchantName,
+            categoryName = result.categoryName.ifBlank { "متفرقه" },
+            merchantName = result.merchantName.ifBlank { bankTitle },
             cardNumber = result.cardNumber ?: result.accountNumber?.let { "حساب:$it" },
             dateMillis = System.currentTimeMillis(),
             rawSmsText = smsText,
             isParsedFromSms = true,
             status = com.example.data.model.TransactionStatus.PENDING_APPROVAL,
-            bankName = result.bankName,
+            bankName = bankTitle,
             balanceAfterToman = result.balanceToman,
             senderNumber = senderAddress
         )
@@ -406,6 +436,47 @@ class FinanceRepository private constructor(context: Context) {
         if (txInDb?.status == com.example.data.model.TransactionStatus.CONFIRMED) return@withContext
         
         resolveAccountAndSyncBalance(transaction)
+    }
+
+    suspend fun approvePendingTransactionWithCategory(
+        transaction: Transaction,
+        newCategoryName: String
+    ) = withContext(Dispatchers.IO) {
+        val updated = transaction.copy(
+            categoryName = newCategoryName.ifBlank { "متفرقه" },
+            status = com.example.data.model.TransactionStatus.CONFIRMED
+        )
+        transactionDao.update(updated)
+        resolveAccountAndSyncBalance(updated)
+    }
+
+    suspend fun approveAllPendingTransactions() = withContext(Dispatchers.IO) {
+        val pendingList = transactionDao.getPendingTransactionsFlow().first()
+        for (pending in pendingList) {
+            approvePendingTransaction(pending)
+        }
+    }
+
+    suspend fun rejectPendingTransaction(transaction: Transaction) = withContext(Dispatchers.IO) {
+        transactionDao.deleteById(transaction.id)
+        if (!transaction.rawSmsText.isNullOrBlank()) {
+            val parsed = parsedSmsDao.findByRawText(transaction.rawSmsText)
+            if (parsed != null) {
+                parsedSmsDao.updateStatus(parsed.id, SmsProcessingStatus.REJECTED, null)
+            }
+        }
+    }
+
+    suspend fun clearAllTransactions() = withContext(Dispatchers.IO) {
+        transactionDao.clearAll()
+        parsedSmsDao.clearAll()
+    }
+
+    suspend fun clearPendingTransactions() = withContext(Dispatchers.IO) {
+        val pendingList = transactionDao.getPendingTransactionsFlow().first()
+        for (pending in pendingList) {
+            transactionDao.deleteById(pending.id)
+        }
     }
 
     suspend fun addTransaction(transaction: Transaction) = withContext(Dispatchers.IO) {

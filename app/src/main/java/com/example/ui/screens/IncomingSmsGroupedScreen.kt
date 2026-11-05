@@ -306,9 +306,12 @@ fun IncomingSmsGroupedScreen(
                                             var processedCount = 0
                                             selectedMsgs.forEach { msg ->
                                                 val parsed = SmsAiParser.parseSmsWithRegex(msg.body, msg.address)
+                                                if (parsed.amountToman <= 0 || com.example.util.DeviceSmsReader.isNonBankSender(msg.address)) {
+                                                    return@forEach
+                                                }
                                                 val bank = msg.detectedBank ?: "بانک"
                                                 val tx = Transaction(
-                                                    amountToman = if (parsed.amountToman > 0) parsed.amountToman else 1000L,
+                                                    amountToman = parsed.amountToman,
                                                     type = parsed.type,
                                                     categoryName = parsed.categoryName.ifBlank { "متفرقه" },
                                                     merchantName = parsed.merchantName.ifBlank { bank },
