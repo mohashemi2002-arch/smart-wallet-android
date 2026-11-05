@@ -153,4 +153,104 @@ class IranianBankSmsParserTest {
         assertEquals(5_306_800L, parsed.balanceToman)
         assertEquals("بانک ملی", parsed.bankName)
     }
+
+    @Test
+    fun testBankSaderatMosaedehAndDateParsing() {
+        val sms = """
+            مساعده: 158,472,000+
+            حساب:80001
+            مانده:219,118,075
+            15:38 - 0813
+        """.trimIndent()
+
+        val parsed = SmsAiParser.parseSmsWithRegex(sms, "BankSaderat")
+
+        // Crucial: Must parse 15,847,200 Toman, NOT 81 Toman!
+        assertEquals(15_847_200L, parsed.amountToman)
+        assertEquals(TransactionType.INCOME, parsed.type)
+        assertEquals("80001", parsed.accountNumber)
+        assertEquals(21_911_807L, parsed.balanceToman)
+        assertEquals("بانک صادرات", parsed.bankName)
+        assertNotNull(parsed.dateMillis)
+    }
+
+    @Test
+    fun testBankSaderatInternetPurchaseAndDateParsing() {
+        val sms = """
+            خريد اينترنتي: 200,000,000-
+            حساب:80001
+            مانده: 109,903,780
+            07:09 - 0628
+        """.trimIndent()
+
+        val parsed = SmsAiParser.parseSmsWithRegex(sms, "BankSaderat")
+
+        // Crucial: Must parse 20,000,000 Toman, NOT 62 Toman!
+        assertEquals(20_000_000L, parsed.amountToman)
+        assertEquals(TransactionType.EXPENSE, parsed.type)
+        assertEquals("80001", parsed.accountNumber)
+        assertEquals(10_990_378L, parsed.balanceToman)
+        assertEquals("بانک صادرات", parsed.bankName)
+        assertNotNull(parsed.dateMillis)
+    }
+
+    @Test
+    fun testBankSaderatTransferPlusFee() {
+        val sms = """
+            انتقال+کارمزد: 2,511,000-
+            حساب:80001
+            مانده: 326,528,780
+            11:10 - 0625
+        """.trimIndent()
+
+        val parsed = SmsAiParser.parseSmsWithRegex(sms, "BankSaderat")
+
+        // Crucial: Must parse 251,100 Toman, NOT 62 Toman!
+        assertEquals(251_100L, parsed.amountToman)
+        assertEquals(TransactionType.EXPENSE, parsed.type)
+        assertEquals("80001", parsed.accountNumber)
+        assertEquals(32_652_878L, parsed.balanceToman)
+        assertEquals("بانک صادرات", parsed.bankName)
+        assertNotNull(parsed.dateMillis)
+    }
+
+    @Test
+    fun testBankSaderatStandaloneAmount() {
+        val sms = """
+            بانك صادرات ايران
+            23,008,000-
+            حساب:80001
+            مانده:193,560,075
+            0814 - 00:16
+        """.trimIndent()
+
+        val parsed = SmsAiParser.parseSmsWithRegex(sms, "BankSaderat")
+
+        assertEquals(2_300_800L, parsed.amountToman)
+        assertEquals(TransactionType.EXPENSE, parsed.type)
+        assertEquals("80001", parsed.accountNumber)
+        assertEquals(19_356_007L, parsed.balanceToman)
+        assertEquals("بانک صادرات", parsed.bankName)
+        assertNotNull(parsed.dateMillis)
+    }
+
+    @Test
+    fun testBankMelliPayaIncome() {
+        val sms = """
+            بانك ملي ايران
+            پايا:400,000,000+
+            حساب:02003
+            مانده:400,094,974
+            0505-13:07
+        """.trimIndent()
+
+        val parsed = SmsAiParser.parseSmsWithRegex(sms, "09830009417")
+
+        assertEquals(40_000_000L, parsed.amountToman)
+        assertEquals(TransactionType.INCOME, parsed.type)
+        assertEquals("02003", parsed.accountNumber)
+        assertEquals(40_009_497L, parsed.balanceToman)
+        assertEquals("بانک ملی", parsed.bankName)
+        assertNotNull(parsed.dateMillis)
+    }
 }

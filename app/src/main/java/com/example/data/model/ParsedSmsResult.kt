@@ -11,6 +11,7 @@ data class ParsedSmsResult(
     val rawText: String,
     val balanceToman: Long? = null,
     val transactionTime: String? = null,
+    val dateMillis: Long? = null,
     val confidence: Float = 0.9f,
     val parsedByAi: Boolean = true
 )

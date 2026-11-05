@@ -191,7 +191,11 @@ class FinanceRepository private constructor(context: Context) {
         Pair(txCount, accCount)
     }
 
-    suspend fun processIncomingSms(smsText: String, senderAddress: String? = null): ParsedSmsResult = withContext(Dispatchers.IO) {
+    suspend fun processIncomingSms(
+        smsText: String,
+        senderAddress: String? = null,
+        smsTimestamp: Long? = null
+    ): ParsedSmsResult = withContext(Dispatchers.IO) {
         // 0. Strict filter: Discard non-bank senders and non-bank messages
         if (senderAddress != null && com.example.util.DeviceSmsReader.isNonBankSender(senderAddress)) {
             return@withContext ParsedSmsResult(
@@ -228,6 +232,7 @@ class FinanceRepository private constructor(context: Context) {
         }
 
         val bankTitle = result.bankName ?: com.example.util.DeviceSmsReader.detectBankName(senderAddress ?: "", smsText) ?: "بانک"
+        val finalDateMillis = result.dateMillis ?: (if (smsTimestamp != null && smsTimestamp > 0L) smsTimestamp else System.currentTimeMillis())
 
         // 1. Create and persist ParsedSmsEntity in Room
         val parsedSmsEntity = ParsedSmsEntity(
@@ -238,7 +243,7 @@ class FinanceRepository private constructor(context: Context) {
             type = result.type,
             cardNumber = result.cardNumber ?: result.accountNumber?.let { "حساب:$it" },
             balanceToman = result.balanceToman,
-            dateMillis = System.currentTimeMillis(),
+            dateMillis = finalDateMillis,
             transactionTimeText = result.transactionTime,
             categoryName = result.categoryName.ifBlank { "متفرقه" },
             merchantName = result.merchantName,
@@ -254,7 +259,7 @@ class FinanceRepository private constructor(context: Context) {
             categoryName = result.categoryName.ifBlank { "متفرقه" },
             merchantName = result.merchantName.ifBlank { bankTitle },
             cardNumber = result.cardNumber ?: result.accountNumber?.let { "حساب:$it" },
-            dateMillis = System.currentTimeMillis(),
+            dateMillis = finalDateMillis,
             rawSmsText = smsText,
             isParsedFromSms = true,
             status = com.example.data.model.TransactionStatus.PENDING_APPROVAL,
@@ -452,6 +457,7 @@ class FinanceRepository private constructor(context: Context) {
 
     suspend fun approveAllPendingTransactions() = withContext(Dispatchers.IO) {
         val pendingList = transactionDao.getPendingTransactionsFlow().first()
+            .sortedBy { it.dateMillis } // صعودی: از دورترین تاریخ به نزدیک‌ترین تاریخ
         for (pending in pendingList) {
             approvePendingTransaction(pending)
         }

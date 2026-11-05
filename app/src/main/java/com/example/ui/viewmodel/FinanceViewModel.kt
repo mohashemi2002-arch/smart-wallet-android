@@ -533,9 +533,18 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
                 return@launch
             }
 
+            // Sort messages chronologically from furthest/oldest to newest
+            val sortedMessages = deviceMessages.sortedBy { msg ->
+                com.example.util.JalaliCalendarHelper.parseBankSmsDateTime(msg.body) ?: msg.timestamp
+            }
+
             var processedCount = 0
-            for (msg in deviceMessages) {
-                val res = repository.processIncomingSms(smsText = msg.body, senderAddress = msg.address)
+            for (msg in sortedMessages) {
+                val res = repository.processIncomingSms(
+                    smsText = msg.body,
+                    senderAddress = msg.address,
+                    smsTimestamp = msg.timestamp
+                )
                 if (res.amountToman > 0) {
                     processedCount++
                 }

@@ -166,4 +166,80 @@ object JalaliCalendarHelper {
         if (jMonth <= 11) return 30
         return if (isLeapYear(jYear)) 30 else 29
     }
+
+    /**
+     * Parses bank SMS date and time from Iranian formats:
+     * - MMDD-HH:MM (e.g. 0730-17:23, 0803-15:28)
+     * - MMDD - HH:MM (e.g. 0814 - 00:16, 0813 - 21:06)
+     * - HH:MM - MMDD (e.g. 15:38 - 0813, 11:10 - 0625, 07:09 - 0628)
+     * - Explicit: 1403/07/30 17:23 or تاریخ: 1405/03/31 ساعت: 08:39:00
+     * - Compact: 14050330-23:19:50
+     */
+    fun parseBankSmsDateTime(smsText: String, fallbackMillis: Long = System.currentTimeMillis()): Long? {
+        val norm = SmsNormalizer.normalize(smsText)
+            .replace('–', '-')
+            .replace('—', '-')
+            .replace('−', '-')
+        val currentJalali = getJalaliDateFromMillis(fallbackMillis)
+        val currentYear = currentJalali.year
+
+        try {
+            // 1. Explicit full Jalali Date: 140x/MM/DD with optional time
+            val fullDateRegex = Regex("""(?:تاريخ|تاریخ)?\s*:?\s*(1[34]\d{2})[/-](0[1-9]|1[0-2])[/-](0[1-9]|[12]\d|3[01])""")
+            val fullDateMatch = fullDateRegex.find(norm)
+            if (fullDateMatch != null) {
+                val y = fullDateMatch.groupValues[1].toInt()
+                val m = fullDateMatch.groupValues[2].toInt()
+                val d = fullDateMatch.groupValues[3].toInt()
+                val timeRegex = Regex("""(?:ساعت)?\s*:?\s*(\d{2}):(\d{2})(?::(\d{2}))?""")
+                val timeMatch = timeRegex.find(norm)
+                val h = timeMatch?.groupValues?.getOrNull(1)?.toIntOrNull() ?: 12
+                val min = timeMatch?.groupValues?.getOrNull(2)?.toIntOrNull() ?: 0
+                val s = timeMatch?.groupValues?.getOrNull(3)?.toIntOrNull() ?: 0
+                return getMillisFromJalali(y, m, d, h, min, s)
+            }
+
+            // 2. Compact 14-digit Jalali timestamp: 14050330-23:19:50
+            val compactRegex = Regex("""(1[34]\d{2})(0[1-9]|1[0-2])([0-3]\d)-(\d{2}):(\d{2}):?(\d{2})?""")
+            val compactMatch = compactRegex.find(norm)
+            if (compactMatch != null) {
+                val y = compactMatch.groupValues[1].toInt()
+                val m = compactMatch.groupValues[2].toInt()
+                val d = compactMatch.groupValues[3].toInt()
+                val h = compactMatch.groupValues[4].toInt()
+                val min = compactMatch.groupValues[5].toInt()
+                val s = compactMatch.groupValues.getOrNull(6)?.toIntOrNull() ?: 0
+                return getMillisFromJalali(y, m, d, h, min, s)
+            }
+
+            // 3. HH:MM - MMDD (e.g. 15:38 - 0813, 11:10 - 0625, 07:09 - 0628)
+            val timeFirstRegex = Regex("""(\d{2}):(\d{2})\s*-\s*(0[1-9]|1[0-2])([0-3]\d)""")
+            val timeFirstMatch = timeFirstRegex.find(norm)
+            if (timeFirstMatch != null) {
+                val h = timeFirstMatch.groupValues[1].toInt()
+                val min = timeFirstMatch.groupValues[2].toInt()
+                val m = timeFirstMatch.groupValues[3].toInt()
+                val d = timeFirstMatch.groupValues[4].toInt()
+                val y = if (m > currentJalali.month + 1) currentYear - 1 else currentYear
+                return getMillisFromJalali(y, m, d, h, min, 0)
+            }
+
+            // 4. MMDD - HH:MM or MMDD-HH:MM (e.g. 0730-17:23, 0814 - 00:16, 0803-15:28)
+            val dateFirstRegex = Regex("""(0[1-9]|1[0-2])([0-3]\d)\s*-\s*(\d{2}):(\d{2})(?::(\d{2}))?""")
+            val dateFirstMatch = dateFirstRegex.find(norm)
+            if (dateFirstMatch != null) {
+                val m = dateFirstMatch.groupValues[1].toInt()
+                val d = dateFirstMatch.groupValues[2].toInt()
+                val h = dateFirstMatch.groupValues[3].toInt()
+                val min = dateFirstMatch.groupValues[4].toInt()
+                val s = dateFirstMatch.groupValues.getOrNull(5)?.toIntOrNull() ?: 0
+                val y = if (m > currentJalali.month + 1) currentYear - 1 else currentYear
+                return getMillisFromJalali(y, m, d, h, min, s)
+            }
+        } catch (e: Exception) {
+            // Ignore format error and fallback
+        }
+
+        return null
+    }
 }

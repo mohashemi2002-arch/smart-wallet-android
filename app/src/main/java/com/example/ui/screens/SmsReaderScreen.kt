@@ -662,13 +662,20 @@ private fun PendingTransactionReviewCard(
                             style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
                             color = MaterialTheme.colorScheme.onSurface
                         )
-                        if (!transaction.cardNumber.isNullOrBlank()) {
-                            Text(
-                                text = transaction.cardNumber,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                        val jDate = remember(transaction.dateMillis) {
+                            com.example.util.JalaliCalendarHelper.getJalaliDateFromMillis(transaction.dateMillis)
                         }
+                        val cal = remember(transaction.dateMillis) {
+                            java.util.Calendar.getInstance().apply { timeInMillis = transaction.dateMillis }
+                        }
+                        val timeStr = remember(transaction.dateMillis) {
+                            String.format("%02d:%02d", cal.get(java.util.Calendar.HOUR_OF_DAY), cal.get(java.util.Calendar.MINUTE))
+                        }
+                        Text(
+                            text = "${jDate.day} ${jDate.monthName} - ساعت $timeStr${if (!transaction.cardNumber.isNullOrBlank()) " (${transaction.cardNumber})" else ""}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
 

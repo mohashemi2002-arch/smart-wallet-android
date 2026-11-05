@@ -81,42 +81,63 @@ object SmsAiParser {
         }
 
         // 4. Extract Amount & Sign (+ or -)
-        // Check for Signed transaction lines:
-        // Examples:
-        // - پايانه فروش: 1,200,000-
-        // - انتقال:2,991,000-
-        // - يارانه:3,000,000+
-        // - حواله پل:50,000,000+
-        // - 3,008,000-
-        // - 20,014,500-
-        // - 15,000,000+
-        val labeledSignedPattern = Pattern.compile("(?:مبلغ|مبلغ:|واریز|برداشت|انتقال|انتقالی|انتقالي|خرید|خريد|حواله پل|یارانه|يارانه|اصلاحی|اصلاحي|پایانه فروش|پايانه فروش|پایا|ساتنا)\\s*:?\\s*([+-])?\\s*([0-9,٫]+)\\s*([+-])?\\s*(ریال|تومان|Rial)?")
+        // First extract date & time to prevent any date digits from matching amounts
+        val parsedDateMillis = com.example.util.JalaliCalendarHelper.parseBankSmsDateTime(normalizedText)
+
+        // Comprehensive labeled pattern covering all Iranian banking keywords:
+        val labeledSignedPattern = Pattern.compile(
+            "(?:مساعده|پايانه فروش|پایانه فروش|خرید اینترنتی|خريد اينترنتي|خريداينترنتي|خرید شارژ|خريد شارژ|" +
+            "انتقال\\s*\\+\\s*کارمزد|انتقال|انتقالی|انتقالي|حواله پل|حواله پایا|پایا|پايا|ساتنا|شرح آزاد|" +
+            "واریز حقوق|واريز حقوق|یارانه|يارانه|برداشت|واریز|واريز|خرید|خريد|مبلغ|اصلاحی|اصلاحي)" +
+            "\\s*:?\\s*([+-])?\\s*([0-9,٫]+)\\s*([+-])?\\s*(ریال|تومان|Rial)?",
+            Pattern.CASE_INSENSITIVE
+        )
         val labeledMatcher = labeledSignedPattern.matcher(normalizedText)
 
-        // Standalone signed number line: e.g. "3,008,000-" or "15,000,000+" or "-20,000,000"
-        val standaloneSignedPattern = Pattern.compile("(?:^|\\n)\\s*([+-])?\\s*([0-9]{1,3}(?:,[0-9]{3})+|[0-9]{4,12})\\s*([+-])\\s*(?:ریال|تومان|Rial)?", Pattern.MULTILINE)
-        val standaloneMatcher = standaloneSignedPattern.matcher(normalizedText)
-
-        val prefixSignedPattern = Pattern.compile("(?:^|\\n)\\s*([+-])\\s*([0-9]{1,3}(?:,[0-9]{3})+|[0-9]{4,12})\\s*(?:ریال|تومان|Rial)?", Pattern.MULTILINE)
-        val prefixMatcher = prefixSignedPattern.matcher(normalizedText)
-
-        val matched = when {
-            labeledMatcher.find() -> labeledMatcher
-            standaloneMatcher.find() -> standaloneMatcher
-            prefixMatcher.find() -> prefixMatcher
-            else -> null
+        // Standalone signed number line: e.g. " 23,008,000-" or "3,008,000-" or "15,000,000+"
+        // Must contain comma grouping OR be at least 5 digits, and NOT contain colon ':' (to avoid timestamps)
+        var standaloneMatchedGroup: MatchResult? = null
+        val hasLabeledMatch = labeledMatcher.find()
+        if (!hasLabeledMatch) {
+            val lines = normalizedText.lines()
+            for (line in lines) {
+                val trimmed = line.trim()
+                // Ignore lines containing ':' (timestamps like 15:38, accounts like حساب:80001, etc.)
+                if (trimmed.contains(":") || trimmed.contains("حساب") || trimmed.contains("مانده") || trimmed.contains("موجودی") || trimmed.contains("کارت")) {
+                    continue
+                }
+                // Check if this line is a signed amount: e.g. "23,008,000-", "+15,000,000", "3,008,000 -"
+                val standaloneRegex = Regex("""^([+-])?\s*([0-9]{1,3}(?:,[0-9]{3})+|[0-9]{5,12})\s*([+-])?\s*(?:ریال|تومان|Rial)?$""")
+                val m = standaloneRegex.find(trimmed)
+                if (m != null) {
+                    val sign1 = m.groupValues[1]
+                    val sign2 = m.groupValues[3]
+                    if (sign1.isNotEmpty() || sign2.isNotEmpty()) {
+                        standaloneMatchedGroup = m
+                        break
+                    }
+                }
+            }
         }
 
-        if (matched != null) {
-            val signBefore = matched.group(1)
-            val rawNum = matched.group(2)?.replace(",", "")?.replace("٫", "") ?: "0"
-            val signAfter = try { matched.group(3) } catch (e: Exception) { null }
-            val unit = try { matched.group(4) ?: "ریال" } catch (e: Exception) { "ریال" }
+        if (hasLabeledMatch) {
+            val fullMatch = labeledMatcher.group(0) ?: ""
+            val signBefore = labeledMatcher.group(1)
+            val rawNum = labeledMatcher.group(2)?.replace(",", "")?.replace("٫", "") ?: "0"
+            val signAfter = try { labeledMatcher.group(3) } catch (e: Exception) { null }
+            val unit = try { labeledMatcher.group(4) ?: "ریال" } catch (e: Exception) { "ریال" }
 
             if (signBefore == "+" || signAfter == "+") {
                 explicitSignType = TransactionType.INCOME
             } else if (signBefore == "-" || signAfter == "-") {
                 explicitSignType = TransactionType.EXPENSE
+            } else {
+                // Infer from keyword
+                if (fullMatch.contains("واریز") || fullMatch.contains("واريز") || fullMatch.contains("مساعده") || fullMatch.contains("یارانه") || fullMatch.contains("يارانه") || fullMatch.contains("حقوق") || fullMatch.contains("شرح آزاد")) {
+                    explicitSignType = TransactionType.INCOME
+                } else if (fullMatch.contains("برداشت") || fullMatch.contains("خرید") || fullMatch.contains("خريد") || fullMatch.contains("فروش") || fullMatch.contains("شارژ")) {
+                    explicitSignType = TransactionType.EXPENSE
+                }
             }
 
             val parsedVal = rawNum.toLongOrNull() ?: 0L
@@ -125,6 +146,19 @@ object SmsAiParser {
             } else {
                 parsedVal / 10L
             }
+        } else if (standaloneMatchedGroup != null) {
+            val sign1 = standaloneMatchedGroup.groupValues[1]
+            val rawNum = standaloneMatchedGroup.groupValues[2].replace(",", "").replace("٫", "")
+            val sign2 = standaloneMatchedGroup.groupValues[3]
+
+            if (sign1 == "+" || sign2 == "+") {
+                explicitSignType = TransactionType.INCOME
+            } else if (sign1 == "-" || sign2 == "-") {
+                explicitSignType = TransactionType.EXPENSE
+            }
+
+            val parsedVal = rawNum.toLongOrNull() ?: 0L
+            amountToman = parsedVal / 10L // Bank Saderat standalone amounts are in Rials
         }
 
         // 5. Extract Balance (مانده حساب)
@@ -138,7 +172,7 @@ object SmsAiParser {
         }
 
         // 6. Determine Transaction Type (Expense vs Income)
-        val incomeKeywords = listOf("واریز", "افزایش", "طلبکار", "به حساب", "به کارت", "انتقال به", "بازگشت", "سود", "پایا به", "یارانه", "يارانه")
+        val incomeKeywords = listOf("واریز", "افزایش", "طلبکار", "به حساب", "به کارت", "انتقال به", "بازگشت", "سود", "پایا به", "یارانه", "يارانه", "مساعده", "حقوق", "شرح آزاد")
         val expenseKeywords = listOf("برداشت", "خرید", "خريد", "کسر", "بدهکار", "از حساب", "از کارت", "انتقال از", "پرداخت", "پایانه فروش", "پايانه فروش")
         val hasIncomeWord = incomeKeywords.any { normalizedText.contains(it) }
         val hasExpenseWord = expenseKeywords.any { normalizedText.contains(it) }
@@ -148,7 +182,7 @@ object SmsAiParser {
         } else if (hasExpenseWord && !hasIncomeWord) {
             TransactionType.EXPENSE
         } else if (hasIncomeWord) {
-            if (normalizedText.contains("واریز") || normalizedText.contains("یارانه")) TransactionType.INCOME else TransactionType.EXPENSE
+            if (normalizedText.contains("واریز") || normalizedText.contains("یارانه") || normalizedText.contains("مساعده")) TransactionType.INCOME else TransactionType.EXPENSE
         } else {
             TransactionType.EXPENSE
         }
@@ -180,10 +214,10 @@ object SmsAiParser {
         val categoryDictionary = mapOf(
             "حمل و نقل" to listOf("اسنپ", "تپسی", "ماکسیم", "قطار", "بلیط", "هواپیما", "snapp", "tapsi", "مترو"),
             "خوراکی و سوپرمارکت" to listOf("هایپر", "سوپر", "کافه", "رستوران", "نان", "شیرینی", "افق کوروش", "جانبو", "میوه"),
-            "پوشاک و خرید" to listOf("دیجی‌کالا", "digikala", "فروشگاه", "پوشاک", "لباس", "کفش", "کیف", "پایانه فروش", "پايانه فروش"),
+            "پوشاک و خرید" to listOf("دیجی‌کالا", "digikala", "فروشگاه", "پوشاک", "لباس", "کفش", "کیف", "پایانه فروش", "پايانه فروش", "خرید اینترنتی", "خريد اينترنتي", "خريداينترنتي"),
             "سلامت و درمان" to listOf("داروخانه", "بیمارستان", "مطب", "دکتر", "آزمایشگاه", "درمانگاه"),
             "قبوض و خدمات" to listOf("شارژ", "همراه اول", "ایرانسل", "رایتل", "برق", "آب", "گاز", "تلفن", "قبض"),
-            "درآمد و حقوق" to listOf("حقوق", "دستمزد", "پاداش", "سود", "یارانه", "يارانه"),
+            "درآمد و حقوق" to listOf("حقوق", "دستمزد", "پاداش", "سود", "یارانه", "يارانه", "مساعده"),
         )
         var merchant = if (type == TransactionType.INCOME) "واریزکننده نامشخص" else "فروشگاه/پایانه نامشخص"
         var category = if (type == TransactionType.INCOME) "درآمد و حقوق" else "متفرقه"
@@ -208,6 +242,7 @@ object SmsAiParser {
             rawText = smsText,
             balanceToman = balanceToman,
             transactionTime = transactionTime,
+            dateMillis = parsedDateMillis,
             confidence = 0.95f,
             parsedByAi = false
         )

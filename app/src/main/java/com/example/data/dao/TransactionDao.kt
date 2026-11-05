@@ -9,7 +9,7 @@ interface TransactionDao {
     @Query("SELECT * FROM transactions ORDER BY dateMillis DESC")
     fun getAllTransactions(): Flow<List<Transaction>>
     
-    @Query("SELECT * FROM transactions WHERE status = 'PENDING_APPROVAL' ORDER BY dateMillis DESC")
+    @Query("SELECT * FROM transactions WHERE status = 'PENDING_APPROVAL' ORDER BY dateMillis ASC")
     fun getPendingTransactionsFlow(): Flow<List<Transaction>>
 
     @Query("SELECT * FROM transactions WHERE status = 'CONFIRMED' ORDER BY dateMillis DESC")
